@@ -647,7 +647,7 @@ module slamm::slamm_tests {
     }
     
     #[test]
-    fun test_slamm_fees() {
+    fun test_slamm_fees_path_independence() {
         let mut scenario = test_scenario::begin(ADMIN);
 
         // Init Pool

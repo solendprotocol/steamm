@@ -1,5 +1,8 @@
 module slamm::pool {
+    use std::option::none;
+    use sui::bag::{Self, Bag};
     use sui::tx_context::sender;
+    use sui::clock::Clock;
     use sui::coin::{Self, Coin};
     use sui::balance::{Self, Balance, Supply};
     use slamm::events::emit_event;
@@ -7,6 +10,8 @@ module slamm::pool {
     use slamm::math::{safe_mul_div_u64};
     use slamm::global_admin::GlobalAdmin;
     use slamm::fees::{Self, Fees, FeeData};
+    use slamm::lend::{Self, LendingConfig, LendingRequirements};
+    use suilend::lending_market::{Self, LendingMarket};
     
     public use fun slamm::cpmm::deposit_liquidity as Pool.cpmm_deposit;
     public use fun slamm::cpmm::redeem_liquidity as Pool.cpmm_redeem;
@@ -49,6 +54,10 @@ module slamm::pool {
         protocol_fees: Fees<A, B>,
         pool_fees: FeeData,
         trading_data: TradingData,
+        lending_a: Option<Lending>,
+        lending_b: Option<Lending>,
+        /// We store 
+        fields: Bag,
     }
 
     public struct TradingData has store {
@@ -58,6 +67,11 @@ module slamm::pool {
         // swap b2a
         swap_a_out_amount: u128,
         swap_b_in_amount: u128,
+    }
+
+    public struct Lending has store {
+        lent: u64,
+        requirements: LendingRequirements
     }
     
     // ===== Public Methods =====
@@ -87,6 +101,9 @@ module slamm::pool {
                 swap_a_out_amount: 0,
                 swap_b_in_amount: 0,
             },
+            lending_a: none(),
+            lending_b: none(),
+            fields: bag::new(ctx),
         };
 
         registry.add_amm(&pool);
@@ -107,6 +124,62 @@ module slamm::pool {
         );
 
         (pool, pool_cap)
+    }
+
+    public fun init_lending<A, B, Hook: drop, State: store, P>(
+        self: &mut Pool<A, B, Hook, State>,
+        _: &PoolCap<A, B, Hook>,
+        config: &LendingConfig,
+        is_a: bool,
+        clock: &Clock,
+    ) {
+        config.assert_p_type<P>();
+
+        if (is_a) {
+            assert!(self.lending_a.is_none(), 0);
+            config.assert_coin_type<A>();
+
+            self.lending_a.fill(
+                Lending {
+                    lent: 0,
+                    requirements: config.new_requirements(clock),
+            });
+
+        } else {
+            assert!(self.lending_b.is_none(), 0);
+            config.assert_coin_type<B>();
+
+            self.lending_b.fill(
+                Lending {
+                    lent: 0,
+                    requirements: config.new_requirements(clock),
+            });
+        }
+    }
+
+    public fun set_lending_requirements<A, B, Hook: drop, State: store>(
+        self: &mut Pool<A, B, Hook, State>,
+        config: &LendingConfig,
+        is_a: bool,
+        clock: &Clock,
+    ) {
+        if (is_a) {
+            assert!(self.lending_a.is_some(), 0);
+            
+            let lending_a = self.lending_a.borrow_mut();
+            assert!(lending_a.requirements.config_id() == object::id(config), 0);
+
+            lending_a.requirements.sync_liquidity_ratio(config, clock);
+
+
+        } else {
+            assert!(self.lending_b.is_some(), 0);
+            
+            let lending_b = self.lending_b.borrow_mut();
+            assert!(lending_b.requirements.config_id() == object::id(config), 0);
+
+            lending_b.requirements.sync_liquidity_ratio(config, clock);
+        }
     }
 
     public fun swap<A, B, Hook: drop, State: store>(
