@@ -11,6 +11,8 @@ module slamm::pool {
     use slamm::global_admin::GlobalAdmin;
     use slamm::fees::{Self, Fees, FeeData};
     use slamm::lend::{Self, LendingConfig, LendingRequirements};
+    use suilend::lending_market::LendingMarket;
+    use suilend::reserve::{CToken};
     
     public use fun slamm::cpmm::deposit_liquidity as Pool.cpmm_deposit;
     public use fun slamm::cpmm::redeem_liquidity as Pool.cpmm_redeem;
@@ -123,62 +125,6 @@ module slamm::pool {
         );
 
         (pool, pool_cap)
-    }
-
-    public fun init_lending<A, B, Hook: drop, State: store, P>(
-        self: &mut Pool<A, B, Hook, State>,
-        _: &PoolCap<A, B, Hook>,
-        config: &LendingConfig,
-        is_a: bool,
-        clock: &Clock,
-    ) {
-        config.assert_p_type<P>();
-
-        if (is_a) {
-            assert!(self.lending_a.is_none(), 0);
-            config.assert_coin_type<A>();
-
-            lend::add_c_token_field<P, A>(&mut self.fields);
-
-            self.lending_a.fill(
-                Lending {
-                    lent: 0,
-                    requirements: config.new_requirements(clock),
-            });
-
-        } else {
-            assert!(self.lending_b.is_none(), 0);
-            config.assert_coin_type<B>();
-
-            lend::add_c_token_field<P, B>(&mut self.fields);
-
-            self.lending_b.fill(
-                Lending {
-                    lent: 0,
-                    requirements: config.new_requirements(clock),
-            });
-        }
-    }
-
-    public fun set_lending_requirements<A, B, Hook: drop, State: store>(
-        self: &mut Pool<A, B, Hook, State>,
-        config: &LendingConfig,
-        is_a: bool,
-        clock: &Clock,
-    ) {
-        if (is_a) {
-            assert!(self.lending_a.is_some(), 0);
-            
-            let lending_a = self.lending_a.borrow_mut();
-            lending_a.requirements.sync_liquidity_ratio(config, clock);
-
-
-        } else {
-            assert!(self.lending_b.is_some(), 0);
-            
-            let lending_b = self.lending_b.borrow_mut();
-            lending_b.requirements.sync_liquidity_ratio(config, clock);
-        }
     }
 
     public fun swap<A, B, Hook: drop, State: store>(
@@ -361,6 +307,142 @@ module slamm::pool {
         (net_amount_in, protocol_fees, pool_fees)
     }
 
+    // ===== Public Lending functions =====
+
+    public fun init_lending<A, B, Hook: drop, State: store, P>(
+        self: &mut Pool<A, B, Hook, State>,
+        _: &PoolCap<A, B, Hook>,
+        config: &LendingConfig,
+        is_a: bool,
+        clock: &Clock,
+    ) {
+        config.assert_p_type<P>();
+
+        if (is_a) {
+            assert!(self.lending_a.is_none(), 0);
+            config.assert_coin_type<A>();
+
+            lend::add_c_token_field<P, A>(&mut self.fields);
+
+            self.lending_a.fill(
+                Lending {
+                    lent: 0,
+                    requirements: config.new_requirements(clock),
+            });
+
+        } else {
+            assert!(self.lending_b.is_none(), 0);
+            config.assert_coin_type<B>();
+
+            lend::add_c_token_field<P, B>(&mut self.fields);
+
+            self.lending_b.fill(
+                Lending {
+                    lent: 0,
+                    requirements: config.new_requirements(clock),
+            });
+        }
+    }
+
+    public fun set_lending_requirements<A, B, Hook: drop, State: store>(
+        self: &mut Pool<A, B, Hook, State>,
+        config: &LendingConfig,
+        is_a: bool,
+        clock: &Clock,
+    ) {
+        if (is_a) {
+            assert!(self.lending_a.is_some(), 0);
+            
+            let lending_a = self.lending_a.borrow_mut();
+            lending_a.requirements.sync_liquidity_ratio(config, clock);
+
+
+        } else {
+            assert!(self.lending_b.is_some(), 0);
+            
+            let lending_b = self.lending_b.borrow_mut();
+            lending_b.requirements.sync_liquidity_ratio(config, clock);
+        }
+    }
+
+    public fun lend<A, B, Hook: drop, State: store, P>(
+        self: &mut Pool<A, B, Hook, State>,
+        amount: u64,
+        lend_a: bool,
+        lending_market: &mut LendingMarket<P>, 
+        reserve_array_index: u64,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        if (lend_a) {
+            let balance_to_lend = self.reserve_a.split(amount);
+
+            let c_tokens = lending_market.deposit_liquidity_and_mint_ctokens<P, A>(
+                reserve_array_index,
+                clock,
+                coin::from_balance(balance_to_lend, ctx),
+                ctx,
+            );
+
+            self.lending_a.borrow_mut().lent = self.lending_a.borrow().lent + amount;
+            lend::deposit_c_tokens(&mut self.fields, c_tokens.into_balance());
+        } else {
+            let balance_to_lend = self.reserve_b.split(amount);
+            
+            let c_tokens = lending_market.deposit_liquidity_and_mint_ctokens<P, B>(
+                reserve_array_index,
+                clock,
+                coin::from_balance(balance_to_lend, ctx),
+                ctx,
+            );
+
+            self.lending_b.borrow_mut().lent = self.lending_b.borrow().lent + amount;
+            lend::deposit_c_tokens(&mut self.fields, c_tokens.into_balance());
+        };
+    }
+
+    public fun recall_loaned<A, B, Hook: drop, State: store, P>(
+        self: &mut Pool<A, B, Hook, State>,
+        amount: u64,
+        recall_a: bool,
+        lending_market: &mut LendingMarket<P>, 
+        reserve_array_index: u64,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        if (recall_a) {
+            let ctokens: Coin<CToken<P, A>> = coin::from_balance(lend::withdraw_c_tokens(&mut self.fields, amount), ctx);
+
+            let coin_a = lending_market.redeem_ctokens_and_withdraw_liquidity(
+                reserve_array_index,
+                clock,
+                ctokens,
+                none(), // rate_limiter_exemption
+                ctx,
+            );
+
+            self.lending_a.borrow_mut().lent = self.lending_a.borrow().lent - amount;
+
+            self.reserve_a.join(coin_a.into_balance());
+
+        } else {
+            let ctokens: Coin<CToken<P, B>> = coin::from_balance(lend::withdraw_c_tokens(&mut self.fields, amount), ctx);
+
+            let coin_b = lending_market.redeem_ctokens_and_withdraw_liquidity(
+                reserve_array_index,
+                clock,
+                ctokens,
+                none(), // rate_limiter_exemption
+                ctx,
+            );
+
+            self.lending_b.borrow_mut().lent = self.lending_a.borrow().lent - amount;
+
+            self.reserve_b.join(coin_b.into_balance());
+        }
+    }
+    
+    
     // ===== View & Getters =====
     
     public fun full_reserves<A, B, Hook: drop, State: store>(self: &Pool<A, B, Hook, State>): (u64, u64) {
