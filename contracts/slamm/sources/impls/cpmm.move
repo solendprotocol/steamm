@@ -73,7 +73,7 @@ module slamm::cpmm {
 
         // We consider the liquidity available for trading
         // as well as the net accumulated fees, as these belong to LPs
-        let (reserve_a, reserve_b) = self.reserves();
+        let (reserve_a, reserve_b) = self.full_reserves();
 
         // 1. Compute token deposits and delta lp tokens
         let (deposit_a, deposit_b, lp_tokens) = if (is_initial_deposit) {
@@ -132,7 +132,7 @@ module slamm::cpmm {
 
         // We consider the liquidity available for trading
         // as well as the net accumulated fees, as these belong to LPs
-        let (reserve_a, reserve_b) = self.reserves();
+        let (reserve_a, reserve_b) = self.full_reserves();
 
         // 1. Compute amounts to withdraw
         let (withdraw_a, withdraw_b) = quote_redeem_(
@@ -197,7 +197,7 @@ module slamm::cpmm {
         amount_in: u64,
         a2b: bool,
     ): SwapQuote {
-        let (reserve_a, reserve_b) = self.reserves();
+        let (reserve_a, reserve_b) = self.full_reserves();
         let (net_amount_in, protocol_fees, admin_fees) = self.net_amount_in(amount_in);
 
         let amount_out = if (a2b) {
@@ -232,7 +232,7 @@ module slamm::cpmm {
     ): DepositQuote {
         // We need to consider the liquidity available for trading
         // as well as the net accumulated fees, as these belong to LPs
-        let (reserve_a, reserve_b) = self.reserves();
+        let (reserve_a, reserve_b) = self.full_reserves();
 
         let (deposit_a, deposit_b, lp_tokens) = quote_deposit_(
             reserve_a,
@@ -257,7 +257,7 @@ module slamm::cpmm {
     ): RedeemQuote {
         // We need to consider the liquidity available for trading
         // as well as the net accumulated fees, as these belong to LPs
-        let (reserve_a, reserve_b) = self.reserves();
+        let (reserve_a, reserve_b) = self.full_reserves();
 
         // Compute amounts to withdraw
         let (withdraw_a, withdraw_b) = quote_redeem_(
@@ -387,7 +387,7 @@ module slamm::cpmm {
     
 
     fun update_invariant<A, B, W: drop>(self: &mut Pool<A, B, Hook<W>, State>): u128 {
-        let (reserve_a, reserve_b) = self.reserves();
+        let (reserve_a, reserve_b) = self.full_reserves();
         self.inner_mut().k = (reserve_a as u128) * (reserve_b as u128);
         
         self.inner().k
