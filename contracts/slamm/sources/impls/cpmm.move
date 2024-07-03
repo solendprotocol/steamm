@@ -6,7 +6,7 @@ module slamm::cpmm {
     use slamm::registry::{Registry};
     use slamm::math::{safe_mul_div_u64};
     use slamm::pool::{Self, Pool, PoolCap, LP, DepositResult, SwapResult};
-    use slamm::quote::{Self, SwapQuote, DepositQuote, RedeemQuote};
+    use slamm::quote::{Self, SwapQuote, DepositQuote, RedeemQuote, Intent};
 
     // Consts
     const MINIMUM_LIQUIDITY: u64 = 10;
@@ -167,20 +167,51 @@ module slamm::cpmm {
         a2b: bool,
         ctx: &mut TxContext,
     ): SwapResult {
-        let quote = quote_swap(
+        let intent = intent_swap(
             self,
             amount_in,
             a2b,
         );
 
+        execute_swap(self, intent, coin_a, coin_b, min_amount_out, ctx)
+    }
+
+    // ===== Intent Functions =====
+
+    public fun intent_swap<A, B, W: drop>(
+        self: &Pool<A, B, Hook<W>, State>,
+        amount_in: u64,
+        a2b: bool,
+    ): Intent<SwapQuote, A, B, Hook<W>> {
+        let quote = quote_swap(self, amount_in, a2b);
+
+        let (amount_a, a_in, amount_b, b_in) = quote.flatten();
+
+        let (lending_action_a, lending_action_b) = self.compute_lending_actions(
+            amount_a, amount_b, a_in, b_in
+        );
+
+        quote.as_intent(
+            lending_action_a,
+            lending_action_b,
+            Hook<W> {},
+        )
+    }
+    
+    public fun execute_swap<A, B, W: drop>(
+        self: &mut Pool<A, B, Hook<W>, State>,
+        intent: Intent<SwapQuote, A, B, Hook<W>>,
+        coin_a: &mut Coin<A>,
+        coin_b: &mut Coin<B>,
+        min_amount_out: u64,
+        ctx: &mut TxContext,
+    ): SwapResult {
         let response = self.swap(
             Hook<W> {},
             coin_a,
             coin_b,
-            amount_in,
-            quote.amount_out(),
+            intent,
             min_amount_out,
-            a2b,
             ctx,
         );
 
@@ -189,7 +220,8 @@ module slamm::cpmm {
 
         response
     }
-
+    
+    
     // ===== View & Getters =====
 
     public fun quote_swap<A, B, W: drop>(

@@ -10,7 +10,8 @@ module slamm::pool {
     use slamm::math::{safe_mul_div_u64};
     use slamm::global_admin::GlobalAdmin;
     use slamm::fees::{Self, Fees, FeeData};
-    use slamm::lend::{Self, LendingConfig, LendingRequirements};
+    use slamm::lend::{Self, Lending, LendingConfig, LendingRequirements, LendingAction};
+    use slamm::quote::{Self, Intent, SwapQuote};
     use suilend::lending_market::LendingMarket;
     use suilend::reserve::{CToken};
     
@@ -57,8 +58,6 @@ module slamm::pool {
         trading_data: TradingData,
         lending_a: Option<Lending>,
         lending_b: Option<Lending>,
-        /// We store 
-        fields: Bag,
     }
 
     public struct TradingData has store {
@@ -70,10 +69,10 @@ module slamm::pool {
         swap_b_in_amount: u128,
     }
 
-    public struct Lending has store {
-        lent: u64,
-        requirements: LendingRequirements
-    }
+    // public struct Lending has store {
+    //     lent: u64,
+    //     requirements: LendingRequirements
+    // }
     
     // ===== Public Methods =====
 
@@ -104,7 +103,6 @@ module slamm::pool {
             },
             lending_a: none(),
             lending_b: none(),
-            fields: bag::new(ctx),
         };
 
         registry.add_amm(&pool);
@@ -127,18 +125,22 @@ module slamm::pool {
         (pool, pool_cap)
     }
 
+    
     public fun swap<A, B, Hook: drop, State: store>(
         self: &mut Pool<A, B, Hook, State>,
         _witness: Hook,
         coin_a: &mut Coin<A>,
         coin_b: &mut Coin<B>,
-        amount_in: u64,
-        amount_out: u64,
+        swap_intent: Intent<SwapQuote, A, B, Hook>,
         min_amount_out: u64,
-        a2b: bool,
         ctx: &mut TxContext,
     ): SwapResult {
-        assert!(amount_out > min_amount_out, ESwapExceedsSlippage);
+        let quote = swap_intent.quote();
+        let amount_in = quote.amount_in();
+        let amount_out = quote.amount_out();
+        let a2b = quote.a2b();
+
+        assert!(quote.amount_out() > min_amount_out, ESwapExceedsSlippage);
         
         let (protocol_fee_num, protocol_fee_denom) = self.protocol_fees.fee_ratio();
         let (admin_fee_num, admin_fee_denom) = self.pool_fees.fee_ratio();
@@ -204,6 +206,8 @@ module slamm::pool {
         };
 
         emit_event(result);
+
+        quote::consume_intent(swap_intent);
 
         result
     }
@@ -315,6 +319,7 @@ module slamm::pool {
         config: &LendingConfig,
         is_a: bool,
         clock: &Clock,
+        ctx: &mut TxContext,
     ) {
         config.assert_p_type<P>();
 
@@ -322,25 +327,17 @@ module slamm::pool {
             assert!(self.lending_a.is_none(), 0);
             config.assert_coin_type<A>();
 
-            lend::add_c_token_field<P, A>(&mut self.fields);
-
             self.lending_a.fill(
-                Lending {
-                    lent: 0,
-                    requirements: config.new_requirements(clock),
-            });
+                lend::new<P, A>(config, clock, ctx)
+            );
 
         } else {
             assert!(self.lending_b.is_none(), 0);
             config.assert_coin_type<B>();
 
-            lend::add_c_token_field<P, B>(&mut self.fields);
-
-            self.lending_b.fill(
-                Lending {
-                    lent: 0,
-                    requirements: config.new_requirements(clock),
-            });
+            self.lending_a.fill(
+                lend::new<P, B>(config, clock, ctx)
+            );
         }
     }
 
@@ -354,106 +351,50 @@ module slamm::pool {
             assert!(self.lending_a.is_some(), 0);
             
             let lending_a = self.lending_a.borrow_mut();
-            lending_a.requirements.sync_liquidity_ratio(config, clock);
+            lending_a.sync_liquidity_ratio(config, clock);
 
 
         } else {
             assert!(self.lending_b.is_some(), 0);
             
             let lending_b = self.lending_b.borrow_mut();
-            lending_b.requirements.sync_liquidity_ratio(config, clock);
+            lending_b.sync_liquidity_ratio(config, clock);
         }
     }
 
-    public fun lend<A, B, Hook: drop, State: store, P>(
+    public fun rebalance_lending<A, B, Hook: drop, State: store, P, IntentOp>(
         self: &mut Pool<A, B, Hook, State>,
-        amount: u64,
-        lend_a: bool,
+        amm_intent: &Intent<IntentOp, A, B, Hook>,
         lending_market: &mut LendingMarket<P>, 
         reserve_array_index: u64,
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        if (lend_a) {
-            let balance_to_lend = self.reserve_a.split(amount);
-
-            let c_tokens = lending_market.deposit_liquidity_and_mint_ctokens<P, A>(
-                reserve_array_index,
-                clock,
-                coin::from_balance(balance_to_lend, ctx),
-                ctx,
-            );
-
-            self.lending_a.borrow_mut().lent = self.lending_a.borrow().lent + amount;
-            lend::deposit_c_tokens(&mut self.fields, c_tokens.into_balance());
-        } else {
-            let balance_to_lend = self.reserve_b.split(amount);
-            
-            let c_tokens = lending_market.deposit_liquidity_and_mint_ctokens<P, B>(
-                reserve_array_index,
-                clock,
-                coin::from_balance(balance_to_lend, ctx),
-                ctx,
-            );
-
-            self.lending_b.borrow_mut().lent = self.lending_b.borrow().lent + amount;
-            lend::deposit_c_tokens(&mut self.fields, c_tokens.into_balance());
-        };
+        lend::rebalance_lending(
+            &mut self.reserve_a,
+            &mut self.reserve_b,
+            &mut self.lending_a,
+            &mut self.lending_b,
+            amm_intent,
+            lending_market,
+            reserve_array_index,
+            clock,
+            ctx,
+        );
     }
 
-    public fun recall_loaned<A, B, Hook: drop, State: store, P>(
-        self: &mut Pool<A, B, Hook, State>,
-        amount: u64,
-        recall_a: bool,
-        lending_market: &mut LendingMarket<P>, 
-        reserve_array_index: u64,
-        clock: &Clock,
-        ctx: &mut TxContext
-    ) {
-        if (recall_a) {
-            let ctokens: Coin<CToken<P, A>> = coin::from_balance(lend::withdraw_c_tokens(&mut self.fields, amount), ctx);
-
-            let coin_a = lending_market.redeem_ctokens_and_withdraw_liquidity(
-                reserve_array_index,
-                clock,
-                ctokens,
-                none(), // rate_limiter_exemption
-                ctx,
-            );
-
-            self.lending_a.borrow_mut().lent = self.lending_a.borrow().lent - amount;
-
-            self.reserve_a.join(coin_a.into_balance());
-
-        } else {
-            let ctokens: Coin<CToken<P, B>> = coin::from_balance(lend::withdraw_c_tokens(&mut self.fields, amount), ctx);
-
-            let coin_b = lending_market.redeem_ctokens_and_withdraw_liquidity(
-                reserve_array_index,
-                clock,
-                ctokens,
-                none(), // rate_limiter_exemption
-                ctx,
-            );
-
-            self.lending_b.borrow_mut().lent = self.lending_a.borrow().lent - amount;
-
-            self.reserve_b.join(coin_b.into_balance());
-        }
-    }
-    
     
     // ===== View & Getters =====
     
     public fun full_reserves<A, B, Hook: drop, State: store>(self: &Pool<A, B, Hook, State>): (u64, u64) {
         let reserve_a = if (self.lending_a.is_some()) {
-            self.reserve_a.value() + self.lending_a.borrow().lent
+            self.reserve_a.value() + self.lending_a.borrow().lent()
         } else {
             self.reserve_a.value()
         };
 
         let reserve_b = if (self.lending_b.is_some()) {
-            self.reserve_b.value() + self.lending_b.borrow().lent
+            self.reserve_b.value() + self.lending_b.borrow().lent()
         } else {
             self.reserve_b.value()
         };
@@ -515,8 +456,8 @@ module slamm::pool {
         b_in: bool,
     ) {
         if (self.lending_a.is_some()) {
-                let lent = self.lending_a.borrow().lent;
-                self.lending_a.borrow().requirements.assert_liquidity_requirements(
+                let lent = self.lending_a.borrow().lent();
+                self.lending_a.borrow().assert_liquidity_requirements(
                     self.reserve_a.value(),
                     amount_a,
                     a_in,
@@ -525,14 +466,44 @@ module slamm::pool {
             };
 
             if (self.lending_b.is_some()) {
-                let lent = self.lending_b.borrow().lent;
-                self.lending_b.borrow().requirements.assert_liquidity_requirements(
+                let lent = self.lending_b.borrow().lent();
+                self.lending_b.borrow().assert_liquidity_requirements(
                     self.reserve_b.value(),
                     amont_b,
                     b_in,
                     lent
                 );
             };
+    }
+    
+    public fun compute_lending_actions<A, B, Hook: drop, State: store>(
+        self: &Pool<A, B, Hook, State>,
+        amount_a: u64,
+        amont_b: u64,
+        a_in: bool,
+        b_in: bool,
+    ): (LendingAction, LendingAction) {
+        let lending_action_a = if (self.lending_a.is_some()) {
+                let lent = self.lending_a.borrow().lent();
+                self.lending_a.borrow().compute_lending_action(
+                    self.reserve_a.value(),
+                    amount_a,
+                    a_in,
+                    lent
+                )
+            } else { lend::no_op() };
+
+        let lending_action_b = if (self.lending_b.is_some()) {
+                let lent = self.lending_b.borrow().lent();
+                self.lending_b.borrow().compute_lending_action(
+                    self.reserve_b.value(),
+                    amont_b,
+                    b_in,
+                    lent
+                )
+            } else { lend::no_op() };
+
+        (lending_action_a, lending_action_b)
     }
     
     // ===== Results/Events =====
