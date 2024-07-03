@@ -560,7 +560,7 @@ module slamm::pool {
 
     // ===== Admin endpoints =====
 
-    public fun collect_protol_fees<A, B, Hook: drop, State: store>(
+    public fun collect_protocol_fees<A, B, Hook: drop, State: store>(
         _global_admin: &GlobalAdmin,
         self: &mut Pool<A, B, Hook, State>,
         ctx: &mut TxContext,
