@@ -6,7 +6,7 @@ module slamm::slamm_tests {
     // use std::debug::print;
     use slamm::pool;
     use slamm::registry;
-    use slamm::cpmm::{Self, minimum_liquidity};
+    use slamm::cpmm::{Self, minimum_liquidity, Hook as CpmmHook, State as CpmmState};
     use sui::test_scenario::{Self, ctx};
     use sui::sui::SUI;
     use sui::coin::{Self};
@@ -783,6 +783,87 @@ module slamm::slamm_tests {
         destroy(pool_2);
         destroy(pool_cap);
         destroy(pool_cap_2);
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = pool::EPoolGuarded)]
+    fun test_fail_multiple_intents() {
+        let mut scenario = test_scenario::begin(ADMIN);
+
+        // Init Pool
+        test_scenario::next_tx(&mut scenario, POOL_CREATOR);
+        let ctx = ctx(&mut scenario);
+
+        let mut registry = registry::init_for_testing(ctx);
+
+        let (mut pool, pool_cap) = cpmm::new<SUI, COIN, Wit>(
+            Wit {},
+            &mut registry,
+            100, // admin fees BPS
+            ctx,
+        );
+
+        let mut coin_a = coin::mint_for_testing<SUI>(e9(1_000), ctx);
+        let mut coin_b = coin::mint_for_testing<COIN>(e9(500_000), ctx);
+
+        let (lp_coins, _) = pool.cpmm_deposit(
+            &mut coin_a,
+            &mut coin_b,
+            e9(1_000),
+            e9(500_000),
+            0,
+            0,
+            ctx,
+        );
+
+        destroy(coin_a);
+        destroy(coin_b);
+
+
+        // Swap
+        test_scenario::next_tx(&mut scenario, TRADER);
+        let ctx = ctx(&mut scenario);
+
+        let mut coin_a = coin::mint_for_testing<SUI>(e9(400), ctx);
+        let mut coin_b = coin::mint_for_testing<COIN>(0, ctx);
+
+        let swap_intent_1 = cpmm::intent_swap<SUI, COIN, Wit>(
+            &mut pool,
+            e9(200),
+            true, // a2b
+        );
+        
+        let swap_intent_2 = cpmm::intent_swap<SUI, COIN, Wit>(
+            &mut pool,
+            e9(200),
+            true, // a2b
+        );
+        
+        cpmm::execute_swap(
+            &mut pool,
+            swap_intent_1,
+            &mut coin_a,
+            &mut coin_b,
+            0,
+            ctx,
+        );
+        
+        cpmm::execute_swap(
+            &mut pool,
+            swap_intent_2,
+            &mut coin_a,
+            &mut coin_b,
+            0,
+            ctx,
+        );
+
+        destroy(registry);
+        destroy(coin_a);
+        destroy(coin_b);
+        destroy(pool);
+        destroy(lp_coins);
+        destroy(pool_cap);
         test_scenario::end(scenario);
     }
 

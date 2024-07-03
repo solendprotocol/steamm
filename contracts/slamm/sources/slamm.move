@@ -30,6 +30,14 @@ module slamm::pool {
     const ESwapExceedsSlippage: u64 = 1;
     const EOutputAExceedsLiquidity: u64 = 2;
     const EOutputBExceedsLiquidity: u64 = 3;
+    const EPoolGuarded: u64 = 4;
+    const EPoolUnguarded: u64 = 5;
+    const ELpBurnAmountMismatch: u64 = 6; // Should not occur
+    const ELendingAlreadyOnForA: u64 = 7;
+    const ELendingAlreadyOnForB: u64 = 8;
+    const ELendingOffForA: u64 = 9;
+    const ELendingOffForB: u64 = 10;
+    const EPoolIdMistmatch: u64 = 11;
 
     /// Marker type for the LP coins of a pool. There can only be one
     /// pool per type, albeit given the permissionless aspect of the pool
@@ -267,7 +275,7 @@ module slamm::pool {
         ctx:  &mut TxContext,
     ): (Coin<A>, Coin<B>, RedeemResult) {
         let quote = redeem_intent.quote();
-        assert!(quote.burn_lp() == lp_tokens.value(), 0);
+        assert!(quote.burn_lp() == lp_tokens.value(), ELpBurnAmountMismatch);
 
         self.assert_liquidity_requirements(
             quote.withdraw_a(),
@@ -332,7 +340,7 @@ module slamm::pool {
         config.assert_p_type<P>();
 
         if (is_a) {
-            assert!(self.lending_a.is_none(), 0);
+            assert!(self.lending_a.is_none(), ELendingAlreadyOnForA);
             config.assert_coin_type<A>();
 
             self.lending_a.fill(
@@ -340,7 +348,7 @@ module slamm::pool {
             );
 
         } else {
-            assert!(self.lending_b.is_none(), 0);
+            assert!(self.lending_b.is_none(), ELendingAlreadyOnForB);
             config.assert_coin_type<B>();
 
             self.lending_a.fill(
@@ -356,14 +364,14 @@ module slamm::pool {
         clock: &Clock,
     ) {
         if (is_a) {
-            assert!(self.lending_a.is_some(), 0);
+            assert!(self.lending_a.is_some(), ELendingOffForA);
             
             let lending_a = self.lending_a.borrow_mut();
             lending_a.sync_liquidity_ratio(config, clock);
 
 
         } else {
-            assert!(self.lending_b.is_some(), 0);
+            assert!(self.lending_b.is_some(), ELendingOffForB);
             
             let lending_b = self.lending_b.borrow_mut();
             lending_b.sync_liquidity_ratio(config, clock);
@@ -499,7 +507,7 @@ module slamm::pool {
         intent: Intent<Quote, A, B, Hook>,
     ) {
         pool.unguard();
-        assert!(object::id(pool) == intent.pool_id, 0);
+        assert!(object::id(pool) == intent.pool_id, EPoolIdMistmatch);
 
         let Intent { pool_id: _, quote: _, lending_a: _, lending_b: _ } = intent;
 
@@ -515,13 +523,13 @@ module slamm::pool {
     fun assert_unguarded<A, B, Hook: drop, State: store>(
         pool: &Pool<A, B, Hook, State>,
     ) {
-        assert!(pool.lock_guard == false, 0);
+        assert!(pool.lock_guard == false, EPoolGuarded);
     }
     
     fun assert_guarded<A, B, Hook: drop, State: store>(
         pool: &Pool<A, B, Hook, State>,
     ) {
-        assert!(pool.lock_guard == true, 0);
+        assert!(pool.lock_guard == true, EPoolUnguarded);
     }
     
     public(package) fun guard<A, B, Hook: drop, State: store>(
