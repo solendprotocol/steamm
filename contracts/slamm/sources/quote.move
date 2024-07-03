@@ -1,14 +1,8 @@
 /// Module for informative structs which provide the output of a given quotation.
 module slamm::quote {
-    use slamm::lend::LendingAction;
-
-    public use fun slamm::quote::swap_as_intent as SwapQuote.as_intent;
-
-    public struct Intent<Op, phantom A, phantom B, phantom Hook> {
-        quote: Op,
-        lending_a: LendingAction,
-        lending_b: LendingAction,
-    }
+    public use fun slamm::pool::as_intent_swap as SwapQuote.as_intent;
+    public use fun slamm::pool::as_intent_deposit as DepositQuote.as_intent;
+    public use fun slamm::pool::as_intent_redeem as RedeemQuote.as_intent;
 
     public fun flatten(quote: &SwapQuote): (u64, bool, u64, bool) {
         let (amount_a, a_in, amount_b, b_in) = if (quote.a2b() == true) {
@@ -29,6 +23,7 @@ module slamm::quote {
     }
 
     public struct DepositQuote has store, drop {
+        initial_deposit: bool,
         deposit_a: u64,
         deposit_b: u64,
         mint_lp: u64,
@@ -38,25 +33,6 @@ module slamm::quote {
         withdraw_a: u64,
         withdraw_b: u64,
         burn_lp: u64
-    }
-
-    public(package) fun swap_as_intent<A, B, Hook: drop>(
-        swap_quote: SwapQuote,
-        lending_a: LendingAction,
-        lending_b: LendingAction,
-        _: Hook,
-    ): Intent<SwapQuote, A, B, Hook> {
-        Intent {
-            quote: swap_quote,
-            lending_a,
-            lending_b,
-        }
-    }
-    
-    public(package) fun consume_intent<A, B, Hook: drop>(
-        intent: Intent<SwapQuote, A, B, Hook>,
-    ) {
-        let Intent { quote: _, lending_a: _, lending_b: _ } = intent;
     }
 
     // ===== Package Methods =====
@@ -78,11 +54,13 @@ module slamm::quote {
     }
     
     public(package) fun deposit_quote(
+        initial_deposit: bool,
         deposit_a: u64,
         deposit_b: u64,
         mint_lp: u64,
     ): DepositQuote {
         DepositQuote {
+            initial_deposit,
             deposit_a,
             deposit_b,
             mint_lp,
@@ -102,11 +80,6 @@ module slamm::quote {
     }
 
     // ===== Public View Methods =====
-
-    public fun quote<Op, A, B, Hook>(self: &Intent<Op, A, B, Hook>): &Op { &self.quote }
-    public fun lending_a<Op, A, B, Hook>(self: &Intent<Op, A, B, Hook>): &LendingAction { &self.lending_a }
-    public fun lending_b<Op, A, B, Hook>(self: &Intent<Op, A, B, Hook>): &LendingAction { &self.lending_b }
-    
     
     public fun amount_in(self: &SwapQuote): u64 { self.amount_in }
     public fun amount_out(self: &SwapQuote): u64 { self.amount_out }
@@ -114,6 +87,7 @@ module slamm::quote {
     public fun admin_fees(self: &SwapQuote): u64 { self.admin_fees }
     public fun a2b(self: &SwapQuote): bool { self.a2b }
     
+    public fun initial_deposit(self: &DepositQuote): bool { self.initial_deposit }
     public fun deposit_a(self: &DepositQuote): u64 { self.deposit_a }
     public fun deposit_b(self: &DepositQuote): u64 { self.deposit_b }
     public fun mint_lp(self: &DepositQuote): u64 { self.mint_lp }

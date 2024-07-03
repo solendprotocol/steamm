@@ -6,7 +6,6 @@ module slamm::lend {
     use sui::clock::{Clock};
     use sui::balance::{Self, Balance};
     use slamm::global_admin::GlobalAdmin;
-    use slamm::quote::Intent;
     use suilend::lending_market::{LendingMarket};
     use suilend::reserve::{CToken};
 
@@ -89,19 +88,20 @@ module slamm::lend {
         }
     }
 
-    public(package) fun rebalance_lending<A, B, Hook: drop, P, IntentOp>(
+    public(package) fun rebalance_lending<A, B, P>(
         reserve_a: &mut Balance<A>,
         reserve_b: &mut Balance<B>,
         lending_a: &mut Option<Lending>,
         lending_b: &mut Option<Lending>,
-        amm_intent: &Intent<IntentOp, A, B, Hook>,
+        lending_action_a: &LendingAction,
+        lending_action_b: &LendingAction,
         lending_market: &mut LendingMarket<P>, 
         reserve_array_index: u64,
         clock: &Clock,
         ctx: &mut TxContext
     ) {
         if (lending_a.is_some()) {
-            match (amm_intent.lending_a()) {
+            match (lending_action_a) {
                 LendingAction::Lend(amount) => {
                     let balance_to_lend = reserve_a.split(*amount);
 
@@ -135,7 +135,7 @@ module slamm::lend {
         };
         
         if (lending_b.is_some()) {
-            match (amm_intent.lending_b()) {
+            match (lending_action_b) {
                 LendingAction::Lend(amount) => {
                     let balance_to_lend = reserve_b.split(*amount);
             

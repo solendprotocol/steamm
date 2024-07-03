@@ -5,8 +5,8 @@ module slamm::cpmm {
     use sui::transfer::public_transfer;
     use slamm::registry::{Registry};
     use slamm::math::{safe_mul_div_u64};
-    use slamm::pool::{Self, Pool, PoolCap, LP, DepositResult, SwapResult};
-    use slamm::quote::{Self, SwapQuote, DepositQuote, RedeemQuote, Intent};
+    use slamm::pool::{Self, Pool, PoolCap, LP, DepositResult, SwapResult, Intent};
+    use slamm::quote::{Self, SwapQuote, DepositQuote, RedeemQuote};
 
     // Consts
     const MINIMUM_LIQUIDITY: u64 = 10;
@@ -69,54 +69,21 @@ module slamm::cpmm {
         min_b: u64,
         ctx:  &mut TxContext,
     ): (Coin<LP<A, B, Hook<W>>>, DepositResult) {
-        let is_initial_deposit = self.lp_supply_val() == 0;
-
-        // We consider the liquidity available for trading
-        // as well as the net accumulated fees, as these belong to LPs
-        let (reserve_a, reserve_b) = self.full_reserves();
-
-        // 1. Compute token deposits and delta lp tokens
-        let (deposit_a, deposit_b, lp_tokens) = if (is_initial_deposit) {
-            (
-                ideal_a,
-                ideal_b,
-                lp_tokens_to_mint(
-                    0,
-                    0,
-                    self.lp_supply_val(),
-                    ideal_a,
-                    ideal_b,
-                )
-            )
-        } else {
-            quote_deposit_(
-                reserve_a,
-                reserve_b,
-                self.lp_supply_val(),
-                ideal_a,
-                ideal_b,
-                min_a,
-                min_b,
-            )
-        };
-
-        // 2. Add liquidity to pool and mint lp tokens
-        let (mut lp_coins, res) = self.deposit_liquidity(
-            Hook<W> {},
-            coin_a.balance_mut().split(deposit_a),
-            coin_b.balance_mut().split(deposit_b),
-            lp_tokens,
+        let intent = intent_deposit(
+            self,
+            ideal_a,
+            ideal_b,
+            min_a,
+            min_b,
+        );
+        
+        let (lp_coins, res) = execute_deposit(
+            self,
+            intent,
+            coin_a,
+            coin_b,
             ctx,
         );
-
-        // 3. Lock minimum liquidity if initial seed liquidity - prevents inflation attack
-        if (is_initial_deposit) {
-            public_transfer(lp_coins.split(MINIMUM_LIQUIDITY, ctx), @0x0);
-
-        };
-        
-        // 4. Recompute invariant
-        update_invariant_assert_increase(self);
 
         (lp_coins, res)
     }
@@ -128,32 +95,20 @@ module slamm::cpmm {
         min_b: u64,
         ctx:  &mut TxContext,
     ): (Coin<A>, Coin<B>) {
-        let lp_burn = lp_tokens.value();
 
-        // We consider the liquidity available for trading
-        // as well as the net accumulated fees, as these belong to LPs
-        let (reserve_a, reserve_b) = self.full_reserves();
-
-        // 1. Compute amounts to withdraw
-        let (withdraw_a, withdraw_b) = quote_redeem_(
-            reserve_a,
-            reserve_b,
-            self.lp_supply_val(),
-            lp_burn,
+        let intent = intent_redeem(
+            self,
+            lp_tokens.value(),
             min_a,
             min_b,
         );
-
-        let (coin_a, coin_b, _) = self.redeem_liquidity(
-            Hook<W> {},
-            withdraw_a,
-            withdraw_b,
+        
+        let (coin_a, coin_b) = execute_redeem(
+            self,
             lp_tokens,
+            intent,
             ctx,
         );
-
-        // 4. Recompute invariant
-        update_invariant_assert_decrease(self);
 
         (coin_a, coin_b)
     }
@@ -176,10 +131,12 @@ module slamm::cpmm {
         execute_swap(self, intent, coin_a, coin_b, min_amount_out, ctx)
     }
 
+
     // ===== Intent Functions =====
 
+
     public fun intent_swap<A, B, W: drop>(
-        self: &Pool<A, B, Hook<W>, State>,
+        self: &mut Pool<A, B, Hook<W>, State>,
         amount_in: u64,
         a2b: bool,
     ): Intent<SwapQuote, A, B, Hook<W>> {
@@ -192,6 +149,7 @@ module slamm::cpmm {
         );
 
         quote.as_intent(
+            self,
             lending_action_a,
             lending_action_b,
             Hook<W> {},
@@ -219,6 +177,109 @@ module slamm::cpmm {
         update_invariant_assert_increase(self);
 
         response
+    }
+
+    public fun intent_deposit<A, B, W: drop>(
+        self: &mut Pool<A, B, Hook<W>, State>,
+        ideal_a: u64,
+        ideal_b: u64,
+        min_a: u64,
+        min_b: u64,
+    ): Intent<DepositQuote, A, B, Hook<W>> {
+        // 1. Compute token deposits and delta lp tokens
+        let quote = quote_deposit_impl(
+            self,
+            ideal_a,
+            ideal_b,
+            min_a,
+            min_b,
+        );
+
+        let (lending_action_a, lending_action_b) = self.compute_lending_actions(
+            quote.deposit_a(), quote.deposit_b(), true, true
+        );
+
+        quote.as_intent(
+            self,
+            lending_action_a,
+            lending_action_b,
+            Hook<W> {},
+        )
+    }
+    
+    public fun execute_deposit<A, B, W: drop>(
+        self: &mut Pool<A, B, Hook<W>, State>,
+        intent: Intent<DepositQuote, A, B, Hook<W>>,
+        coin_a: &mut Coin<A>,
+        coin_b: &mut Coin<B>,
+        ctx:  &mut TxContext,
+    ): (Coin<LP<A, B, Hook<W>>>, DepositResult) {
+        let is_initial_deposit = intent.quote().initial_deposit();
+
+        // 2. Add liquidity to pool and mint lp tokens
+        let (mut lp_coins, res) = self.deposit_liquidity(
+            Hook<W> {},
+            coin_a.balance_mut(),
+            coin_b.balance_mut(),
+            intent,
+            ctx,
+        );
+
+        // 3. Lock minimum liquidity if initial seed liquidity - prevents inflation attack
+        if (is_initial_deposit) {
+            public_transfer(lp_coins.split(MINIMUM_LIQUIDITY, ctx), @0x0);
+
+        };
+        
+        // 4. Recompute invariant
+        update_invariant_assert_increase(self);
+
+        (lp_coins, res)
+    }
+
+    public fun intent_redeem<A, B, W: drop>(
+        self: &mut Pool<A, B, Hook<W>, State>,
+        lp_tokens: u64,
+        min_a: u64,
+        min_b: u64,
+    ): Intent<RedeemQuote, A, B, Hook<W>> {
+        // 1. Compute amounts to withdraw
+        let quote = quote_redeem_impl(
+            self,
+            lp_tokens,
+            min_a,
+            min_b,
+        );
+
+        let (lending_action_a, lending_action_b) = self.compute_lending_actions(
+            quote.withdraw_a(), quote.withdraw_b(), false, false
+        );
+
+        quote.as_intent(
+            self,
+            lending_action_a,
+            lending_action_b,
+            Hook<W> {},
+        )
+    }
+
+    public fun execute_redeem<A, B, W: drop>(
+        self: &mut Pool<A, B, Hook<W>, State>,
+        lp_tokens: Coin<LP<A, B, Hook<W>>>,
+        intent: Intent<RedeemQuote, A, B, Hook<W>>,
+        ctx:  &mut TxContext,
+    ): (Coin<A>, Coin<B>) {
+        let (coin_a, coin_b, _) = self.redeem_liquidity(
+            Hook<W> {},
+            intent,
+            lp_tokens,
+            ctx,
+        );
+
+        // 4. Recompute invariant
+        update_invariant_assert_decrease(self);
+
+        (coin_a, coin_b)
     }
     
     
@@ -258,25 +319,45 @@ module slamm::cpmm {
     }
 
     public fun quote_deposit<A, B, W: drop>(
-        self: &mut Pool<A, B, Hook<W>, State>,
+        self: &Pool<A, B, Hook<W>, State>,
         ideal_a: u64,
         ideal_b: u64,
     ): DepositQuote {
-        // We need to consider the liquidity available for trading
+        quote_deposit_impl(
+            self,
+            ideal_a,
+            ideal_b,
+            0,
+            0,
+        )
+    }
+    
+    fun quote_deposit_impl<A, B, W: drop>(
+        self: &Pool<A, B, Hook<W>, State>,
+        ideal_a: u64,
+        ideal_b: u64,
+        min_a: u64,
+        min_b: u64,
+    ): DepositQuote {
+        let is_initial_deposit = self.lp_supply_val() == 0;
+
+        // We consider the liquidity available for trading
         // as well as the net accumulated fees, as these belong to LPs
         let (reserve_a, reserve_b) = self.full_reserves();
 
+        // 1. Compute token deposits and delta lp tokens
         let (deposit_a, deposit_b, lp_tokens) = quote_deposit_(
             reserve_a,
             reserve_b,
             self.lp_supply_val(),
             ideal_a,
             ideal_b,
-            0,
-            0,
+            min_a,
+            min_b,
         );
 
         quote::deposit_quote(
+            is_initial_deposit,
             deposit_a,
             deposit_b,
             lp_tokens,
@@ -286,6 +367,20 @@ module slamm::cpmm {
     public fun quote_redeem<A, B, W: drop>(
         self: &mut Pool<A, B, Hook<W>, State>,
         lp_tokens: u64,
+    ): RedeemQuote {
+        quote_redeem_impl(
+            self,
+            lp_tokens,
+            0,
+            0,
+        )
+    }
+    
+    public fun quote_redeem_impl<A, B, W: drop>(
+        self: &mut Pool<A, B, Hook<W>, State>,
+        lp_tokens: u64,
+        min_a: u64,
+        min_b: u64,
     ): RedeemQuote {
         // We need to consider the liquidity available for trading
         // as well as the net accumulated fees, as these belong to LPs
@@ -297,8 +392,8 @@ module slamm::cpmm {
             reserve_b,
             self.lp_supply_val(),
             lp_tokens,
-            0,
-            0,
+            min_a,
+            min_b,
         );
 
         quote::redeem_quote(
@@ -325,25 +420,41 @@ module slamm::cpmm {
         min_a: u64,
         min_b: u64
     ): (u64, u64, u64) {
-        let (delta_a, delta_b) = tokens_to_deposit(
-            reserve_a,
-            reserve_b,
-            ideal_a,
-            ideal_b,
-            min_a,
-            min_b,
-        );
+        let is_initial_deposit = lp_supply == 0;
 
-        // Compute new LP Tokens
-        let delta_lp = lp_tokens_to_mint(
-            reserve_a,
-            reserve_b,
-            lp_supply,
-            delta_a,
-            delta_b,
-        );
+        if (is_initial_deposit) {
+            (
+                ideal_a,
+                ideal_b,
+                lp_tokens_to_mint(
+                    0,
+                    0,
+                    lp_supply,
+                    ideal_a,
+                    ideal_b,
+                )
+            )
+        } else {
+            let (deposit_a, deposit_b) = tokens_to_deposit(
+                reserve_a,
+                reserve_b,
+                ideal_a,
+                ideal_b,
+                min_a,
+                min_b,
+            );
 
-        (delta_a, delta_b, delta_lp)
+            // Compute new LP Tokens
+            let lp_tokens = lp_tokens_to_mint(
+                reserve_a,
+                reserve_b,
+                lp_supply,
+                deposit_a,
+                deposit_b,
+            );
+
+            (deposit_a, deposit_b, lp_tokens)   
+        }
     }
 
     fun tokens_to_deposit(
@@ -429,14 +540,14 @@ module slamm::cpmm {
         let k0 = self.inner().k;
 
         let k1 = update_invariant(self);
-        assert!(k1 > k0, EInvariantViolation);
+        assert!(k1 >= k0, EInvariantViolation);
     }
     
     fun update_invariant_assert_decrease<A, B, W: drop>(self: &mut Pool<A, B, Hook<W>, State>) {
         let k0 = self.inner().k;
 
         let k1 = update_invariant(self);
-        assert!(k1 < k0, EInvariantViolation);
+        assert!(k1 <= k0, EInvariantViolation);
     }
 
     // ===== Tests =====

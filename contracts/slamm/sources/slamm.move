@@ -1,6 +1,5 @@
 module slamm::pool {
     use std::option::none;
-    use sui::bag::{Self, Bag};
     use sui::tx_context::sender;
     use sui::clock::Clock;
     use sui::coin::{Self, Coin};
@@ -10,10 +9,9 @@ module slamm::pool {
     use slamm::math::{safe_mul_div_u64};
     use slamm::global_admin::GlobalAdmin;
     use slamm::fees::{Self, Fees, FeeData};
-    use slamm::lend::{Self, Lending, LendingConfig, LendingRequirements, LendingAction};
-    use slamm::quote::{Self, Intent, SwapQuote};
+    use slamm::quote::{SwapQuote, DepositQuote, RedeemQuote};
+    use slamm::lend::{Self, Lending, LendingConfig, LendingAction};
     use suilend::lending_market::LendingMarket;
-    use suilend::reserve::{CToken};
     
     public use fun slamm::cpmm::deposit_liquidity as Pool.cpmm_deposit;
     public use fun slamm::cpmm::redeem_liquidity as Pool.cpmm_redeem;
@@ -58,6 +56,7 @@ module slamm::pool {
         trading_data: TradingData,
         lending_a: Option<Lending>,
         lending_b: Option<Lending>,
+        lock_guard: bool,
     }
 
     public struct TradingData has store {
@@ -69,11 +68,13 @@ module slamm::pool {
         swap_b_in_amount: u128,
     }
 
-    // public struct Lending has store {
-    //     lent: u64,
-    //     requirements: LendingRequirements
-    // }
-    
+    public struct Intent<Quote, phantom A, phantom B, phantom Hook> {
+        pool_id: ID,
+        quote: Quote,
+        lending_a: LendingAction,
+        lending_b: LendingAction,
+    }
+
     // ===== Public Methods =====
 
     public(package) fun new<A, B, Hook: drop, State: store>(
@@ -103,6 +104,7 @@ module slamm::pool {
             },
             lending_a: none(),
             lending_b: none(),
+            lock_guard: false,
         };
 
         registry.add_amm(&pool);
@@ -207,7 +209,7 @@ module slamm::pool {
 
         emit_event(result);
 
-        quote::consume_intent(swap_intent);
+        self.consume(swap_intent);
 
         result
     }
@@ -215,28 +217,30 @@ module slamm::pool {
     public fun deposit_liquidity<A, B, Hook: drop, State: store>(
         self: &mut Pool<A, B, Hook, State>,
         _witness: Hook,
-        balance_a: Balance<A>,
-        balance_b: Balance<B>,
-        lp_to_mint: u64,
+        balance_a: &mut Balance<A>,
+        balance_b: &mut Balance<B>,
+        deposit_intent: Intent<DepositQuote, A, B, Hook>,
         ctx:  &mut TxContext,
     ): (Coin<LP<A, B, Hook>>, DepositResult) {
-        let deposit_a = balance_a.value();
-        let deposit_b = balance_b.value();
+        let quote = deposit_intent.quote();
+
+        let deposit_a = balance_a.split(quote.deposit_a());
+        let deposit_b = balance_b.split(quote.deposit_b());
 
         self.assert_liquidity_requirements(
-            deposit_a,
-            deposit_b,
+            deposit_a.value(),
+            deposit_b.value(),
             true,
             true,
         );
         
         // 1. Add liquidity to pool
-        self.reserve_a.join(balance_a);
-        self.reserve_b.join(balance_b);
+        self.reserve_a.join(deposit_a);
+        self.reserve_b.join(deposit_b);
 
         // 2. Mint LP Tokens
         let lp_coins = coin::from_balance(
-            self.lp_supply.increase_supply(lp_to_mint),
+            self.lp_supply.increase_supply(quote.mint_lp()),
             ctx
         );
 
@@ -244,12 +248,13 @@ module slamm::pool {
         let result = DepositResult {
             user: sender(ctx),
             pool_id: object::id(self),
-            deposit_a,
-            deposit_b,
-            mint_lp: lp_to_mint,
+            deposit_a: quote.deposit_a(),
+            deposit_b: quote.deposit_b(),
+            mint_lp: quote.mint_lp(),
         };
         
         emit_event(result);
+        self.consume(deposit_intent);
 
         (lp_coins, result)
     }
@@ -257,14 +262,16 @@ module slamm::pool {
     public fun redeem_liquidity<A, B, Hook: drop, State: store>(
         self: &mut Pool<A, B, Hook, State>,
         _witness: Hook,
-        withdraw_a: u64,
-        withdraw_b: u64,
+        redeem_intent: Intent<RedeemQuote, A, B, Hook>,
         lp_tokens: Coin<LP<A, B, Hook>>,
         ctx:  &mut TxContext,
     ): (Coin<A>, Coin<B>, RedeemResult) {
+        let quote = redeem_intent.quote();
+        assert!(quote.burn_lp() == lp_tokens.value(), 0);
+
         self.assert_liquidity_requirements(
-            withdraw_a,
-            withdraw_b,
+            quote.withdraw_a(),
+            quote.withdraw_b(),
             false,
             false,
         );
@@ -278,11 +285,11 @@ module slamm::pool {
 
         // 2. Prepare tokens to send
         let base_tokens = coin::from_balance(
-            self.reserve_a.split(withdraw_a),
+            self.reserve_a.split(quote.withdraw_a()),
             ctx,
         );
         let quote_tokens = coin::from_balance(
-            self.reserve_b.split(withdraw_b),
+            self.reserve_b.split(quote.withdraw_b()),
             ctx,
         );
 
@@ -290,12 +297,13 @@ module slamm::pool {
         let result = RedeemResult {
             user: sender(ctx),
             pool_id: object::id(self),
-            withdraw_a,
-            withdraw_b,
+            withdraw_a: quote.withdraw_a(),
+            withdraw_b: quote.withdraw_b(),
             burn_lp: lp_burn,
         };
 
         emit_event(result);
+        self.consume(redeem_intent);
 
         (base_tokens, quote_tokens, result)
     }
@@ -375,7 +383,8 @@ module slamm::pool {
             &mut self.reserve_b,
             &mut self.lending_a,
             &mut self.lending_b,
-            amm_intent,
+            &amm_intent.lending_a,
+            &amm_intent.lending_b,
             lending_market,
             reserve_array_index,
             clock,
@@ -418,8 +427,117 @@ module slamm::pool {
         self.lp_supply.supply_value()
     }
 
+    // ===== Intent functions =====
+
+    public(package) fun as_intent<A, B, Hook: drop, State: store, Quote>(
+        quote: Quote,
+        pool: &mut Pool<A, B, Hook, State>,
+        lending_a: LendingAction,
+        lending_b: LendingAction,
+        _: Hook,
+    ): Intent<Quote, A, B, Hook> {
+        pool.guard();
+        
+        Intent {
+            pool_id: object::id(pool),
+            quote: quote,
+            lending_a,
+            lending_b,
+        }
+    }
+    
+    public(package) fun as_intent_swap<A, B, Hook: drop, State: store>(
+        quote: SwapQuote,
+        pool: &mut Pool<A, B, Hook, State>,
+        lending_a: LendingAction,
+        lending_b: LendingAction,
+        hook: Hook,
+    ): Intent<SwapQuote, A, B, Hook> {
+        as_intent(
+            quote,
+            pool,
+            lending_a,
+            lending_b,
+            hook,
+        )
+    }
+    
+    public(package) fun as_intent_deposit<A, B, Hook: drop, State: store>(
+        quote: DepositQuote,
+        pool: &mut Pool<A, B, Hook, State>,
+        lending_a: LendingAction,
+        lending_b: LendingAction,
+        hook: Hook,
+    ): Intent<DepositQuote, A, B, Hook> {
+        as_intent(
+            quote,
+            pool,
+            lending_a,
+            lending_b,
+            hook,
+        )
+    }
+    
+    public(package) fun as_intent_redeem<A, B, Hook: drop, State: store>(
+        quote: RedeemQuote,
+        pool: &mut Pool<A, B, Hook, State>,
+        lending_a: LendingAction,
+        lending_b: LendingAction,
+        hook: Hook,
+    ): Intent<RedeemQuote, A, B, Hook> {
+        as_intent(
+            quote,
+            pool,
+            lending_a,
+            lending_b,
+            hook,
+        )
+    }
+    
+    fun consume<A, B, Hook: drop, State: store, Quote: drop>(
+        pool: &mut Pool<A, B, Hook, State>,
+        intent: Intent<Quote, A, B, Hook>,
+    ) {
+        pool.unguard();
+        assert!(object::id(pool) == intent.pool_id, 0);
+
+        let Intent { pool_id: _, quote: _, lending_a: _, lending_b: _ } = intent;
+
+    }
+
+    public fun quote<Op, A, B, Hook>(self: &Intent<Op, A, B, Hook>): &Op { &self.quote }
+    public fun lending_a<Op, A, B, Hook>(self: &Intent<Op, A, B, Hook>): &LendingAction { &self.lending_a }
+    public fun lending_b<Op, A, B, Hook>(self: &Intent<Op, A, B, Hook>): &LendingAction { &self.lending_b }
+
+
     // ===== Package functions =====
 
+    fun assert_unguarded<A, B, Hook: drop, State: store>(
+        pool: &Pool<A, B, Hook, State>,
+    ) {
+        assert!(pool.lock_guard == false, 0);
+    }
+    
+    fun assert_guarded<A, B, Hook: drop, State: store>(
+        pool: &Pool<A, B, Hook, State>,
+    ) {
+        assert!(pool.lock_guard == true, 0);
+    }
+    
+    public(package) fun guard<A, B, Hook: drop, State: store>(
+        pool: &mut Pool<A, B, Hook, State>,
+    ) {
+        pool.assert_unguarded();
+        pool.lock_guard = true
+    }
+    
+    public(package) fun unguard<A, B, Hook: drop, State: store>(
+        pool: &mut Pool<A, B, Hook, State>,
+    ) {
+        pool.assert_guarded();
+        pool.lock_guard = false
+    }
+    
     public(package) fun inner<A, B, Hook: drop, State: store>(
         pool: &Pool<A, B, Hook, State>,
     ): &State {
