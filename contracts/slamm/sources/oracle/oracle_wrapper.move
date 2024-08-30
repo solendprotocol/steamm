@@ -1,17 +1,13 @@
 module slamm::oracle_wrapper {
     use std::option::{none, some};
     use sui::{
-        object::UID,
-        math,
         bag::{Self, Bag},
-        coin::Coin
     };
     use sui::clock::{Self, Clock};
     use pyth::{
         i64,
         price::{Price as PythPrice},
         price_info::{PriceInfoObject},
-        price_identifier::{PriceIdentifier},
     };
     use suilend::{
         decimal::{Self, Decimal},
@@ -29,7 +25,6 @@ module slamm::oracle_wrapper {
 
     const CURRENT_VERSION: u16 = 1;
     const PRICE_STALENESS_THRESHOLD_S: u64 = 0;
-    const BPS: u64 = 10_000;
 
     // ===== Errors =====
 
@@ -123,7 +118,7 @@ module slamm::oracle_wrapper {
         price_info
     }
 
-    // // errors if the PriceInfoObject is stale/invalid.
+    // errors if the PriceInfoObject is stale/invalid.
     public fun update_pyth_price_for_cointype<CoinType>(
         oracle_info: &mut OracleInfo<PriceInfoObject, CoinType>,
         price_info: &PriceInfoObject,
@@ -140,6 +135,81 @@ module slamm::oracle_wrapper {
         oracle_info.price = if (price.is_none()) { none() } else { some(Price { price: price.extract() })};
         oracle_info.smoothed_price = some(Price { price: smoothed_price});
         oracle_info.price_last_update_timestamp_s = clock::timestamp_ms(clock) / 1000;
+    }
+    
+    public fun get_price<CoinType>(
+        oracle_info: &OracleInfo<PriceInfoObject, CoinType>,
+        clock: &Clock,
+    ): Option<u256> {
+        oracle_info.assert_liveness(clock);
+
+        if (oracle_info.price.is_some()) {
+            some(oracle_info.price.borrow().price)
+        } else {
+            none()
+        }
+    }
+
+    public fun get_smoothed_price<CoinType>(
+        oracle_info: &OracleInfo<PriceInfoObject, CoinType>,
+        clock: &Clock,
+    ): Option<u256> {
+        oracle_info.assert_liveness(clock);
+
+        if (oracle_info.smoothed_price.is_some()) {
+            some(oracle_info.smoothed_price.borrow().price)
+        } else {
+            none()
+        }
+    }
+
+    public fun get_price_with_fallback<CoinType>(
+        oracle_info: &OracleInfo<PriceInfoObject, CoinType>,
+        clock: &Clock,
+    ): u256 {
+        oracle_info.assert_liveness(clock);
+
+        let mut price = oracle_info.get_price_unchecked();
+
+        if (price.is_none()) {
+            let mut smooth_price = oracle_info.get_smoothed_price_unchecked();
+            assert!(smooth_price.is_some(), 0);
+            return smooth_price.extract()
+        } else {
+            return price.extract()
+        }
+    }
+    
+    public fun assert_liveness<CoinType>(
+        oracle_info: &OracleInfo<PriceInfoObject, CoinType>,
+        clock: &Clock,
+    ) {
+        let cur_time_s = clock.timestamp_ms() / 1000;
+
+        assert!(
+            cur_time_s - oracle_info.price_last_update_timestamp_s <= PRICE_STALENESS_THRESHOLD_S, 
+            EPriceStale
+        );
+    }
+
+    fun get_price_unchecked<CoinType>(
+        oracle_info: &OracleInfo<PriceInfoObject, CoinType>,
+    ): Option<u256> {
+        if (oracle_info.price.is_some()) {
+            some(oracle_info.price.borrow().price)
+        } else {
+            none()
+        }
+    }
+
+    fun get_smoothed_price_unchecked<CoinType>(
+        oracle_info: &OracleInfo<PriceInfoObject, CoinType>,
+    ): Option<u256> {
+        if (oracle_info.smoothed_price.is_some()) {
+            some(oracle_info.smoothed_price.borrow().price)
+        } else {
+            none()
+        }
     }
 
     /// parse the pyth price info object to get a price and identifier. This function returns an None if the
@@ -196,6 +266,16 @@ module slamm::oracle_wrapper {
                 )
             )
         }
+    }
+
+    #[test_only]
+    public fun set_oracle_price_for_testing<Source, CointType>(
+        self: &mut OracleInfo<Source, CointType>,
+        price: u256,
+        clock: &Clock,
+    ) {
+        self.price.swap_or_fill(Price { price });
+        self.price_last_update_timestamp_s = clock.timestamp_ms() / 1_000;
     }
 
     // ===== Versioning Functions =====

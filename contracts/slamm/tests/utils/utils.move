@@ -5,6 +5,7 @@ module slamm::test_utils {
     use slamm::omm::{Self, Hook as OmmHook, State as OmmState};
     use slamm::bank::{Self, Bank};
     use slamm::pool::{Pool};
+    use slamm::oracle_wrapper::OracleInfo;
     use sui::test_utils::destroy;
     use sui::clock::Clock;
     use sui::test_scenario::{Self, ctx, Scenario};
@@ -235,32 +236,36 @@ module slamm::test_utils {
 
     public fun update_pool_oracle_price_ahead_of_trade<A, B, W: drop>(
         pool: &mut Pool<A, B, OmmHook<W>, OmmState>,
+        oracle_a: &mut OracleInfo<PriceInfoObject, A>,
+        oracle_b: &mut OracleInfo<PriceInfoObject, B>,
         amount_in: u64,
         a2b: bool,
-        clock_bump: u64,
+        clock_bump_seconds: u64,
         clock: &mut Clock,
     ) {
+        bump_clock_seconds(clock_bump_seconds, clock);
         let (quote, _, _, _, _) = omm::quote_swap_for_testing(
             pool,
+            oracle_a,
+            oracle_b,
             amount_in,
             a2b, // a2b,
-            clock.timestamp_ms() + clock_bump,
+            clock,
         );
-
-        bump_clock(clock, clock_bump);
 
         let a = if (a2b) {pool.total_funds_a() + quote.amount_in()} else {pool.total_funds_a() - quote.amount_out()};
         let b = if (a2b) {pool.total_funds_b() - quote.amount_out()} else {pool.total_funds_b() + quote.amount_in()};
-        omm::set_oracle_price_as_hypothetical_internal_reserves(
-            pool,
-            a,
-            b,
-            clock,
-        );
+        
+        oracle_a.set_oracle_price_for_testing(a as u256, clock);
+        oracle_b.set_oracle_price_for_testing(b as u256, clock);
+
     }
     
-    public fun bump_clock(clock: &mut Clock, seconds: u64) {
-        let new_ts = clock.timestamp_ms() + (1000 * seconds); // 1 second * X
-        clock.set_for_testing(new_ts);
+    public fun bump_clock_seconds(
+        clock_bump_seconds: u64,
+        clock: &mut Clock,
+    ) {
+        let clock_time = clock.timestamp_ms();
+        clock.set_for_testing(clock_time + (clock_bump_seconds * 1_000));
     }
 }

@@ -1,7 +1,7 @@
 /// Oracle AMM Hook implementation
 module slamm::omm {
     use sui::coin::Coin;
-    use sui::clock::{Self, Clock};
+    use sui::clock::Clock;
     use slamm::{
         global_admin::GlobalAdmin,
         registry::{Registry},
@@ -13,25 +13,20 @@ module slamm::omm {
         version::{Self, Version},
     };
     use suilend::{
-        decimal::{Self, Decimal},
-        oracles,
+        decimal::{Self, Decimal, from_scaled_val},
     };
     use pyth::{
         price_info::{PriceInfoObject},
-        price_identifier::{PriceIdentifier},
     };
+    use slamm::oracle_wrapper::OracleInfo;
 
     // ===== Constants =====
 
     const CURRENT_VERSION: u16 = 1;
-    const PRICE_STALENESS_THRESHOLD_S: u64 = 0;
     const BPS: u64 = 10_000;
 
     // ===== Errors =====
 
-    const EPriceIdentifierMismatch: u64 = 1;
-    const EInvalidPrice: u64 = 2;
-    const EPriceStale: u64 = 3;
     const EPriceInfoIsZero: u64 = 4;
 
     /// Hook type for the Oracle AMM implementation. Serves as both
@@ -50,10 +45,6 @@ module slamm::omm {
     /// instead we compute it at runtime.
     public struct State has store {
         version: Version,
-        // Object containing the price information of `A`
-        price_info_a: PriceInfo,
-        // Object containing the price information of `B`
-        price_info_b: PriceInfo,
         // Reference price from which we compute the absolute price deviation
         reference_price: Decimal,
         // Exponential Moving-Average of the absolute price deviation (instant vol)
@@ -87,14 +78,6 @@ module slamm::omm {
         max_accumulator: Decimal,
     }
 
-    /// Price info object with data sourced from the Pyth oracle
-    public struct PriceInfo has store {
-        price_identifier: PriceIdentifier,
-        price: Decimal,
-        smoothed_price: Decimal,
-        price_last_update_timestamp_s: u64,
-    }
-
     // ===== Public Methods =====
 
     /// Initializes and returns a new AMM Pool along with its associated PoolCap.
@@ -124,8 +107,8 @@ module slamm::omm {
         _witness: W,
         registry: &mut Registry,
         swap_fee_bps: u64,
-        price_feed_a: &PriceInfoObject,
-        price_feed_b: &PriceInfoObject,
+        oracle_a: &OracleInfo<PriceInfoObject, A>,
+        oracle_b: &OracleInfo<PriceInfoObject, B>,
         filter_period: u64,
         decay_period: u64,
         fee_control_bps: u64,
@@ -134,14 +117,10 @@ module slamm::omm {
         clock: &Clock,
         ctx: &mut TxContext,
     ): (Pool<A, B, Hook<W>, State>, PoolCap<A, B, Hook<W>, State>) {
-        let price_info_a = from_price_feed(price_feed_a, clock);
-        let price_info_b = from_price_feed(price_feed_b, clock);
-        let reference_price = new_instant_price_oracle_(&price_info_a, &price_info_b);
+        let reference_price = new_instant_price_oracle_(oracle_a, oracle_b, clock);
         
         let inner = State {
             version: version::new(CURRENT_VERSION),
-            price_info_a,
-            price_info_b,
             ema: Ema {
                 reference_val: decimal::from(0),
                 accumulator: decimal::from(0),
@@ -168,6 +147,8 @@ module slamm::omm {
     
     public fun intent_swap<A, B, W: drop>(
         self: &mut Pool<A, B, Hook<W>, State>,
+        oracle_a: &OracleInfo<PriceInfoObject, A>,
+        oracle_b: &OracleInfo<PriceInfoObject, B>,
         amount_in: u64,
         a2b: bool,
         clock: &Clock,
@@ -175,7 +156,7 @@ module slamm::omm {
         self.inner_mut().version.assert_version_and_upgrade(CURRENT_VERSION);
 
         let (quote, reference_price, reference_vol, vol_accumulator, last_update_ms) = quote_swap_impl(
-            self, amount_in, a2b, clock.timestamp_ms()
+            self, oracle_a, oracle_b, amount_in, a2b, clock
         );
         
         // Update parameters
@@ -220,12 +201,13 @@ module slamm::omm {
 
     public(package) fun quote_swap_impl<A, B, W: drop>(
         self: &Pool<A, B, Hook<W>, State>,
+        oracle_a: &OracleInfo<PriceInfoObject, A>,
+        oracle_b: &OracleInfo<PriceInfoObject, B>,
         amount_in: u64,
         a2b: bool,
-        current_ms: u64,
+        clock: &Clock,
     ): (SwapQuote, Decimal, Decimal, Decimal, u64) {
-        self.inner().assert_price_is_fresh_(current_ms);
-        quote_swap_(self, amount_in, a2b, current_ms)
+        quote_swap_(self, oracle_a, oracle_b, amount_in, a2b, clock)
     }
     
     /// Computes a swap quote for a given input amount and direction
@@ -249,16 +231,21 @@ module slamm::omm {
     /// - Time of last reference update (in ms)
     fun quote_swap_<A, B, W: drop>(
         self: &Pool<A, B, Hook<W>, State>,
+        oracle_a: &OracleInfo<PriceInfoObject, A>,
+        oracle_b: &OracleInfo<PriceInfoObject, B>,
         amount_in: u64,
         a2b: bool,
-        // The current timestamp in milliseconds.
-        current_ms: u64,
+        clock: &Clock,
     ): (SwapQuote, Decimal, Decimal, Decimal, u64) {
-        self.inner().assert_price_is_fresh_(current_ms);
         let (reserve_a, reserve_b) = self.total_funds();
 
         // Update price and vol reference depending on timespan ellapsed
-        let (reference_price, reference_vol, last_update_ms) = get_updated_references(self, current_ms);
+        let (reference_price, reference_vol, last_update_ms) = get_updated_references(
+            self,
+            oracle_a,
+            oracle_b,
+            clock,
+        );
 
         let amount_out = cpmm::quote_swap_impl(
             reserve_a,
@@ -270,7 +257,12 @@ module slamm::omm {
         let mut quote = self.get_quote(amount_in, amount_out, a2b);
 
         let new_instant_price_internal = new_instant_price_internal(self, &quote);
-        let new_instant_price_oracle = new_instant_price_oracle(self);
+        let new_instant_price_oracle = new_instant_price_oracle(
+            self,
+            oracle_a,
+            oracle_b,
+            clock
+        );
 
         let vol_accumulator = self.inner().new_volatility_accumulator(
             reference_price,
@@ -301,11 +293,13 @@ module slamm::omm {
     
     public fun quote_swap<A, B, W: drop>(
         self: &Pool<A, B, Hook<W>, State>,
+        oracle_a: &OracleInfo<PriceInfoObject, A>,
+        oracle_b: &OracleInfo<PriceInfoObject, B>,
         amount_in: u64,
         a2b: bool,
         clock: &Clock,
     ): SwapQuote {
-        let (quote, _, _, _, _) = quote_swap_impl(self, amount_in, a2b, clock.timestamp_ms());
+        let (quote, _, _, _, _) = quote_swap_impl(self, oracle_a, oracle_b, amount_in, a2b, clock);
 
         quote
     }
@@ -336,39 +330,39 @@ module slamm::omm {
     }
     
     public fun new_instant_price_oracle<A, B, W: drop>(
-        self: &Pool<A, B, Hook<W>, State>
+        // Remains here to assert type checking with oracles A and B
+        _self: &Pool<A, B, Hook<W>, State>,
+        oracle_a: &OracleInfo<PriceInfoObject, A>,
+        oracle_b: &OracleInfo<PriceInfoObject, B>,
+        clock: &Clock,
     ): Decimal {
         new_instant_price_oracle_(
-            &self.inner().price_info_a,
-            &self.inner().price_info_b,
+            oracle_a,
+            oracle_b,
+            clock,
         )
     }
     
-    public fun new_instant_price_oracle_(
-        price_info_a: &PriceInfo,
-        price_info_b: &PriceInfo,
+    fun new_instant_price_oracle_<A, B>(
+        oracle_a: &OracleInfo<PriceInfoObject, A>,
+        oracle_b: &OracleInfo<PriceInfoObject, B>,
+        clock: &Clock,
     ): Decimal {
-        assert!(price_info_a.price.gt(decimal::from(0)), EPriceInfoIsZero);
-        assert!(price_info_b.price.gt(decimal::from(0)), EPriceInfoIsZero);
+        let price_a = from_scaled_val(
+            oracle_a.get_price_with_fallback(clock)
+        );
+        
+        let price_b = from_scaled_val(
+            oracle_b.get_price_with_fallback(clock)
+        );
+
+        assert!(price_a.gt(decimal::from(0)), EPriceInfoIsZero);
+        assert!(price_b.gt(decimal::from(0)), EPriceInfoIsZero);
         
         get_oracle_price(
-            price_info_a.price,
-            price_info_b.price,
+            price_a,
+            price_b,
         )
-    }
-
-    /// Cache the price from pyth onto the state object. this needs to be done
-    /// before swapping
-    public fun refresh_reserve_prices<A, B, W: drop>(
-        self: &mut Pool<A, B, Hook<W>, State>,
-        price_feed_a: &PriceInfoObject,
-        price_feed_b: &PriceInfoObject,
-        clock: &Clock,
-    ) {
-        self.inner_mut().version.assert_version_and_upgrade(CURRENT_VERSION);
-
-        self.inner_mut().price_info_a.update_price(price_feed_a, clock);
-        self.inner_mut().price_info_b.update_price(price_feed_b, clock);
     }
 
     // ===== Versioning =====
@@ -395,8 +389,6 @@ module slamm::omm {
 
     // ===== Getter Functions =====
 
-    public fun price_info_a(self: &State): &PriceInfo { &self.price_info_a }
-    public fun price_info_b(self: &State): &PriceInfo { &self.price_info_b }
     public fun ema(self: &State): &Ema { &self.ema }
     public fun reference_val(self: &Ema): Decimal { self.reference_val }
     public fun accumulator(self: &Ema): Decimal { self.accumulator }
@@ -407,33 +399,6 @@ module slamm::omm {
     public fun filter_period(self: &State): u64 { self.filter_period }
     public fun decay_period(self: &State): u64 { self.decay_period }
     public fun fee_control(self: &State): Decimal { self.fee_control }
-
-    // ===== Assert Functions =====
-
-    // make sure we are using the latest published price on sui
-    public fun assert_price_is_fresh(
-        self: &State,
-        clock: &Clock,
-    ) {
-        assert_price_is_fresh_(self, clock.timestamp_ms());
-    }
-    
-    fun assert_price_is_fresh_(
-        self: &State,
-        current_ms: u64,
-    ) {
-        let cur_time_s = current_ms / 1000;
-
-        assert!(
-            cur_time_s - self.price_info_a.price_last_update_timestamp_s <= PRICE_STALENESS_THRESHOLD_S, 
-            EPriceStale
-        );
-        
-        assert!(
-            cur_time_s - self.price_info_b.price_last_update_timestamp_s <= PRICE_STALENESS_THRESHOLD_S, 
-            EPriceStale
-        );
-    }
     
     // ===== Private Functions =====
 
@@ -460,9 +425,12 @@ module slamm::omm {
     /// - Last update in miliseconds
     fun get_updated_references<A, B, W: drop>(
         self: &Pool<A, B, Hook<W>, State>,
-        current_ms: u64,
+        oracle_a: &OracleInfo<PriceInfoObject, A>,
+        oracle_b: &OracleInfo<PriceInfoObject, B>,
+        clock: &Clock,
     ): (Decimal, Decimal, u64) {
         let state = self.inner();
+        let current_ms = clock.timestamp_ms();
         let time_elapsed = current_ms - state.last_update_ms;
 
         if (time_elapsed >= state.filter_period && time_elapsed <= state.decay_period) {
@@ -470,13 +438,13 @@ module slamm::omm {
             let vol_accumulated = self.inner().ema.accumulator;
 
             let reference_val = vol_accumulated.mul(reduction_factor);
-            let reference_price = new_instant_price_oracle(self);
+            let reference_price = new_instant_price_oracle(self, oracle_a, oracle_b, clock);
             return (reference_price, reference_val, current_ms)
         };
 
         if (time_elapsed > state.decay_period) {
             let reference_val = decimal::from(0);
-            let reference_price = new_instant_price_oracle(self);
+            let reference_price = new_instant_price_oracle(self, oracle_a, oracle_b, clock);
             return (reference_price, reference_val, current_ms)
         };
 
@@ -540,34 +508,6 @@ module slamm::omm {
         }
     }
 
-    fun from_price_feed(
-        price_feed: &PriceInfoObject,
-        clock: &Clock,
-    ): PriceInfo {
-        let (mut price, smoothed_price, price_identifier) = oracles::get_pyth_price_and_identifier(price_feed, clock);
-
-        PriceInfo {
-            price_identifier,
-            price: option::extract(&mut price),
-            smoothed_price,
-            price_last_update_timestamp_s: clock::timestamp_ms(clock) / 1000,
-        }
-    }
-
-    fun update_price(
-        self: &mut PriceInfo,
-        price_feed: &PriceInfoObject,
-        clock: &Clock,
-    ) {
-        let (mut price, smoothed_price, price_identifier) = oracles::get_pyth_price_and_identifier(price_feed, clock);
-        assert!(price_identifier == self.price_identifier, EPriceIdentifierMismatch);
-        assert!(option::is_some(&price), EInvalidPrice);
-
-        self.price = option::extract(&mut price);
-        self.smoothed_price = smoothed_price;
-        self.price_last_update_timestamp_s = clock::timestamp_ms(clock) / 1000;
-    }
-
     #[allow(unused_function)]
     fun get_oracle_output_amount(
         amount_in: u64,
@@ -590,42 +530,21 @@ module slamm::omm {
     #[test_only]
     public(package) fun quote_swap_for_testing<A, B, W: drop>(
         self: &Pool<A, B, Hook<W>, State>,
+        oracle_a: &OracleInfo<PriceInfoObject, A>,
+        oracle_b: &OracleInfo<PriceInfoObject, B>,
         amount_in: u64,
         a2b: bool,
-        current_ms: u64,
+        clock: &Clock,
     ): (SwapQuote, Decimal, Decimal, Decimal, u64) {
         quote_swap_(
             self,
+            oracle_a,
+            oracle_b,
             amount_in,
             a2b,
-            current_ms,
+            clock,
         )
 
-    }
-    
-    #[test_only]
-    public(package) fun set_oracle_price_as_hypothetical_internal_reserves<A, B, W: drop>(
-        self: &mut Pool<A, B, Hook<W>, State>,
-        reserve_a: u64,
-        reserve_b: u64,
-        clock: &Clock,
-    ) {
-        self.inner_mut().price_info_a.price = decimal::from(reserve_a);
-        self.inner_mut().price_info_a.smoothed_price = decimal::from(reserve_a);
-        self.inner_mut().price_info_b.price = decimal::from(reserve_b);
-        self.inner_mut().price_info_b.smoothed_price = decimal::from(reserve_b);
-        self.inner_mut().price_info_b.price_last_update_timestamp_s = clock.timestamp_ms() / 1_000;
-        self.inner_mut().price_info_a.price_last_update_timestamp_s = clock.timestamp_ms() / 1_000;
-    }
-    
-    #[test_only]
-    public(package) fun set_oracle_price_as_internal_for_testing<A, B, W: drop>(
-        self: &mut Pool<A, B, Hook<W>, State>,
-        clock: &Clock,
-    ) {
-        let reserve_a = self.total_funds_a();
-        let reserve_b = self.total_funds_b();
-        set_oracle_price_as_hypothetical_internal_reserves(self, reserve_a, reserve_b, clock)
     }
     
     #[test_only]
