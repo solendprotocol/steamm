@@ -1,7 +1,9 @@
 #[test_only]
 module slamm::test_utils {
+    use std::option::{some, none};
     use slamm::cpmm::{Self, State as CpmmState, Hook as CpmmHook};
     use slamm::registry;
+    use slamm::oracle_wrapper;
     use slamm::omm::{Self, Hook as OmmHook, State as OmmState};
     use slamm::bank::{Self, Bank};
     use slamm::pool::{Pool};
@@ -16,11 +18,7 @@ module slamm::test_utils {
     use suilend::test_sui::{TEST_SUI};
     use suilend::lending_market::{Self, LENDING_MARKET};
     use suilend::reserve_config;
-    use pyth::price_info::{Self, PriceInfoObject};
-    use pyth::price_feed;
-    use pyth::price_identifier;
-    use pyth::price;
-    use pyth::i64;
+    use pyth::price_info::{PriceInfoObject};
 
     public fun e9(amt: u64): u64 {
         1_000_000_000 * amt
@@ -126,13 +124,12 @@ module slamm::test_utils {
     }
     
     #[test_only]
-    public fun get_price_info(
+    public fun get_price_info<CoinType>(
         idx: u8,
-        price_: u64,
-        exponent: u64,
+        price: u64,
         clock: &Clock,
         ctx: &mut TxContext,
-    ): PriceInfoObject {
+    ): OracleInfo<PriceInfoObject, CoinType> {
         let mut v = vector::empty<u8>();
         vector::push_back(&mut v, idx);
 
@@ -142,38 +139,15 @@ module slamm::test_utils {
             i = i + 1;
         };
 
-        let price_info_obj = price_info::new_price_info_object_for_testing(
-            price_info::new_price_info(
-                0,
-                0,
-                price_feed::new(
-                    price_identifier::from_byte_vec(v),
-                    price::new(
-                        i64::new(price_, false),
-                        0,
-                        i64::new(exponent, false),
-                        clock.timestamp_ms(),
-                    ),
-                    price::new(
-                        i64::new(price_, false),
-                        0,
-                        i64::new(exponent, false),
-                        clock.timestamp_ms(),
-                    )
-                )
-            ),
-            ctx
-        );
-
-        price_info_obj
+        oracle_wrapper::new_oracle_for_testing<PriceInfoObject, CoinType>(v, some(price as u256), none(), clock, ctx)
     }
     
     #[test_only]
-    public fun zero_price_info(
+    public fun zero_price_info<CoinType>(
         idx: u8,
         clock: &Clock,
         ctx: &mut TxContext,
-    ): PriceInfoObject {
+    ): OracleInfo<PriceInfoObject, CoinType> {
         let mut v = vector::empty<u8>();
         vector::push_back(&mut v, idx);
 
@@ -183,57 +157,22 @@ module slamm::test_utils {
             i = i + 1;
         };
 
-        let price_info_obj = price_info::new_price_info_object_for_testing(
-            price_info::new_price_info(
-                0,
-                0,
-                price_feed::new(
-                    price_identifier::from_byte_vec(v),
-                    price::new(
-                        i64::new(0, false),
-                        0,
-                        i64::new(0, false),
-                        clock.timestamp_ms(),
-                    ),
-                    price::new(
-                        i64::new(0, false),
-                        0,
-                        i64::new(0, false),
-                        clock.timestamp_ms(),
-                    )
-                )
-            ),
-            ctx
-        );
-
-        price_info_obj
+        oracle_wrapper::new_oracle_for_testing<PriceInfoObject, CoinType>(v, some(0 as u256), none(), clock, ctx)
     }
 
-    public fun update_pyth_price(price_info_obj: &mut PriceInfoObject, price: u64, expo: u8, clock: &Clock) {
-        let price_info = price_info::get_price_info_from_price_info_object(price_info_obj);
-
-        let price = price::new(
-            i64::new(price, false),
-            0,
-            i64::new((expo as u64), false),
-            clock.timestamp_ms() / 1000
-        );
-
-        price_info::update_price_info_object_for_testing(
-            price_info_obj,
-            &price_info::new_price_info(
-                0,
-                0,
-                price_feed::new(
-                    price_info::get_price_identifier(&price_info),
-                    price,
-                    price
-                )
-            )
-        );
+    public fun set_oracle_price_as_internal_for_testing<A, B, W: drop>(
+        pool: &mut Pool<A, B, OmmHook<W>, OmmState>,
+        oracle_a: &mut OracleInfo<PriceInfoObject, A>,
+        oracle_b: &mut OracleInfo<PriceInfoObject, B>,
+        clock: &Clock,
+    ) {
+        let a = pool.total_funds_a();
+        let b = pool.total_funds_b();
         
+        oracle_a.set_oracle_price_for_testing(a as u256, clock);
+        oracle_b.set_oracle_price_for_testing(b as u256, clock);
     }
-
+    
     public fun update_pool_oracle_price_ahead_of_trade<A, B, W: drop>(
         pool: &mut Pool<A, B, OmmHook<W>, OmmState>,
         oracle_a: &mut OracleInfo<PriceInfoObject, A>,
@@ -243,7 +182,8 @@ module slamm::test_utils {
         clock_bump_seconds: u64,
         clock: &mut Clock,
     ) {
-        bump_clock_seconds(clock_bump_seconds, clock);
+        let clock_time = clock.timestamp_ms();
+        bump_clock_seconds(clock, clock_bump_seconds);
         let (quote, _, _, _, _) = omm::quote_swap_for_testing(
             pool,
             oracle_a,
@@ -253,17 +193,19 @@ module slamm::test_utils {
             clock,
         );
 
+        // Set back clock to initial time
+        clock.set_for_testing(clock_time);
+
         let a = if (a2b) {pool.total_funds_a() + quote.amount_in()} else {pool.total_funds_a() - quote.amount_out()};
         let b = if (a2b) {pool.total_funds_b() - quote.amount_out()} else {pool.total_funds_b() + quote.amount_in()};
         
         oracle_a.set_oracle_price_for_testing(a as u256, clock);
         oracle_b.set_oracle_price_for_testing(b as u256, clock);
-
     }
     
     public fun bump_clock_seconds(
-        clock_bump_seconds: u64,
         clock: &mut Clock,
+        clock_bump_seconds: u64,
     ) {
         let clock_time = clock.timestamp_ms();
         clock.set_for_testing(clock_time + (clock_bump_seconds * 1_000));

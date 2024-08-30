@@ -24,7 +24,7 @@ module slamm::oracle_wrapper {
     const MAX_STALENESS_SECONDS: u64 = 60;
 
     const CURRENT_VERSION: u16 = 1;
-    const PRICE_STALENESS_THRESHOLD_S: u64 = 0;
+    const PRICE_STALENESS_THRESHOLD_S: u64 = 15;
 
     // ===== Errors =====
 
@@ -268,16 +268,6 @@ module slamm::oracle_wrapper {
         }
     }
 
-    #[test_only]
-    public fun set_oracle_price_for_testing<Source, CointType>(
-        self: &mut OracleInfo<Source, CointType>,
-        price: u256,
-        clock: &Clock,
-    ) {
-        self.price.swap_or_fill(Price { price });
-        self.price_last_update_timestamp_s = clock.timestamp_ms() / 1_000;
-    }
-
     // ===== Versioning Functions =====
 
     public fun upgrade_registry(
@@ -356,4 +346,46 @@ module slamm::oracle_wrapper {
     // ): Decimal {
     //     price_a.div(price_b)
     // }
+
+    // ===== Test-only Functions =====
+
+    #[test_only]
+    public fun new_oracle_for_testing<Source, CoinType>(
+        price_identifier: vector<u8>,
+        mut price: Option<u256>,
+        mut smoothed_price: Option<u256>,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ): OracleInfo<Source, CoinType> {
+        OracleInfo<Source, CoinType> {
+            id: object::new(ctx),
+            version: CURRENT_VERSION,
+            price_identifier: PriceId { bytes: price_identifier },
+            price: if (price.is_some()) { some(Price { price: price.extract() }) } else { none() },
+            smoothed_price: if (smoothed_price.is_some()) { some(Price { price: smoothed_price.extract() }) } else { none() },
+            price_last_update_timestamp_s: clock::timestamp_ms(clock) / 1000,
+        }
+    }
+
+    #[test_only]
+    public fun set_oracle_price_for_testing<Source, CointType>(
+        self: &mut OracleInfo<Source, CointType>,
+        price: u256,
+        clock: &Clock,
+    ) {
+        self.price.swap_or_fill(Price { price });
+        self.price_last_update_timestamp_s = clock.timestamp_ms() / 1_000;
+    }
+    
+    #[test_only]
+    public fun set_oracle_for_testing<Source, CoinType>(
+        oracle: &mut OracleInfo<Source, CoinType>,
+        mut price: Option<u256>,
+        mut smoothed_price: Option<u256>,
+        clock: &Clock,
+    ) {
+        oracle.price = if (price.is_some()) { some(Price { price: price.extract() }) } else { none() };
+        oracle.smoothed_price = if (smoothed_price.is_some()) { some(Price { price: smoothed_price.extract() }) } else { none() };
+        oracle.price_last_update_timestamp_s = clock::timestamp_ms(clock) / 1000;
+    }
 }
