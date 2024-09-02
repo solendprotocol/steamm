@@ -9,7 +9,7 @@ module slamm::test_utils {
     use slamm::pool::{Pool};
     use slamm::oracle_wrapper::OracleInfo;
     use sui::test_utils::destroy;
-    use sui::clock::{Self, Clock};
+    use sui::clock::Clock;
     use sui::test_scenario::{Self, ctx, Scenario};
     use sui::sui::SUI;
     use sui::bag::{Self, Bag};
@@ -203,8 +203,6 @@ module slamm::test_utils {
         oracle_a.set_oracle_price_for_testing(a as u256, clock);
         oracle_b.set_oracle_price_for_testing(b as u256, clock);
     }
-
-    use std::debug::print;
     
     public fun bump_clock_seconds(
         clock: &mut Clock,

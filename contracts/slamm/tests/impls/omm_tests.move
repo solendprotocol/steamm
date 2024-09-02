@@ -1782,8 +1782,6 @@ module slamm::omm_tests {
         destroy(lending_market);
         test_scenario::end(scenario);
     }
-
-    use std::debug::print;
     
     // Assert that:
     // - Reference price does not change in filter period
