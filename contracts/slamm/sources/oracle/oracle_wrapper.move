@@ -179,7 +179,7 @@ module slamm::oracle_wrapper {
             return price.extract()
         }
     }
-    
+
     public fun assert_liveness<CoinType>(
         oracle_info: &OracleInfo<PriceInfoObject, CoinType>,
         clock: &Clock,
@@ -374,6 +374,14 @@ module slamm::oracle_wrapper {
         clock: &Clock,
     ) {
         self.price.swap_or_fill(Price { price });
+        self.price_last_update_timestamp_s = clock.timestamp_ms() / 1_000;
+    }
+    
+    #[test_only]
+    public fun set_oracle_ts_for_testing<Source, CointType>(
+        self: &mut OracleInfo<Source, CointType>,
+        clock: &Clock,
+    ) {
         self.price_last_update_timestamp_s = clock.timestamp_ms() / 1_000;
     }
     

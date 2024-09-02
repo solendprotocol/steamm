@@ -9,7 +9,7 @@ module slamm::test_utils {
     use slamm::pool::{Pool};
     use slamm::oracle_wrapper::OracleInfo;
     use sui::test_utils::destroy;
-    use sui::clock::Clock;
+    use sui::clock::{Self, Clock};
     use sui::test_scenario::{Self, ctx, Scenario};
     use sui::sui::SUI;
     use sui::bag::{Self, Bag};
@@ -182,8 +182,11 @@ module slamm::test_utils {
         clock_bump_seconds: u64,
         clock: &mut Clock,
     ) {
-        let clock_time = clock.timestamp_ms();
         bump_clock_seconds(clock, clock_bump_seconds);
+
+        oracle_a.set_oracle_ts_for_testing(clock);
+        oracle_b.set_oracle_ts_for_testing(clock);
+        
         let (quote, _, _, _, _) = omm::quote_swap_for_testing(
             pool,
             oracle_a,
@@ -194,14 +197,14 @@ module slamm::test_utils {
         );
 
         // Set back clock to initial time
-        clock.set_for_testing(clock_time);
-
         let a = if (a2b) {pool.total_funds_a() + quote.amount_in()} else {pool.total_funds_a() - quote.amount_out()};
         let b = if (a2b) {pool.total_funds_b() - quote.amount_out()} else {pool.total_funds_b() + quote.amount_in()};
         
         oracle_a.set_oracle_price_for_testing(a as u256, clock);
         oracle_b.set_oracle_price_for_testing(b as u256, clock);
     }
+
+    use std::debug::print;
     
     public fun bump_clock_seconds(
         clock: &mut Clock,

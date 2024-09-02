@@ -42,7 +42,7 @@ module slamm::omm_tests {
 
         
         let price_info_a = test_utils::get_price_info(1, 10, &clock, ctx); // price: 10
-        let price_info_b = test_utils::get_price_info(2, 5, &clock, ctx); // price: 5
+        let price_info_b = test_utils::get_price_info(2, 10, &clock, ctx); // price: 10
         
         let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
             Wit {},
@@ -526,15 +526,15 @@ module slamm::omm_tests {
         // Swap
         test_scenario::next_tx(&mut scenario, TRADER);
 
-        let new_ts = clock.timestamp_ms() + 1000; // 1 second
-        clock.set_for_testing(new_ts);
-
         oracle_wrapper::set_oracle_for_testing(
             &mut price_info_a,
             some(5_u256),
             none(),
             &clock,
         );
+
+        let new_ts = clock.timestamp_ms() + 1000 * 16; // 16 seconds
+        clock.set_for_testing(new_ts);
         
         let (_, _, _, vol, _) = omm::quote_swap_impl(
             &pool,
@@ -1592,7 +1592,6 @@ module slamm::omm_tests {
         let mut coin_a = coin::mint_for_testing<SUI>(100_000_000, ctx);
         let mut coin_b = coin::mint_for_testing<COIN>(0, ctx);
 
-        
         // Initial trade to create some accumulated volatility
         let swap_intent = pool.omm_intent_swap(
             &price_info_a,
@@ -1783,6 +1782,8 @@ module slamm::omm_tests {
         destroy(lending_market);
         test_scenario::end(scenario);
     }
+
+    use std::debug::print;
     
     // Assert that:
     // - Reference price does not change in filter period

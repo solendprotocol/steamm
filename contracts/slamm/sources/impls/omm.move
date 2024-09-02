@@ -160,6 +160,7 @@ module slamm::omm {
         );
         
         // Update parameters
+        // print(&vol_accumulator);
         self.inner_mut().ema.accumulator = vol_accumulator;
         self.inner_mut().reference_price = reference_price;
         self.inner_mut().ema.reference_val = reference_vol;
@@ -263,6 +264,14 @@ module slamm::omm {
             oracle_b,
             clock
         );
+
+        // print(&@0x99);
+        // print(&reference_price); // 2000000000000000000
+        // print(&reference_vol); // 0 --> no volatility
+        // print(&new_instant_price_internal); // --> internal price = 1209756355070088884
+        // print(&new_instant_price_oracle); // --> oracle price = 2000000000000000000
+
+        // print(&@0x88);
 
         let vol_accumulator = self.inner().new_volatility_accumulator(
             reference_price,
