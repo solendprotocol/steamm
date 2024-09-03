@@ -28,7 +28,9 @@ module slamm::oracle_wrapper {
 
     // ===== Errors =====
 
-    public struct OracleKey<phantom Source, phantom CoinType> has store, copy, drop {}
+    public struct OracleKey<phantom CoinType> has store, copy, drop {}
+    
+    public struct PythKey has store, copy, drop {}
 
     public struct OracleRegistry has key, store {
         id: UID,
@@ -47,7 +49,7 @@ module slamm::oracle_wrapper {
     // price is computed by base * 10^(exponent)
     // this struct does not have the store ability. 
     // invariant: Price objects are never stale.
-    public struct Price<phantom Source, phantom CoinType> has store, copy, drop {
+    public struct Price<phantom CoinType> has store, copy, drop {
         price: u256
     }
 
@@ -55,14 +57,19 @@ module slamm::oracle_wrapper {
     /// Price info has key so it can be queried as a standalone object, therefore
     /// avoiding centralising all price feeds into one object with dynamic fields.
     /// We keep track of all the price info object in the OracleRegistry
-    public struct OracleInfo<phantom Source, phantom CoinType> has key, store {
+    public struct OracleInfo<phantom CoinType> has key, store {
         id: UID,
         version: u16,
+        oracle_type: u8,
+        fields: Bag,
+    }
+    
+    public struct PythData<phantom CoinType> has store {
         price_identifier: PriceId,
-        price: Option<Price<Source, CoinType>>,
+        price: Option<Price<CoinType>>,
         // Added option here assuming some feeds might not offer
         // smoothed price
-        smoothed_price: Option<Price<Source, CoinType>>,
+        smoothed_price: Option<Price<CoinType>>,
         price_last_update_timestamp_s: u64,
     }
 
@@ -90,7 +97,7 @@ module slamm::oracle_wrapper {
         price_info_obj: &PriceInfoObject,
         clock: &Clock,
         ctx: &mut TxContext,
-    ): OracleInfo<PriceInfoObject, CoinType> {
+    ): OracleInfo<CoinType> {
         let (mut price, smoothed_price) = get_pyth_price(price_info_obj, clock);
         let price_info = price_info_obj.get_price_info_from_price_info_object();
         let price_feed = price_info.get_price_feed();
@@ -100,18 +107,26 @@ module slamm::oracle_wrapper {
         let oracle_uid = object::new(ctx);
         let oracle_id = oracle_uid.uid_to_inner();
 
-        let price_info = OracleInfo<PriceInfoObject, CoinType> {
-            id: oracle_uid,
-            version: CURRENT_VERSION,
+        let pyth_data = PythData<CoinType> {
             price_identifier: PriceId { bytes: price_identifier },
             price: if (price.is_none()) { none() } else { some(Price { price: price.extract() })},
             smoothed_price: some(Price { price: smoothed_price}),
             price_last_update_timestamp_s: clock::timestamp_ms(clock) / 1000,
         };
 
+        let mut fields = bag::new(ctx);
+        fields.add(PythKey {}, pyth_data);
+
+        let price_info = OracleInfo<CoinType> {
+            id: oracle_uid,
+            version: CURRENT_VERSION,
+            oracle_type: 1,
+            fields,
+        };
+
         // Add oracle ID to registry
         registry.oracles.add(
-            OracleKey<PriceInfoObject, CoinType> {},
+            OracleKey<CoinType> {},
             oracle_id
         );
 
@@ -120,7 +135,7 @@ module slamm::oracle_wrapper {
 
     // errors if the PriceInfoObject is stale/invalid.
     public fun update_pyth_price_for_cointype<CoinType>(
-        oracle_info: &mut OracleInfo<PriceInfoObject, CoinType>,
+        oracle_info: &mut OracleInfo<CoinType>,
         price_info: &PriceInfoObject,
         clock: &Clock,
     ) {
@@ -129,42 +144,48 @@ module slamm::oracle_wrapper {
         let price_feed = price_info_.get_price_feed();
         let price_identifier = price_feed.get_price_identifier().get_bytes();
 
-        assert!(price_identifier == oracle_info.price_identifier.bytes, EPriceIdentifierMismatch);
+        let pyth_data: &mut PythData<CoinType> = oracle_info.fields.borrow_mut(PythKey {});
+
+        assert!(price_identifier == pyth_data.price_identifier.bytes, EPriceIdentifierMismatch);
         assert!(option::is_some(&price), EInvalidPrice);
 
-        oracle_info.price = if (price.is_none()) { none() } else { some(Price { price: price.extract() })};
-        oracle_info.smoothed_price = some(Price { price: smoothed_price});
-        oracle_info.price_last_update_timestamp_s = clock::timestamp_ms(clock) / 1000;
+        pyth_data.price = if (price.is_none()) { none() } else { some(Price { price: price.extract() })};
+        pyth_data.smoothed_price = some(Price { price: smoothed_price});
+        pyth_data.price_last_update_timestamp_s = clock::timestamp_ms(clock) / 1000;
     }
     
     public fun get_price<CoinType>(
-        oracle_info: &OracleInfo<PriceInfoObject, CoinType>,
+        oracle_info: &OracleInfo<CoinType>,
         clock: &Clock,
     ): Option<u256> {
         oracle_info.assert_liveness(clock);
 
-        if (oracle_info.price.is_some()) {
-            some(oracle_info.price.borrow().price)
+        let pyth_data: &PythData<CoinType> = oracle_info.fields.borrow(PythKey {});
+
+        if (pyth_data.price.is_some()) {
+            some(pyth_data.price.borrow().price)
         } else {
             none()
         }
     }
 
     public fun get_smoothed_price<CoinType>(
-        oracle_info: &OracleInfo<PriceInfoObject, CoinType>,
+        oracle_info: &OracleInfo<CoinType>,
         clock: &Clock,
     ): Option<u256> {
         oracle_info.assert_liveness(clock);
 
-        if (oracle_info.smoothed_price.is_some()) {
-            some(oracle_info.smoothed_price.borrow().price)
+        let pyth_data: &PythData<CoinType> = oracle_info.fields.borrow(PythKey {});
+
+        if (pyth_data.smoothed_price.is_some()) {
+            some(pyth_data.smoothed_price.borrow().price)
         } else {
             none()
         }
     }
 
     public fun get_price_with_fallback<CoinType>(
-        oracle_info: &OracleInfo<PriceInfoObject, CoinType>,
+        oracle_info: &OracleInfo<CoinType>,
         clock: &Clock,
     ): u256 {
         oracle_info.assert_liveness(clock);
@@ -181,32 +202,38 @@ module slamm::oracle_wrapper {
     }
 
     public fun assert_liveness<CoinType>(
-        oracle_info: &OracleInfo<PriceInfoObject, CoinType>,
+        oracle_info: &OracleInfo<CoinType>,
         clock: &Clock,
     ) {
         let cur_time_s = clock.timestamp_ms() / 1000;
 
+        let pyth_data: &PythData<CoinType> = oracle_info.fields.borrow(PythKey {});
+
         assert!(
-            cur_time_s - oracle_info.price_last_update_timestamp_s <= PRICE_STALENESS_THRESHOLD_S, 
+            cur_time_s - pyth_data.price_last_update_timestamp_s <= PRICE_STALENESS_THRESHOLD_S, 
             EPriceStale
         );
     }
 
     fun get_price_unchecked<CoinType>(
-        oracle_info: &OracleInfo<PriceInfoObject, CoinType>,
+        oracle_info: &OracleInfo<CoinType>,
     ): Option<u256> {
-        if (oracle_info.price.is_some()) {
-            some(oracle_info.price.borrow().price)
+        let pyth_data: &PythData<CoinType> = oracle_info.fields.borrow(PythKey {});
+
+        if (pyth_data.price.is_some()) {
+            some(pyth_data.price.borrow().price)
         } else {
             none()
         }
     }
 
     fun get_smoothed_price_unchecked<CoinType>(
-        oracle_info: &OracleInfo<PriceInfoObject, CoinType>,
+        oracle_info: &OracleInfo<CoinType>,
     ): Option<u256> {
-        if (oracle_info.smoothed_price.is_some()) {
-            some(oracle_info.smoothed_price.borrow().price)
+        let pyth_data: &PythData<CoinType> = oracle_info.fields.borrow(PythKey {});
+
+        if (pyth_data.smoothed_price.is_some()) {
+            some(pyth_data.smoothed_price.borrow().price)
         } else {
             none()
         }
@@ -279,9 +306,9 @@ module slamm::oracle_wrapper {
         self.version = current_version;
     }
     
-    public fun upgrade_oracle<Source, CoinType>(
+    public fun upgrade_oracle<CoinType>(
         _: &Admin,
-        self: &mut OracleInfo<Source, CoinType>,
+        self: &mut OracleInfo<CoinType>,
         current_version: u16,
     ) {
         assert!(self.version < current_version, EIncorrectVersion);
@@ -304,97 +331,67 @@ module slamm::oracle_wrapper {
         assert_version(version, CURRENT_VERSION);
     }
 
-
-    // ===== Private Functions =====
-
-    // fun update_price<CoinType>(
-    //     self: &mut OracleInfo<PriceInfoObject, CoinType>,
-    //     price_info: &PriceInfoObject,
-    //     clock: &Clock,
-    // ) {
-    //     let price_feed = price_info.get_price_info_from_price_info_object().get_price_feed();
-    //     let price_identifier = price_feed.get_price_identifier().get_bytes();
-
-    //     let (mut price, smoothed_price) = get_pyth_price(price_info, clock);
-    //     assert!(option::is_some(&price), EInvalidPrice);
-    //     assert!(price_identifier == self.price_identifier.bytes, EPriceIdentifierMismatch);
-
-    //     if (price.is_none()) {
-    //         self.price = none();
-    //     } else {
-    //         self.price.swap_or_fill(
-    //             Price { price: price.extract() }
-    //         );
-    //     };
-        
-    //     self.smoothed_price.swap_or_fill(Price { price: smoothed_price });
-    //     self.price_last_update_timestamp_s = clock::timestamp_ms(clock) / 1000;
-    // }
-
-    // #[allow(unused_function)]
-    // fun get_oracle_output_amount(
-    //     amount_in: u64,
-    //     input_price: Decimal,
-    //     output_price: Decimal
-    // ): u64 {
-    //     decimal::from(amount_in).mul(input_price).div(output_price).floor()
-    // }
-    
-    // fun get_oracle_price(
-    //     price_a: Decimal,
-    //     price_b: Decimal
-    // ): Decimal {
-    //     price_a.div(price_b)
-    // }
-
     // ===== Test-only Functions =====
 
     #[test_only]
-    public fun new_oracle_for_testing<Source, CoinType>(
+    public fun new_pyth_oracle_for_testing<CoinType>(
         price_identifier: vector<u8>,
         mut price: Option<u256>,
         mut smoothed_price: Option<u256>,
         clock: &Clock,
         ctx: &mut TxContext,
-    ): OracleInfo<Source, CoinType> {
-        OracleInfo<Source, CoinType> {
-            id: object::new(ctx),
-            version: CURRENT_VERSION,
+    ): OracleInfo<CoinType> {
+        let pyth_data = PythData<CoinType> {
             price_identifier: PriceId { bytes: price_identifier },
-            price: if (price.is_some()) { some(Price { price: price.extract() }) } else { none() },
+            price: if (price.is_none()) { none() } else { some(Price { price: price.extract() })},
             smoothed_price: if (smoothed_price.is_some()) { some(Price { price: smoothed_price.extract() }) } else { none() },
             price_last_update_timestamp_s: clock::timestamp_ms(clock) / 1000,
+        };
+
+        let mut fields = bag::new(ctx);
+        fields.add(PythKey {}, pyth_data);
+
+        OracleInfo<CoinType> {
+            id: object::new(ctx),
+            version: CURRENT_VERSION,
+            oracle_type: 1,
+            fields,
         }
     }
 
     #[test_only]
-    public fun set_oracle_price_for_testing<Source, CointType>(
-        self: &mut OracleInfo<Source, CointType>,
+    public fun set_oracle_price_for_testing<CoinType>(
+        self: &mut OracleInfo<CoinType>,
         price: u256,
         clock: &Clock,
     ) {
-        self.price.swap_or_fill(Price { price });
-        self.price_last_update_timestamp_s = clock.timestamp_ms() / 1_000;
+        let pyth_data: &mut PythData<CoinType> = self.fields.borrow_mut(PythKey {});
+
+        pyth_data.price.swap_or_fill(Price { price });
+        pyth_data.price_last_update_timestamp_s = clock.timestamp_ms() / 1_000;
     }
     
     #[test_only]
-    public fun set_oracle_ts_for_testing<Source, CointType>(
-        self: &mut OracleInfo<Source, CointType>,
+    public fun set_oracle_ts_for_testing<CoinType>(
+        self: &mut OracleInfo<CoinType>,
         clock: &Clock,
     ) {
-        self.price_last_update_timestamp_s = clock.timestamp_ms() / 1_000;
+        let pyth_data: &mut PythData<CoinType> = self.fields.borrow_mut(PythKey {});
+        pyth_data.price_last_update_timestamp_s = clock.timestamp_ms() / 1_000;
     }
     
     #[test_only]
-    public fun set_oracle_for_testing<Source, CoinType>(
-        oracle: &mut OracleInfo<Source, CoinType>,
+    public fun set_oracle_for_testing<CoinType>(
+        self: &mut OracleInfo<CoinType>,
         mut price: Option<u256>,
         mut smoothed_price: Option<u256>,
         clock: &Clock,
     ) {
-        oracle.price = if (price.is_some()) { some(Price { price: price.extract() }) } else { none() };
-        oracle.smoothed_price = if (smoothed_price.is_some()) { some(Price { price: smoothed_price.extract() }) } else { none() };
-        oracle.price_last_update_timestamp_s = clock::timestamp_ms(clock) / 1000;
+        let pyth_data: &mut PythData<CoinType> = self.fields.borrow_mut(PythKey {});
+
+        pyth_data.price = if (price.is_some()) { some(Price { price: price.extract() }) } else { none() };
+        pyth_data.smoothed_price = if (smoothed_price.is_some()) { some(Price { price: smoothed_price.extract() }) } else { none() };
+        pyth_data.price_last_update_timestamp_s = clock::timestamp_ms(clock) / 1000;
     }
 
     #[test_only]
@@ -494,23 +491,25 @@ module slamm::oracle_wrapper {
             ctx(&mut scenario),
         );
 
+        let pyth_data: &PythData<TestCoin> = oracle.fields.borrow(PythKey {});
+
         assert_eq(
-            decimal::from_scaled_val(oracle.price.borrow().price).floor(),
+            decimal::from_scaled_val(pyth_data.price.borrow().price).floor(),
             1
         );
 
         assert_eq(
-            decimal::from_scaled_val(oracle.smoothed_price.borrow().price).floor(),
+            decimal::from_scaled_val(pyth_data.smoothed_price.borrow().price).floor(),
             1
         );
 
         assert_eq(
-            oracle.price_last_update_timestamp_s,
+            pyth_data.price_last_update_timestamp_s,
             current_ts / 1000
         );
 
         assert_eq(
-            registry.oracles.contains(OracleKey<PriceInfoObject, TestCoin> {}),
+            registry.oracles.contains(OracleKey<TestCoin> {}),
             true,
         );
 
@@ -546,18 +545,20 @@ module slamm::oracle_wrapper {
             ctx(&mut scenario),
         );
 
+        let pyth_data: &PythData<TestCoin> = oracle.fields.borrow(PythKey {});
+
         assert_eq(
-            decimal::from_scaled_val(oracle.price.borrow().price).floor(),
+            decimal::from_scaled_val(pyth_data.price.borrow().price).floor(),
             1
         );
 
         assert_eq(
-            decimal::from_scaled_val(oracle.smoothed_price.borrow().price).floor(),
+            decimal::from_scaled_val(pyth_data.smoothed_price.borrow().price).floor(),
             1
         );
 
         assert_eq(
-            oracle.price_last_update_timestamp_s,
+            pyth_data.price_last_update_timestamp_s,
             current_ts / 1000
         );
 
@@ -568,18 +569,20 @@ module slamm::oracle_wrapper {
 
         update_pyth_price_for_cointype(&mut oracle, &price_info_obj_2, &clock);
 
+        let pyth_data: &PythData<TestCoin> = oracle.fields.borrow(PythKey {});
+
         assert_eq(
-            decimal::from_scaled_val(oracle.price.borrow().price).floor(),
+            decimal::from_scaled_val(pyth_data.price.borrow().price).floor(),
             10
         );
         
         assert_eq(
-            decimal::from_scaled_val(oracle.smoothed_price.borrow().price).floor(),
+            decimal::from_scaled_val(pyth_data.smoothed_price.borrow().price).floor(),
             10
         );
 
         assert_eq(
-            oracle.price_last_update_timestamp_s,
+            pyth_data.price_last_update_timestamp_s,
             current_ts / 1000
         );
 
@@ -617,18 +620,20 @@ module slamm::oracle_wrapper {
             ctx(&mut scenario),
         );
 
+        let pyth_data: &PythData<TestCoin> = oracle.fields.borrow(PythKey {});
+
         assert_eq(
-            decimal::from_scaled_val(oracle.price.borrow().price).floor(),
+            decimal::from_scaled_val(pyth_data.price.borrow().price).floor(),
             1
         );
 
         assert_eq(
-            decimal::from_scaled_val(oracle.smoothed_price.borrow().price).floor(),
+            decimal::from_scaled_val(pyth_data.smoothed_price.borrow().price).floor(),
             1
         );
 
         assert_eq(
-            oracle.price_last_update_timestamp_s,
+            pyth_data.price_last_update_timestamp_s,
             current_ts / 1000
         );
 
@@ -673,18 +678,20 @@ module slamm::oracle_wrapper {
             ctx(&mut scenario),
         );
 
+        let pyth_data: &PythData<TestCoin> = oracle.fields.borrow(PythKey {});
+
         assert_eq(
-            decimal::from_scaled_val(oracle.price.borrow().price).floor(),
+            decimal::from_scaled_val(pyth_data.price.borrow().price).floor(),
             1
         );
 
         assert_eq(
-            decimal::from_scaled_val(oracle.smoothed_price.borrow().price).floor(),
+            decimal::from_scaled_val(pyth_data.smoothed_price.borrow().price).floor(),
             1
         );
 
         assert_eq(
-            oracle.price_last_update_timestamp_s,
+            pyth_data.price_last_update_timestamp_s,
             current_ts / 1000
         );
 
@@ -726,18 +733,20 @@ module slamm::oracle_wrapper {
             ctx(&mut scenario),
         );
 
+        let pyth_data: &PythData<TestCoin> = oracle.fields.borrow(PythKey {});
+
         assert_eq(
-            decimal::from_scaled_val(oracle.price.borrow().price).floor(),
+            decimal::from_scaled_val(pyth_data.price.borrow().price).floor(),
             1
         );
 
         assert_eq(
-            decimal::from_scaled_val(oracle.smoothed_price.borrow().price).floor(),
+            decimal::from_scaled_val(pyth_data.smoothed_price.borrow().price).floor(),
             1
         );
 
         assert_eq(
-            oracle.price_last_update_timestamp_s,
+            pyth_data.price_last_update_timestamp_s,
             current_ts / 1000
         );
 
@@ -779,18 +788,20 @@ module slamm::oracle_wrapper {
             ctx(&mut scenario),
         );
 
+        let pyth_data: &PythData<TestCoin> = oracle.fields.borrow(PythKey {});
+
         assert_eq(
-            decimal::from_scaled_val(oracle.price.borrow().price).floor(),
+            decimal::from_scaled_val(pyth_data.price.borrow().price).floor(),
             1
         );
 
         assert_eq(
-            decimal::from_scaled_val(oracle.smoothed_price.borrow().price).floor(),
+            decimal::from_scaled_val(pyth_data.smoothed_price.borrow().price).floor(),
             1
         );
 
         assert_eq(
-            oracle.price_last_update_timestamp_s,
+            pyth_data.price_last_update_timestamp_s,
             current_ts / 1000
         );
 
