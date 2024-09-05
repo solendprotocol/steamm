@@ -3,8 +3,7 @@ module slamm::test_utils {
     use std::option::{some, none};
     use slamm::cpmm::{Self, State as CpmmState, Hook as CpmmHook};
     use slamm::registry;
-    use slamm::oracle_wrapper;
-    use slamm::omm::{Self, Hook as OmmHook, State as OmmState};
+    use slamm::omm::{Self, Hook as OmmHook, State as OmmState, min_confidence_interval, max_staleness_seconds};
     use slamm::bank::{Self, Bank};
     use slamm::pool::{Pool};
     use slamm::oracle_wrapper::OracleInfo;
@@ -19,6 +18,8 @@ module slamm::test_utils {
     use suilend::lending_market::{Self, LENDING_MARKET};
     use suilend::reserve_config;
     use pyth::price_info::{PriceInfoObject};
+    use slamm::oracle_wrapper::{Self, OraclePrice, Price};
+    use slamm::pyth::{Self as pyth_wrapper};
 
     public fun e9(amt: u64): u64 {
         1_000_000_000 * amt
@@ -124,12 +125,10 @@ module slamm::test_utils {
     }
     
     #[test_only]
-    public fun get_price_info<CoinType>(
+    public fun get_oracle<CoinType>(
         idx: u8,
-        price: u64,
-        clock: &Clock,
         ctx: &mut TxContext,
-    ): OracleInfo<PriceInfoObject, CoinType> {
+    ): OracleInfo<CoinType> {
         let mut v = vector::empty<u8>();
         vector::push_back(&mut v, idx);
 
@@ -139,58 +138,65 @@ module slamm::test_utils {
             i = i + 1;
         };
 
-        oracle_wrapper::new_oracle_for_testing<PriceInfoObject, CoinType>(v, some(price as u256), none(), clock, ctx)
+        // pyth_wrapper::new_pyth_oracle_for_testing<CoinType>(v, some(price as u256), none(), clock, ctx)
+        pyth_wrapper::new_pyth_oracle_for_testing<CoinType>(v, ctx)
     }
     
     #[test_only]
-    public fun zero_price_info<CoinType>(
-        idx: u8,
-        clock: &Clock,
-        ctx: &mut TxContext,
-    ): OracleInfo<PriceInfoObject, CoinType> {
-        let mut v = vector::empty<u8>();
-        vector::push_back(&mut v, idx);
-
-        let mut i = 1;
-        while (i < 32) {
-            vector::push_back(&mut v, 0);
-            i = i + 1;
-        };
-
-        oracle_wrapper::new_oracle_for_testing<PriceInfoObject, CoinType>(v, some(0 as u256), none(), clock, ctx)
+    public fun new_oracle_price<CoinType>(
+        base: u64,
+        exponent: u64,
+        has_negative_exponent: bool,
+    ): OraclePrice<CoinType> {
+        oracle_wrapper::new_oracle_price_for_testing<CoinType>(base, exponent, has_negative_exponent, min_confidence_interval(), max_staleness_seconds())
     }
+    
+    // #[test_only]
+    // public fun zero_price_info<CoinType>(
+    //     idx: u8,
+    //     clock: &Clock,
+    //     ctx: &mut TxContext,
+    // ): OracleInfo<PriceInfoObject, CoinType> {
+    //     let mut v = vector::empty<u8>();
+    //     vector::push_back(&mut v, idx);
 
-    public fun set_oracle_price_as_internal_for_testing<A, B, W: drop>(
-        pool: &mut Pool<A, B, OmmHook<W>, OmmState>,
-        oracle_a: &mut OracleInfo<PriceInfoObject, A>,
-        oracle_b: &mut OracleInfo<PriceInfoObject, B>,
-        clock: &Clock,
-    ) {
-        let a = pool.total_funds_a();
-        let b = pool.total_funds_b();
+    //     let mut i = 1;
+    //     while (i < 32) {
+    //         vector::push_back(&mut v, 0);
+    //         i = i + 1;
+    //     };
+
+    //     oracle_wrapper::new_oracle_for_testing<PriceInfoObject, CoinType>(v, some(0 as u256), none(), clock, ctx)
+    // }
+
+    // public fun set_oracle_price_as_internal_for_testing<A, B, W: drop>(
+    //     pool: &mut Pool<A, B, OmmHook<W>, OmmState>,
+    //     oracle_a: &mut OracleInfo<PriceInfoObject, A>,
+    //     oracle_b: &mut OracleInfo<PriceInfoObject, B>,
+    //     clock: &Clock,
+    // ) {
+    //     let a = pool.total_funds_a();
+    //     let b = pool.total_funds_b();
         
-        oracle_a.set_oracle_price_for_testing(a as u256, clock);
-        oracle_b.set_oracle_price_for_testing(b as u256, clock);
-    }
+    //     oracle_a.set_oracle_price_for_testing(a as u256, clock);
+    //     oracle_b.set_oracle_price_for_testing(b as u256, clock);
+    // }
     
     public fun update_pool_oracle_price_ahead_of_trade<A, B, W: drop>(
         pool: &mut Pool<A, B, OmmHook<W>, OmmState>,
-        oracle_a: &mut OracleInfo<PriceInfoObject, A>,
-        oracle_b: &mut OracleInfo<PriceInfoObject, B>,
+        oracle_a: Price<A>,
+        oracle_b: Price<B>,
         amount_in: u64,
         a2b: bool,
         clock_bump_seconds: u64,
         clock: &mut Clock,
-    ) {
+    ): (OraclePrice<A>, OraclePrice<B>) {
         bump_clock_seconds(clock, clock_bump_seconds);
-
-        oracle_a.set_oracle_ts_for_testing(clock);
-        oracle_b.set_oracle_ts_for_testing(clock);
         
         let (quote, _, _, _, _) = omm::quote_swap_for_testing(
             pool,
-            oracle_a,
-            oracle_b,
+            &oracle_a,
+            &oracle_b,
             amount_in,
             a2b, // a2b,
             clock,
@@ -199,9 +205,11 @@ module slamm::test_utils {
         // Set back clock to initial time
         let a = if (a2b) {pool.total_funds_a() + quote.amount_in()} else {pool.total_funds_a() - quote.amount_out()};
         let b = if (a2b) {pool.total_funds_b() - quote.amount_out()} else {pool.total_funds_b() + quote.amount_in()};
+
+        let price_info_a = new_oracle_price<A>(a, 0, false);
+        let price_info_b = new_oracle_price<B>(b, 0, false);
         
-        oracle_a.set_oracle_price_for_testing(a as u256, clock);
-        oracle_b.set_oracle_price_for_testing(b as u256, clock);
+        (price_info_a, price_info_b)
     }
     
     public fun bump_clock_seconds(

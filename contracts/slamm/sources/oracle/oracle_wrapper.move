@@ -236,6 +236,60 @@ module slamm::oracle_wrapper {
     #[test_only]
     public struct TestCoin has drop {}
 
+    #[test_only]
+    public fun new_oracle_for_testing<CoinType>(
+        oracle_type: u8,
+        ctx: &mut TxContext,
+    ): OracleInfo<CoinType> {
+        let fields = bag::new(ctx);
+
+        OracleInfo<CoinType> {
+            id: object::new(ctx),
+            version: CURRENT_VERSION,
+            oracle_type,
+            fields,
+        }
+    }
+    
+    #[test_only]
+    public fun clone_for_testing<CoinType>(
+        oracle_price: &OraclePrice<CoinType>,
+    ): OraclePrice<CoinType> {
+        OraclePrice<CoinType> {
+            price: Price {
+                base: oracle_price.price.base,
+                exponent: oracle_price.price.exponent,
+                has_negative_exponent: oracle_price.price.has_negative_exponent,
+            },
+            min_confidence_interval_bps: oracle_price.min_confidence_interval_bps,
+            max_staleness_seconds: oracle_price.max_staleness_seconds,
+        }
+    }
+    
+    #[test_only]
+    public fun new_oracle_price_for_testing<CoinType>(
+        base: u64,
+        exponent: u64,
+        has_negative_exponent: bool,
+        min_confidence_interval_bps: u64,
+        max_staleness_seconds: u64,
+    ): OraclePrice<CoinType> {
+        OraclePrice<CoinType> {
+            price: Price { base, exponent, has_negative_exponent },
+            min_confidence_interval_bps,
+            max_staleness_seconds,
+        }
+    }
+    
+    #[test_only]
+    public fun new_price_for_testing<CoinType>(
+        base: u64,
+        exponent: u64,
+        has_negative_exponent: bool,
+    ): Price<CoinType> {
+        Price { base, exponent, has_negative_exponent }
+    }
+
     #[test]
     fun test_init_oracle_registry() {
         let mut scenario = test_scenario::begin(@0x0);

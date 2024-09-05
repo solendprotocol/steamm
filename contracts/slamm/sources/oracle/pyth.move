@@ -7,7 +7,7 @@ module slamm::pyth {
         price_info::{Self, PriceInfoObject},
         price::{Price as PythPrice},
     };
-    use slamm::oracle_wrapper::{Admin, OracleInfo, OraclePrice, new_oracle_price};
+    use slamm::oracle_wrapper::{Self, Admin, OracleInfo, OraclePrice, new_oracle_price};
 
     const EAlreadyInitialised: u64 = 0;
     const EPriceStale: u64 = 1;
@@ -109,30 +109,26 @@ module slamm::pyth {
     use sui::{
         test_scenario::{Self, Scenario, ctx},
         test_utils::{assert_eq, destroy},
+        bag,
     };
 
     #[test_only]
     use pyth::{price, price_identifier::{Self, PriceIdentifier}, price_feed};
 
-    // #[test_only]
-    // public fun new_pyth_oracle_for_testing<CoinType>(
-    //     price_identifier: vector<u8>,
-    //     ctx: &mut TxContext,
-    // ): OracleInfo<CoinType> {
-    //     let pyth_data = PythData<CoinType> {
-    //         price_identifier: PriceId { bytes: price_identifier },
-    //     };
+    #[test_only]
+    public fun new_pyth_oracle_for_testing<CoinType>(
+        price_identifier: vector<u8>,
+        ctx: &mut TxContext,
+    ): OracleInfo<CoinType> {
+        let pyth_data = PythData<CoinType> {
+            price_identifier: PriceId { bytes: price_identifier },
+        };
 
-    //     let mut fields = bag::new(ctx);
-    //     fields.add(PythKey {}, pyth_data);
+        let mut oracle = oracle_wrapper::new_oracle_for_testing<CoinType>(1, ctx);
+        oracle.fields_mut().add(PythKey {}, pyth_data);
 
-    //     OracleInfo<CoinType> {
-    //         id: object::new(ctx),
-    //         version: CURRENT_VERSION,
-    //         oracle_type: 1,
-    //         fields,
-    //     }
-    // }
+        oracle
+    }
 
     #[test_only]
     fun create_price_obj(

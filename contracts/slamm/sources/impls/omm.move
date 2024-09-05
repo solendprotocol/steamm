@@ -107,8 +107,8 @@ module slamm::omm {
         _witness: W,
         registry: &mut Registry,
         swap_fee_bps: u64,
-        oracle_price_a: Price<A>,
-        oracle_price_b: Price<B>,
+        oracle_price_a: OraclePrice<A>,
+        oracle_price_b: OraclePrice<B>,
         filter_period: u64,
         decay_period: u64,
         fee_control_bps: u64,
@@ -117,7 +117,10 @@ module slamm::omm {
         clock: &Clock,
         ctx: &mut TxContext,
     ): (Pool<A, B, Hook<W>, State>, PoolCap<A, B, Hook<W>, State>) {
-        let reference_price = new_instant_price_oracle_(&oracle_price_a, &oracle_price_b);
+        let price_a = oracle_price_a.get_price(MIN_CONFIDENCE_INTERVAL, MAX_STALENESS_SECONDS);
+        let price_b = oracle_price_b.get_price(MIN_CONFIDENCE_INTERVAL, MAX_STALENESS_SECONDS);
+
+        let reference_price = new_instant_price_oracle_(&price_a, &price_b);
         
         let inner = State {
             version: version::new(CURRENT_VERSION),
@@ -409,6 +412,8 @@ module slamm::omm {
     public fun filter_period(self: &State): u64 { self.filter_period }
     public fun decay_period(self: &State): u64 { self.decay_period }
     public fun fee_control(self: &State): Decimal { self.fee_control }
+    public fun min_confidence_interval(): u64 { MIN_CONFIDENCE_INTERVAL }
+    public fun max_staleness_seconds(): u64 { MAX_STALENESS_SECONDS }
     
     // ===== Private Functions =====
 
