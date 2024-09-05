@@ -15,12 +15,15 @@ module slamm::omm {
     use suilend::{
         decimal::{Self, Decimal},
     };
-    use slamm::oracle_wrapper::Price;
+    use slamm::oracle_wrapper::{OraclePrice, Price};
 
     // ===== Constants =====
 
     const CURRENT_VERSION: u16 = 1;
     const BPS: u64 = 10_000;
+    // min confidence ratio of X means that the confidence interval must be less than (100/x)% of the price
+    const MIN_CONFIDENCE_INTERVAL: u64 = 10;
+    const MAX_STALENESS_SECONDS: u64 = 60;
 
     // ===== Errors =====
 
@@ -144,16 +147,19 @@ module slamm::omm {
     
     public fun intent_swap<A, B, W: drop>(
         self: &mut Pool<A, B, Hook<W>, State>,
-        oracle_price_a: Price<A>,
-        oracle_price_b: Price<B>,
+        oracle_price_a: OraclePrice<A>,
+        oracle_price_b: OraclePrice<B>,
         amount_in: u64,
         a2b: bool,
         clock: &Clock,
     ): Intent<A, B, Hook<W>, State> {
+        let price_a = oracle_price_a.get_price(MIN_CONFIDENCE_INTERVAL, MAX_STALENESS_SECONDS);
+        let price_b = oracle_price_b.get_price(MIN_CONFIDENCE_INTERVAL, MAX_STALENESS_SECONDS);
+
         self.inner_mut().version.assert_version_and_upgrade(CURRENT_VERSION);
 
         let (quote, reference_price, reference_vol, vol_accumulator, last_update_ms) = quote_swap_impl(
-            self, &oracle_price_a, &oracle_price_b, amount_in, a2b, clock
+            self, &price_a, &price_b, amount_in, a2b, clock
         );
         
         // Update parameters
@@ -289,13 +295,16 @@ module slamm::omm {
     
     public fun quote_swap<A, B, W: drop>(
         self: &Pool<A, B, Hook<W>, State>,
-        oracle_price_a: &Price<A>,
-        oracle_price_b: &Price<B>,
+        oracle_price_a: &OraclePrice<A>,
+        oracle_price_b: &OraclePrice<B>,
         amount_in: u64,
         a2b: bool,
         clock: &Clock,
     ): SwapQuote {
-        let (quote, _, _, _, _) = quote_swap_impl(self, oracle_price_a, oracle_price_b, amount_in, a2b, clock);
+        let price_a = oracle_price_a.get_price_ref(MIN_CONFIDENCE_INTERVAL, MAX_STALENESS_SECONDS);
+        let price_b = oracle_price_b.get_price_ref(MIN_CONFIDENCE_INTERVAL, MAX_STALENESS_SECONDS);
+
+        let (quote, _, _, _, _) = quote_swap_impl(self, price_a, price_b, amount_in, a2b, clock);
 
         quote
     }

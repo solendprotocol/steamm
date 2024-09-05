@@ -1,3 +1,4 @@
+#[allow(lint(share_owned))]
 module slamm::oracle_wrapper {
     use sui::{
         bag::{Self, Bag},
@@ -8,6 +9,8 @@ module slamm::oracle_wrapper {
 
     // ===== Constants =====
     const EIncorrectVersion: u64 = 0;
+    const EInvalidStaleness: u64 = 1;
+    const EInvalidConfidenceInterval: u64 = 2;
 
     const CURRENT_VERSION: u16 = 1;
 
@@ -25,16 +28,16 @@ module slamm::oracle_wrapper {
         id: UID,
     }
     
+    public struct OraclePrice<phantom CoinType> {
+        price: Price<CoinType>,
+        min_confidence_interval_bps: u64,
+        max_staleness_seconds: u64,
+    }
+    
     public struct Price<phantom CoinType> has drop {
         base: u64,
         exponent: u64,
         has_negative_exponent: bool,
-    }
-    
-    public struct EmaPrice<phantom CoinType> has drop {
-        base: u64,
-        exponent: u64,
-        is_negative_exponent: bool,
     }
 
     public use fun slamm::oracle_wrapper::price_base as Price.base;
@@ -54,6 +57,25 @@ module slamm::oracle_wrapper {
 
     public fun oracle_type<CoinType>(oracle: &OracleInfo<CoinType>): u8 { oracle.oracle_type }
     public(package) fun fields_mut<CoinType>(oracle: &mut OracleInfo<CoinType>): &mut Bag { &mut oracle.fields }
+    
+    public(package) fun new_oracle_price<CoinType>(
+        base: u64,
+        exponent: u64,
+        has_negative_exponent: bool,
+        min_confidence_interval_bps: u64,
+        max_staleness_seconds: u64,
+    ): OraclePrice<CoinType> {
+        OraclePrice {
+            price: Price {
+                base,
+                exponent,
+                has_negative_exponent,
+            },
+            min_confidence_interval_bps,
+            max_staleness_seconds,
+        }
+        
+    }
     
     public(package) fun new_price<CoinType>(
         base: u64,
@@ -119,7 +141,7 @@ module slamm::oracle_wrapper {
 
         price_info
     }
-    
+  
     public fun init_oracle_for_cointype<CoinType>(
         admin: &Admin,
         registry: &mut OracleRegistry,
@@ -128,6 +150,40 @@ module slamm::oracle_wrapper {
         let oracle = new_oracle_for_cointype<CoinType>(admin, registry, ctx);
 
         share_object(oracle);
+    }
+
+    public fun get_price<CoinType>(
+        oracle_price: OraclePrice<CoinType>,
+        min_confidence_interval_bps: u64,
+        max_staleness_seconds: u64,
+    ): Price<CoinType> {
+        assert!(
+            oracle_price.max_staleness_seconds == max_staleness_seconds, EInvalidStaleness
+        );
+        
+        assert!(
+            oracle_price.min_confidence_interval_bps == min_confidence_interval_bps, EInvalidConfidenceInterval
+        );
+        
+        let OraclePrice<CoinType> { price, min_confidence_interval_bps: _, max_staleness_seconds: _ } = oracle_price;
+
+        price
+    }
+    
+    public fun get_price_ref<CoinType>(
+        oracle_price: &OraclePrice<CoinType>,
+        min_confidence_interval_bps: u64,
+        max_staleness_seconds: u64,
+    ): &Price<CoinType> {
+        assert!(
+            oracle_price.max_staleness_seconds == max_staleness_seconds, EInvalidStaleness
+        );
+        
+        assert!(
+            oracle_price.min_confidence_interval_bps == min_confidence_interval_bps, EInvalidConfidenceInterval
+        );
+
+        &oracle_price.price
     }
 
     // ===== Versioning Functions =====

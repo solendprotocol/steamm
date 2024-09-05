@@ -5,13 +5,14 @@ module slamm::pyth {
     use pyth::{
         i64,
         price_info::{Self, PriceInfoObject},
+        price::{Price as PythPrice},
     };
-    use slamm::oracle_wrapper::{Admin, OracleInfo, Price, new_price};
+    use slamm::oracle_wrapper::{Admin, OracleInfo, OraclePrice, new_oracle_price};
 
     const EAlreadyInitialised: u64 = 0;
-    const EPriceIdentifierMismatch: u64 = 1;
-    const EPriceStale: u64 = 2;
-    const EPriceOutsideConfidence: u64 = 3;
+    const EPriceStale: u64 = 1;
+    const EPriceOutsideConfidence: u64 = 2;
+    const EPriceIdentifierMismatch: u64 = 3;
 
     public struct PythKey has store, copy, drop {}
 
@@ -46,62 +47,60 @@ module slamm::pyth {
     // errors if the PriceInfoObject is stale/invalid.
     public fun get_updated_price<CoinType>(
         oracle_info: &mut OracleInfo<CoinType>,
-        price_info: &PriceInfoObject,
+        price_info_obj: &PriceInfoObject,
         // min confidence ratio of X means that the confidence interval must be less than (100/x)% of the price
         max_confidence_interval_bps: u64,
         max_staleness_seconds: u64,
         clock: &Clock,
-    ): Price<CoinType> {
-        let price_info_ = price_info.get_price_info_from_price_info_object();
+    ): OraclePrice<CoinType> {
+        let price_info_ = price_info_obj.get_price_info_from_price_info_object();
         let price_feed = price_info_.get_price_feed();
         let price_identifier = price_feed.get_price_identifier().get_bytes();
         let pyth_data: &mut PythData<CoinType> = oracle_info.fields_mut().borrow_mut(PythKey {});
         
         assert!(price_identifier == pyth_data.price_identifier.bytes, EPriceIdentifierMismatch);
+
+        let price_obj = price_feed.get_price();
         
-        get_pyth_spot_price<CoinType>(price_info, max_confidence_interval_bps, max_staleness_seconds, clock)
+        get_price<CoinType>(price_obj, max_confidence_interval_bps, max_staleness_seconds, clock)
     }
 
-    fun get_pyth_spot_price<CoinType>(
-        price_info_obj: &PriceInfoObject,
-        max_confidence_interval_bps: u64,
+    fun get_price<CoinType>(
+        pyth_price: PythPrice,
+        min_confidence_interval_bps: u64,
         max_staleness_seconds: u64,
         clock: &Clock
-    ): Price<CoinType> {
-        let price_info = price_info_obj.get_price_info_from_price_info_object();
-        let price_feed = price_info.get_price_feed();
-
-        let price = price_feed.get_price();
-        let price_mag = i64::get_magnitude_if_positive(&price.get_price());
-        let conf = price.get_conf();
+    ): OraclePrice<CoinType> {
+        let price_mag = i64::get_magnitude_if_positive(&pyth_price.get_price());
+        let conf = pyth_price.get_conf();
 
         // confidence interval check
         // we want to make sure conf / price <= x%
         // -> conf * (100 / x )<= price
-        assert!(conf * max_confidence_interval_bps <= price_mag, EPriceOutsideConfidence);
+        assert!(conf * min_confidence_interval_bps <= price_mag, EPriceOutsideConfidence);
 
         // check current sui time against pythnet publish time. there can be some issues that arise because the
         // timestamps are from different sources and may get out of sync, but that's why we have a fallback oracle
         let cur_time_s = clock::timestamp_ms(clock) / 1000;
         assert!(
-            cur_time_s <= price.get_timestamp() || cur_time_s - price.get_timestamp() <= max_staleness_seconds, EPriceStale
+            cur_time_s <= pyth_price.get_timestamp() || cur_time_s - pyth_price.get_timestamp() <= max_staleness_seconds, EPriceStale
         );
 
-        // let spot_price = parse_price_to_decimal(price);
-        let spot_price_ = price_feed.get_price();
-        let spot_exponent_is_negative = price_feed.get_price().get_expo().get_is_negative();
+        let price_exponent_is_negative = pyth_price.get_expo().get_is_negative();
 
-        let spot_price = new_price(
-            spot_price_.get_price().get_magnitude_if_positive(),
-            if (spot_exponent_is_negative) {
-                spot_price_.get_expo().get_magnitude_if_negative()
+        let price = new_oracle_price(
+            pyth_price.get_price().get_magnitude_if_positive(),
+            if (price_exponent_is_negative) {
+                pyth_price.get_expo().get_magnitude_if_negative()
             } else {
-                spot_price_.get_expo().get_magnitude_if_positive()
+                pyth_price.get_expo().get_magnitude_if_positive()
             },
-            spot_exponent_is_negative
+            price_exponent_is_negative,
+            min_confidence_interval_bps,
+            max_staleness_seconds,
         );
 
-        spot_price
+        price
     }
 
     // ===== Test-only Functions =====
