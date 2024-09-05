@@ -1,3 +1,4 @@
+#[allow(unused_use)]
 module slamm::pyth {
     use sui::{ 
         clock::{Self, Clock}
@@ -7,12 +8,16 @@ module slamm::pyth {
         price_info::{Self, PriceInfoObject},
         price::{Price as PythPrice},
     };
-    use slamm::oracle_wrapper::{Self, Admin, OracleInfo, OraclePrice, new_oracle_price};
+    use slamm::oracle_wrapper::{Self, Admin, OracleInfo, OracleRegistry, OraclePrice, new_oracle_price};
+
+    // ===== Errors =====
 
     const EAlreadyInitialised: u64 = 0;
     const EPriceStale: u64 = 1;
     const EPriceOutsideConfidence: u64 = 2;
     const EPriceIdentifierMismatch: u64 = 3;
+
+    // ===== Structs =====
 
     public struct PythKey has store, copy, drop {}
 
@@ -23,6 +28,8 @@ module slamm::pyth {
     public struct PriceId has store, copy, drop {
         bytes: vector<u8>,
     }
+
+    // ===== Admin functions =====
 
     // Admin gated to ensure that CoinType does not mismatch the PriceInfoObject
     public fun set_pyth_oracle_for_cointype<CoinType>(
@@ -44,6 +51,8 @@ module slamm::pyth {
         oracle.fields_mut().add(PythKey {}, pyth_data);
     }
 
+    // ===== Public functions =====
+
     // errors if the PriceInfoObject is stale/invalid.
     public fun get_updated_price<CoinType>(
         oracle_info: &mut OracleInfo<CoinType>,
@@ -64,6 +73,8 @@ module slamm::pyth {
         
         get_price<CoinType>(price_obj, min_confidence_interval_bps, max_staleness_seconds, clock)
     }
+
+    // ===== Private functions =====
 
     fun get_price<CoinType>(
         pyth_price: PythPrice,
@@ -109,11 +120,13 @@ module slamm::pyth {
     use sui::{
         test_scenario::{Self, Scenario, ctx},
         test_utils::{assert_eq, destroy},
-        bag,
     };
 
     #[test_only]
     use pyth::{price, price_identifier::{Self, PriceIdentifier}, price_feed};
+
+    #[test_only]
+    public struct TestCoin has drop {}
 
     #[test_only]
     public fun new_pyth_oracle_for_testing<CoinType>(
@@ -135,12 +148,13 @@ module slamm::pyth {
         current_ts: u64,
         price: u64,
         exponent: u64,
+        confidence: u64,
         id: u8,
         scenario: &mut Scenario,
     ): (PriceIdentifier, PriceInfoObject) {
         let price = price::new(
             i64::from_u64(price),
-            0,
+            confidence,
             i64::from_u64(exponent),
             current_ts
         );
@@ -176,63 +190,189 @@ module slamm::pyth {
         (price_id, price_info_obj)
     }
 
-    // #[test]
-    // fun test_new_pyth_oracle_for_cointype() {
-    //     let mut scenario = test_scenario::begin(@0x0);
-    //     init(ctx(&mut scenario));
+    // ===== Tests =====
 
-    //     test_scenario::next_tx(&mut scenario, @0x0);
+    #[test]
+    fun test_new_pyth_oracle_for_cointype() {
+        let mut scenario = test_scenario::begin(@0x0);
+        oracle_wrapper::init_for_testing(ctx(&mut scenario));
 
-    //     let mut registry = test_scenario::take_shared<OracleRegistry>(&scenario);
-    //     let admin = test_scenario::take_from_address<Admin>(&scenario, @0x0);
+        test_scenario::next_tx(&mut scenario, @0x0);
 
-    //     let clock = clock::create_for_testing(ctx(&mut scenario));
+        let mut registry = test_scenario::take_shared<OracleRegistry>(&scenario);
+        let admin = test_scenario::take_from_address<Admin>(&scenario, @0x0);
 
-    //     let current_ts = clock.timestamp_ms();
+        let clock = clock::create_for_testing(ctx(&mut scenario));
 
-    //     let (_, price_info_obj) = create_price_obj(current_ts, 1, 0, 1, &mut scenario);
+        let current_ts = clock.timestamp_ms();
 
-    //     let oracle = set_pyth_oracle_for_cointype<TestCoin>(
-    //         &admin,
-    //         &mut registry,
-    //         &price_info_obj,
-    //         ctx(&mut scenario),
-    //     );
+        let (_, price_info_obj) = create_price_obj(current_ts, 1, 0, 0, 1, &mut scenario);
 
-    //     let pyth_data: &PythData<TestCoin> = oracle.fields.borrow(PythKey {});
+        let mut oracle = oracle_wrapper::new_oracle_for_cointype<TestCoin>(
+            &admin,
+            &mut registry,
+            ctx(&mut scenario),
+        );
+        
+        set_pyth_oracle_for_cointype<TestCoin>(
+            &admin,
+            &mut oracle,
+            &price_info_obj,
+        );
 
-    //     assert_eq(
-    //         decimal::from_scaled_val(pyth_data.price.borrow().price).floor(),
-    //         1
-    //     );
+        let pyth_data: &PythData<TestCoin> = oracle.fields().borrow(PythKey {});
 
-    //     assert_eq(
-    //         decimal::from_scaled_val(pyth_data.smoothed_price.borrow().price).floor(),
-    //         1
-    //     );
+        let mut id = vector::empty<u8>();
+        vector::push_back(&mut id, 1);
 
-    //     assert_eq(
-    //         pyth_data.price_last_update_timestamp_s,
-    //         current_ts / 1000
-    //     );
+        let mut i = 1;
+        while (i < 32) {
+            vector::push_back(&mut id, 0);
+            i = i + 1;
+        };
 
-    //     assert_eq(
-    //         registry.oracles.contains(OracleKey<TestCoin> {}),
-    //         true,
-    //     );
-
-    //     destroy(registry);
-    //     destroy(admin);
-    //     destroy(clock);
-    //     destroy(oracle);
-    //     destroy(price_info_obj);
-    //     destroy(scenario);
-    // }
+        assert_eq(
+            pyth_data.price_identifier.bytes,
+            id
+        );
+        destroy(registry);
+        destroy(admin);
+        destroy(clock);
+        destroy(oracle);
+        destroy(price_info_obj);
+        destroy(scenario);
+    }
     
-    // #[test]
-    // fun test_set_pyth_oracle_for_cointype() {
+    #[test]
+    fun test_pyth_oracle_for_cointype_updated_price() {
+        let mut scenario = test_scenario::begin(@0x0);
+        oracle_wrapper::init_for_testing(ctx(&mut scenario));
+
+        test_scenario::next_tx(&mut scenario, @0x0);
+
+        let mut registry = test_scenario::take_shared<OracleRegistry>(&scenario);
+        let admin = test_scenario::take_from_address<Admin>(&scenario, @0x0);
+
+        let clock = clock::create_for_testing(ctx(&mut scenario));
+
+        let current_ts = clock.timestamp_ms();
+
+        let (_, price_info_obj) = create_price_obj(current_ts, 1, 0, 0, 1, &mut scenario);
+
+        let mut oracle = oracle_wrapper::new_oracle_for_cointype<TestCoin>(
+            &admin,
+            &mut registry,
+            ctx(&mut scenario),
+        );
+        
+        set_pyth_oracle_for_cointype<TestCoin>(
+            &admin,
+            &mut oracle,
+            &price_info_obj,
+        );
+
+        let oracle_price = get_updated_price(
+            &mut oracle,
+            &price_info_obj,
+            10,
+            60,
+            &clock,
+        );
+        
+        let price_ref = oracle_price.get_price_ref(10, 60);
+
+        assert_eq(
+            oracle_price.min_confidence_interval_bps(),
+            10,
+        );
+        
+        assert_eq(
+            oracle_price.max_staleness_seconds(),
+            60,
+        );
+
+        assert_eq(price_ref.base(), 1);
+        assert_eq(price_ref.exponent(), 0);
+        assert_eq(price_ref.has_negative_exponent(), false);
+
+        destroy(registry);
+        destroy(oracle_price);
+        destroy(admin);
+        destroy(clock);
+        destroy(oracle);
+        destroy(price_info_obj);
+        destroy(scenario);
+    }
+    
+    #[test]
+    #[expected_failure(abort_code = EPriceStale)]
+    fun test_pyth_oracle_for_cointype_fail_updated_price_staleness() {
+        let mut scenario = test_scenario::begin(@0x0);
+        oracle_wrapper::init_for_testing(ctx(&mut scenario));
+
+        test_scenario::next_tx(&mut scenario, @0x0);
+
+        let mut registry = test_scenario::take_shared<OracleRegistry>(&scenario);
+        let admin = test_scenario::take_from_address<Admin>(&scenario, @0x0);
+
+        let mut clock = clock::create_for_testing(ctx(&mut scenario));
+
+        let current_ts = clock.timestamp_ms();
+
+        let (_, price_info_obj) = create_price_obj(current_ts, 1, 0, 0, 1, &mut scenario);
+
+        let mut oracle = oracle_wrapper::new_oracle_for_cointype<TestCoin>(
+            &admin,
+            &mut registry,
+            ctx(&mut scenario),
+        );
+        
+        set_pyth_oracle_for_cointype<TestCoin>(
+            &admin,
+            &mut oracle,
+            &price_info_obj,
+        );
+
+        clock.increment_for_testing(61 * 1000);
+
+        let oracle_price = get_updated_price(
+            &mut oracle,
+            &price_info_obj,
+            10,
+            60,
+            &clock,
+        );
+        
+        let price_ref = oracle_price.get_price_ref(10, 60);
+
+        assert_eq(
+            oracle_price.min_confidence_interval_bps(),
+            10,
+        );
+        
+        assert_eq(
+            oracle_price.max_staleness_seconds(),
+            60,
+        );
+
+        assert_eq(price_ref.base(), 1);
+        assert_eq(price_ref.exponent(), 0);
+        assert_eq(price_ref.has_negative_exponent(), false);
+
+        destroy(registry);
+        destroy(oracle_price);
+        destroy(admin);
+        destroy(clock);
+        destroy(oracle);
+        destroy(price_info_obj);
+        destroy(scenario);
+    }
+    
+    // #[test] // TODO
+    // // #[expected_failure(abort_code = EPriceStale)]
+    // fun test_pyth_oracle_for_cointype_fail_updated_price_confidence() {
     //     let mut scenario = test_scenario::begin(@0x0);
-    //     init(ctx(&mut scenario));
+    //     oracle_wrapper::init_for_testing(ctx(&mut scenario));
 
     //     test_scenario::next_tx(&mut scenario, @0x0);
 
@@ -243,286 +383,83 @@ module slamm::pyth {
 
     //     let current_ts = clock.timestamp_ms();
 
-    //     let (_, price_info_obj) = create_price_obj(current_ts, 1, 0, 1, &mut scenario);
+    //     let (_, price_info_obj) = create_price_obj(current_ts, 1, 0, 20, 1, &mut scenario);
 
-    //     let mut oracle = set_pyth_oracle_for_cointype<TestCoin>(
+    //     let mut oracle = oracle_wrapper::new_oracle_for_cointype<TestCoin>(
     //         &admin,
     //         &mut registry,
-    //         &price_info_obj,
-    //         &clock,
     //         ctx(&mut scenario),
-    //     );
-
-    //     let pyth_data: &PythData<TestCoin> = oracle.fields.borrow(PythKey {});
-
-    //     assert_eq(
-    //         decimal::from_scaled_val(pyth_data.price.borrow().price).floor(),
-    //         1
-    //     );
-
-    //     assert_eq(
-    //         decimal::from_scaled_val(pyth_data.smoothed_price.borrow().price).floor(),
-    //         1
-    //     );
-
-    //     assert_eq(
-    //         pyth_data.price_last_update_timestamp_s,
-    //         current_ts / 1000
-    //     );
-
-    //     clock.set_for_testing(current_ts + 1000);
-    //     let current_ts = clock.timestamp_ms();
-
-    //     let (_, price_info_obj_2) = create_price_obj(current_ts, 1, 1, 1, &mut scenario);
-
-    //     update_pyth_price_for_cointype(&mut oracle, &price_info_obj_2, &clock);
-
-    //     let pyth_data: &PythData<TestCoin> = oracle.fields.borrow(PythKey {});
-
-    //     assert_eq(
-    //         decimal::from_scaled_val(pyth_data.price.borrow().price).floor(),
-    //         10
     //     );
         
-    //     assert_eq(
-    //         decimal::from_scaled_val(pyth_data.smoothed_price.borrow().price).floor(),
-    //         10
-    //     );
-
-    //     assert_eq(
-    //         pyth_data.price_last_update_timestamp_s,
-    //         current_ts / 1000
-    //     );
-
-    //     destroy(registry);
-    //     destroy(admin);
-    //     destroy(clock);
-    //     destroy(oracle);
-    //     destroy(price_info_obj);
-    //     destroy(price_info_obj_2);
-    //     destroy(scenario);
-    // }
-    
-    // #[test]
-    // #[expected_failure(abort_code = EPriceIdentifierMismatch)]
-    // fun test_fail_price_id() {
-    //     let mut scenario = test_scenario::begin(@0x0);
-    //     init(ctx(&mut scenario));
-
-    //     test_scenario::next_tx(&mut scenario, @0x0);
-
-    //     let mut registry = test_scenario::take_shared<OracleRegistry>(&scenario);
-    //     let admin = test_scenario::take_from_address<Admin>(&scenario, @0x0);
-
-    //     let mut clock = clock::create_for_testing(ctx(&mut scenario));
-
-    //     let current_ts = clock.timestamp_ms();
-
-    //     let (_, price_info_obj) = create_price_obj(current_ts, 1, 0, 1, &mut scenario);
-
-    //     let mut oracle = set_pyth_oracle_for_cointype<TestCoin>(
+    //     set_pyth_oracle_for_cointype<TestCoin>(
     //         &admin,
-    //         &mut registry,
+    //         &mut oracle,
     //         &price_info_obj,
+    //     );
+
+    //     let oracle_price = get_updated_price(
+    //         &mut oracle,
+    //         &price_info_obj,
+    //         0,
+    //         60,
     //         &clock,
-    //         ctx(&mut scenario),
     //     );
-
-    //     let pyth_data: &PythData<TestCoin> = oracle.fields.borrow(PythKey {});
-
-    //     assert_eq(
-    //         decimal::from_scaled_val(pyth_data.price.borrow().price).floor(),
-    //         1
-    //     );
-
-    //     assert_eq(
-    //         decimal::from_scaled_val(pyth_data.smoothed_price.borrow().price).floor(),
-    //         1
-    //     );
-
-    //     assert_eq(
-    //         pyth_data.price_last_update_timestamp_s,
-    //         current_ts / 1000
-    //     );
-
-    //     clock.set_for_testing(current_ts + 1000);
-    //     let current_ts = clock.timestamp_ms();
-
-    //     let (_, price_info_obj_2) = create_price_obj(current_ts, 1, 1, 2, &mut scenario);
-
-    //     update_pyth_price_for_cointype(&mut oracle, &price_info_obj_2, &clock);
+        
+    //     let price_ref = oracle_price.get_price_ref(0, 60);
 
     //     destroy(registry);
+    //     destroy(oracle_price);
     //     destroy(admin);
     //     destroy(clock);
     //     destroy(oracle);
     //     destroy(price_info_obj);
-    //     destroy(price_info_obj_2);
     //     destroy(scenario);
     // }
 
-    // #[test]
-    // #[expected_failure(abort_code = EPriceStale)]
-    // fun test_fail_liveness_price() {
-    //     let mut scenario = test_scenario::begin(@0x0);
-    //     init(ctx(&mut scenario));
+    #[test]
+    #[expected_failure(abort_code = EPriceIdentifierMismatch)]
+    fun test_fail_price_id() {
+        let mut scenario = test_scenario::begin(@0x0);
+        oracle_wrapper::init_for_testing(ctx(&mut scenario));
 
-    //     test_scenario::next_tx(&mut scenario, @0x0);
+        test_scenario::next_tx(&mut scenario, @0x0);
 
-    //     let mut registry = test_scenario::take_shared<OracleRegistry>(&scenario);
-    //     let admin = test_scenario::take_from_address<Admin>(&scenario, @0x0);
+        let mut registry = test_scenario::take_shared<OracleRegistry>(&scenario);
+        let admin = test_scenario::take_from_address<Admin>(&scenario, @0x0);
 
-    //     let mut clock = clock::create_for_testing(ctx(&mut scenario));
+        let clock = clock::create_for_testing(ctx(&mut scenario));
 
-    //     let current_ts = clock.timestamp_ms();
+        let current_ts = clock.timestamp_ms();
 
-    //     let (_, price_info_obj) = create_price_obj(current_ts, 1, 0, 1, &mut scenario);
+        let (_, price_info_obj) = create_price_obj(current_ts, 1, 0, 0, 1, &mut scenario);
+        let (_, price_info_obj_2) = create_price_obj(current_ts, 1, 0, 0, 2, &mut scenario);
 
-    //     let oracle = set_pyth_oracle_for_cointype<TestCoin>(
-    //         &admin,
-    //         &mut registry,
-    //         &price_info_obj,
-    //         &clock,
-    //         ctx(&mut scenario),
-    //     );
+        let mut oracle = oracle_wrapper::new_oracle_for_cointype<TestCoin>(
+            &admin,
+            &mut registry,
+            ctx(&mut scenario),
+        );
+        
+        set_pyth_oracle_for_cointype<TestCoin>(
+            &admin,
+            &mut oracle,
+            &price_info_obj,
+        );
 
-    //     let pyth_data: &PythData<TestCoin> = oracle.fields.borrow(PythKey {});
-
-    //     assert_eq(
-    //         decimal::from_scaled_val(pyth_data.price.borrow().price).floor(),
-    //         1
-    //     );
-
-    //     assert_eq(
-    //         decimal::from_scaled_val(pyth_data.smoothed_price.borrow().price).floor(),
-    //         1
-    //     );
-
-    //     assert_eq(
-    //         pyth_data.price_last_update_timestamp_s,
-    //         current_ts / 1000
-    //     );
-
-    //     clock.set_for_testing(current_ts + 1000 * (PRICE_STALENESS_THRESHOLD_S + 1));
-
-    //     let price = oracle.get_price(&clock);
-
-    //     destroy(registry);
-    //     destroy(admin);
-    //     destroy(clock);
-    //     destroy(oracle);
-    //     destroy(price_info_obj);
-    //     destroy(price);
-    //     destroy(scenario);
-    // }
-    
-    // #[test]
-    // #[expected_failure(abort_code = EPriceStale)]
-    // fun test_fail_liveness_smoothed_price() {
-    //     let mut scenario = test_scenario::begin(@0x0);
-    //     init(ctx(&mut scenario));
-
-    //     test_scenario::next_tx(&mut scenario, @0x0);
-
-    //     let mut registry = test_scenario::take_shared<OracleRegistry>(&scenario);
-    //     let admin = test_scenario::take_from_address<Admin>(&scenario, @0x0);
-
-    //     let mut clock = clock::create_for_testing(ctx(&mut scenario));
-
-    //     let current_ts = clock.timestamp_ms();
-
-    //     let (_, price_info_obj) = create_price_obj(current_ts, 1, 0, 1, &mut scenario);
-
-    //     let oracle = set_pyth_oracle_for_cointype<TestCoin>(
-    //         &admin,
-    //         &mut registry,
-    //         &price_info_obj,
-    //         &clock,
-    //         ctx(&mut scenario),
-    //     );
-
-    //     let pyth_data: &PythData<TestCoin> = oracle.fields.borrow(PythKey {});
-
-    //     assert_eq(
-    //         decimal::from_scaled_val(pyth_data.price.borrow().price).floor(),
-    //         1
-    //     );
-
-    //     assert_eq(
-    //         decimal::from_scaled_val(pyth_data.smoothed_price.borrow().price).floor(),
-    //         1
-    //     );
-
-    //     assert_eq(
-    //         pyth_data.price_last_update_timestamp_s,
-    //         current_ts / 1000
-    //     );
-
-    //     clock.set_for_testing(current_ts + 1000 * (PRICE_STALENESS_THRESHOLD_S + 1));
-
-    //     let price = oracle.get_smoothed_price(&clock);
-
-    //     destroy(registry);
-    //     destroy(admin);
-    //     destroy(clock);
-    //     destroy(oracle);
-    //     destroy(price_info_obj);
-    //     destroy(price);
-    //     destroy(scenario);
-    // }
-    
-    // #[test]
-    // #[expected_failure(abort_code = EPriceStale)]
-    // fun test_fail_liveness_price_with_fallback() {
-    //     let mut scenario = test_scenario::begin(@0x0);
-    //     init(ctx(&mut scenario));
-
-    //     test_scenario::next_tx(&mut scenario, @0x0);
-
-    //     let mut registry = test_scenario::take_shared<OracleRegistry>(&scenario);
-    //     let admin = test_scenario::take_from_address<Admin>(&scenario, @0x0);
-
-    //     let mut clock = clock::create_for_testing(ctx(&mut scenario));
-
-    //     let current_ts = clock.timestamp_ms();
-
-    //     let (_, price_info_obj) = create_price_obj(current_ts, 1, 0, 1, &mut scenario);
-
-    //     let oracle = set_pyth_oracle_for_cointype<TestCoin>(
-    //         &admin,
-    //         &mut registry,
-    //         &price_info_obj,
-    //         &clock,
-    //         ctx(&mut scenario),
-    //     );
-
-    //     let pyth_data: &PythData<TestCoin> = oracle.fields.borrow(PythKey {});
-
-    //     assert_eq(
-    //         decimal::from_scaled_val(pyth_data.price.borrow().price).floor(),
-    //         1
-    //     );
-
-    //     assert_eq(
-    //         decimal::from_scaled_val(pyth_data.smoothed_price.borrow().price).floor(),
-    //         1
-    //     );
-
-    //     assert_eq(
-    //         pyth_data.price_last_update_timestamp_s,
-    //         current_ts / 1000
-    //     );
-
-    //     clock.set_for_testing(current_ts + 1000 * (PRICE_STALENESS_THRESHOLD_S + 1));
-
-    //     let price = oracle.get_price_with_fallback(&clock);
-
-    //     destroy(registry);
-    //     destroy(admin);
-    //     destroy(clock);
-    //     destroy(oracle);
-    //     destroy(price_info_obj);
-    //     destroy(price);
-    //     destroy(scenario);
-    // }
+        let oracle_price = get_updated_price(
+            &mut oracle,
+            &price_info_obj_2,
+            10,
+            60,
+            &clock,
+        );
+        destroy(registry);
+        destroy(admin);
+        destroy(clock);
+        destroy(oracle);
+        destroy(price_info_obj);
+        destroy(price_info_obj_2);
+        destroy(oracle_price);
+        destroy(scenario);
+    }
 }

@@ -7,14 +7,21 @@ module slamm::oracle_wrapper {
         transfer::share_object,
     };
 
+    public use fun slamm::oracle_wrapper::price_base as Price.base;
+    public use fun slamm::oracle_wrapper::price_exponent as Price.exponent;
+    public use fun slamm::oracle_wrapper::price_has_negative_exponent as Price.has_negative_exponent;
+
     // ===== Constants =====
-    const EIncorrectVersion: u64 = 0;
-    const EInvalidStaleness: u64 = 1;
-    const EInvalidConfidenceInterval: u64 = 2;
 
     const CURRENT_VERSION: u16 = 1;
 
     // ===== Errors =====
+
+    const EIncorrectVersion: u64 = 0;
+    const EInvalidStaleness: u64 = 1;
+    const EInvalidConfidenceInterval: u64 = 2;
+
+    // ===== Structs =====
 
     public struct OracleKey<phantom CoinType> has store, copy, drop {}
 
@@ -26,6 +33,17 @@ module slamm::oracle_wrapper {
 
     public struct Admin has key {
         id: UID,
+    }
+
+    /// Price info object with data sourced from oracle
+    /// Price info has key so it can be queried as a standalone object, therefore
+    /// avoiding centralising all price feeds into one object with dynamic fields.
+    /// We keep track of all the price info object in the OracleRegistry
+    public struct OracleInfo<phantom CoinType> has key, store {
+        id: UID,
+        version: u16,
+        oracle_type: u8,
+        fields: Bag,
     }
     
     public struct OraclePrice<phantom CoinType> {
@@ -40,63 +58,7 @@ module slamm::oracle_wrapper {
         has_negative_exponent: bool,
     }
 
-    public use fun slamm::oracle_wrapper::price_base as Price.base;
-    public use fun slamm::oracle_wrapper::price_exponent as Price.exponent;
-    public use fun slamm::oracle_wrapper::price_has_negative_exponent as Price.has_negative_exponent;
-
-    /// Price info object with data sourced from oracle
-    /// Price info has key so it can be queried as a standalone object, therefore
-    /// avoiding centralising all price feeds into one object with dynamic fields.
-    /// We keep track of all the price info object in the OracleRegistry
-    public struct OracleInfo<phantom CoinType> has key, store {
-        id: UID,
-        version: u16,
-        oracle_type: u8,
-        fields: Bag,
-    }
-
-    public fun oracle_type<CoinType>(oracle: &OracleInfo<CoinType>): u8 { oracle.oracle_type }
-    public(package) fun fields_mut<CoinType>(oracle: &mut OracleInfo<CoinType>): &mut Bag { &mut oracle.fields }
-    
-    public(package) fun new_oracle_price<CoinType>(
-        base: u64,
-        exponent: u64,
-        has_negative_exponent: bool,
-        min_confidence_interval_bps: u64,
-        max_staleness_seconds: u64,
-    ): OraclePrice<CoinType> {
-        OraclePrice {
-            price: Price {
-                base,
-                exponent,
-                has_negative_exponent,
-            },
-            min_confidence_interval_bps,
-            max_staleness_seconds,
-        }
-        
-    }
-    
-    public(package) fun new_price<CoinType>(
-        base: u64,
-        exponent: u64,
-        has_negative_exponent: bool,
-    ): Price<CoinType> {
-        Price {
-            base,
-            exponent,
-            has_negative_exponent,
-        }
-    }
-
-    public(package) fun set_oracle_type<CoinType>(
-        oracle: &mut OracleInfo<CoinType>,
-        oracle_type: u8,
-    ) { oracle.oracle_type = oracle_type }
-    
-    public fun price_base<CoinType>(price: &Price<CoinType>): u64 { price.base }
-    public fun price_exponent<CoinType>(price: &Price<CoinType>): u64 { price.exponent }
-    public fun price_has_negative_exponent<CoinType>(price: &Price<CoinType>): bool { price.has_negative_exponent }
+    // ===== Init function =====
 
     fun init(ctx: &mut TxContext) {
         transfer::transfer(
@@ -114,6 +76,8 @@ module slamm::oracle_wrapper {
 
         transfer::share_object(registry);
     }
+
+    // ===== Admin function =====
 
     // Admin gated to ensure that CoinType does not mismatch the PriceInfoObject
     public fun new_oracle_for_cointype<CoinType>(
@@ -152,6 +116,54 @@ module slamm::oracle_wrapper {
         share_object(oracle);
     }
 
+    // ===== Package function =====
+
+    public(package) fun new_oracle_price<CoinType>(
+        base: u64,
+        exponent: u64,
+        has_negative_exponent: bool,
+        min_confidence_interval_bps: u64,
+        max_staleness_seconds: u64,
+    ): OraclePrice<CoinType> {
+        OraclePrice {
+            price: Price {
+                base,
+                exponent,
+                has_negative_exponent,
+            },
+            min_confidence_interval_bps,
+            max_staleness_seconds,
+        }
+        
+    }
+    
+    public(package) fun new_price<CoinType>(
+        base: u64,
+        exponent: u64,
+        has_negative_exponent: bool,
+    ): Price<CoinType> {
+        Price {
+            base,
+            exponent,
+            has_negative_exponent,
+        }
+    }
+
+    public(package) fun set_oracle_type<CoinType>(
+        oracle: &mut OracleInfo<CoinType>,
+        oracle_type: u8,
+    ) { oracle.oracle_type = oracle_type }
+
+    public(package) fun fields_mut<CoinType>(oracle: &mut OracleInfo<CoinType>): &mut Bag { &mut oracle.fields }
+
+    // ===== Getter function =====
+
+    public fun oracle_type<CoinType>(oracle: &OracleInfo<CoinType>): u8 { oracle.oracle_type }
+    public fun fields<CoinType>(oracle: &OracleInfo<CoinType>): &Bag { &oracle.fields }
+    public fun price_base<CoinType>(price: &Price<CoinType>): u64 { price.base }
+    public fun price_exponent<CoinType>(price: &Price<CoinType>): u64 { price.exponent }
+    public fun price_has_negative_exponent<CoinType>(price: &Price<CoinType>): bool { price.has_negative_exponent }
+
     public fun get_price<CoinType>(
         oracle_price: OraclePrice<CoinType>,
         min_confidence_interval_bps: u64,
@@ -184,6 +196,18 @@ module slamm::oracle_wrapper {
         );
 
         &oracle_price.price
+    }
+
+    public fun min_confidence_interval_bps<CoinType>(
+        oracle_price: &OraclePrice<CoinType>,
+    ): u64 {
+        oracle_price.min_confidence_interval_bps
+    }
+
+    public fun max_staleness_seconds<CoinType>(
+        oracle_price: &OraclePrice<CoinType>,
+    ): u64 {
+        oracle_price.max_staleness_seconds
     }
 
     // ===== Versioning Functions =====
@@ -226,12 +250,10 @@ module slamm::oracle_wrapper {
 
     #[test_only]
     use sui::{
-        test_scenario::{Self, Scenario, ctx},
-        test_utils::{assert_eq, destroy},
+        test_scenario::{Self, ctx},
+        test_utils::destroy,
     };
-    
-    #[test_only]
-    use pyth::{price, price_identifier::{Self, PriceIdentifier}, price_feed};
+
 
     #[test_only]
     public struct TestCoin has drop {}
@@ -299,6 +321,13 @@ module slamm::oracle_wrapper {
         has_negative_exponent: bool,
     ): Price<CoinType> {
         Price { base, exponent, has_negative_exponent }
+    }
+    
+    #[test_only]
+    public fun init_for_testing(
+        ctx: &mut TxContext,
+    ) {
+        init(ctx);
     }
 
     #[test]

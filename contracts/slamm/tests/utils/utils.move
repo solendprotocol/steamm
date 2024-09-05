@@ -1,6 +1,5 @@
 #[test_only]
 module slamm::test_utils {
-    use std::option::{some, none};
     use slamm::cpmm::{Self, State as CpmmState, Hook as CpmmHook};
     use slamm::registry;
     use slamm::omm::{Self, Hook as OmmHook, State as OmmState, min_confidence_interval, max_staleness_seconds};
@@ -17,7 +16,6 @@ module slamm::test_utils {
     use suilend::test_sui::{TEST_SUI};
     use suilend::lending_market::{Self, LENDING_MARKET};
     use suilend::reserve_config;
-    use pyth::price_info::{PriceInfoObject};
     use slamm::oracle_wrapper::{Self, OraclePrice, Price};
     use slamm::pyth::{Self as pyth_wrapper};
 

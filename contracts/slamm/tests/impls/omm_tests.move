@@ -1,6 +1,5 @@
 #[test_only]
 module slamm::omm_tests {
-    use std::option::{some, none};
     use slamm::registry;
     use slamm::bank;
     use slamm::oracle_wrapper;
@@ -482,6 +481,7 @@ module slamm::omm_tests {
             clock.timestamp_ms() / 1000,
             1,
             1,
+            0,
             1,
             &mut scenario,
         );
@@ -490,6 +490,7 @@ module slamm::omm_tests {
             clock.timestamp_ms() / 1000,
             1,
             1,
+            0,
             2,
             &mut scenario,
         );
