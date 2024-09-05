@@ -267,6 +267,17 @@ module slamm::oracle_wrapper {
     }
     
     #[test_only]
+    public fun clone_price_for_testing<CoinType>(
+        price: &Price<CoinType>,
+    ): Price<CoinType> {
+        Price {
+            base: price.base,
+            exponent: price.exponent,
+            has_negative_exponent: price.has_negative_exponent,
+        }
+    }
+    
+    #[test_only]
     public fun new_oracle_price_for_testing<CoinType>(
         base: u64,
         exponent: u64,

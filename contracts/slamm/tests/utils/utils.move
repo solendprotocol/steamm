@@ -169,18 +169,17 @@ module slamm::test_utils {
     //     oracle_wrapper::new_oracle_for_testing<PriceInfoObject, CoinType>(v, some(0 as u256), none(), clock, ctx)
     // }
 
-    // public fun set_oracle_price_as_internal_for_testing<A, B, W: drop>(
-    //     pool: &mut Pool<A, B, OmmHook<W>, OmmState>,
-    //     oracle_a: &mut OracleInfo<PriceInfoObject, A>,
-    //     oracle_b: &mut OracleInfo<PriceInfoObject, B>,
-    //     clock: &Clock,
-    // ) {
-    //     let a = pool.total_funds_a();
-    //     let b = pool.total_funds_b();
+    public fun set_oracle_price_as_internal_for_testing<A, B, W: drop>(
+        pool: &mut Pool<A, B, OmmHook<W>, OmmState>,
+    ): (OraclePrice<A>, OraclePrice<B>) {
+        let a = pool.total_funds_a();
+        let b = pool.total_funds_b();
         
-    //     oracle_a.set_oracle_price_for_testing(a as u256, clock);
-    //     oracle_b.set_oracle_price_for_testing(b as u256, clock);
-    // }
+        let price_info_a = new_oracle_price<A>(a, 0, false);
+        let price_info_b = new_oracle_price<B>(b, 0, false);
+        
+        (price_info_a, price_info_b)
+    }
     
     public fun update_pool_oracle_price_ahead_of_trade<A, B, W: drop>(
         pool: &mut Pool<A, B, OmmHook<W>, OmmState>,

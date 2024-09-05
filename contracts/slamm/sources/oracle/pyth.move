@@ -49,7 +49,7 @@ module slamm::pyth {
         oracle_info: &mut OracleInfo<CoinType>,
         price_info_obj: &PriceInfoObject,
         // min confidence ratio of X means that the confidence interval must be less than (100/x)% of the price
-        max_confidence_interval_bps: u64,
+        min_confidence_interval_bps: u64,
         max_staleness_seconds: u64,
         clock: &Clock,
     ): OraclePrice<CoinType> {
@@ -62,7 +62,7 @@ module slamm::pyth {
 
         let price_obj = price_feed.get_price();
         
-        get_price<CoinType>(price_obj, max_confidence_interval_bps, max_staleness_seconds, clock)
+        get_price<CoinType>(price_obj, min_confidence_interval_bps, max_staleness_seconds, clock)
     }
 
     fun get_price<CoinType>(
@@ -131,7 +131,7 @@ module slamm::pyth {
     }
 
     #[test_only]
-    fun create_price_obj(
+    public fun create_price_obj(
         current_ts: u64,
         price: u64,
         exponent: u64,

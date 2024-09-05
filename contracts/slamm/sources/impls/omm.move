@@ -120,7 +120,7 @@ module slamm::omm {
         let price_a = oracle_price_a.get_price(MIN_CONFIDENCE_INTERVAL, MAX_STALENESS_SECONDS);
         let price_b = oracle_price_b.get_price(MIN_CONFIDENCE_INTERVAL, MAX_STALENESS_SECONDS);
 
-        let reference_price = new_instant_price_oracle_(&price_a, &price_b);
+        let reference_price = new_instant_price_oracle(&price_a, &price_b);
         
         let inner = State {
             version: version::new(CURRENT_VERSION),
@@ -264,7 +264,7 @@ module slamm::omm {
         let mut quote = self.get_quote(amount_in, amount_out, a2b);
 
         let new_instant_price_internal = new_instant_price_internal(self, &quote);
-        let new_instant_price_oracle = new_instant_price_oracle_(
+        let new_instant_price_oracle = new_instant_price_oracle(
             oracle_price_a,
             oracle_price_b,
         );
@@ -338,7 +338,7 @@ module slamm::omm {
     }
     
     
-    fun new_instant_price_oracle_<A, B>(
+    public(package) fun new_instant_price_oracle<A, B>(
         oracle_price_a: &Price<A>,
         oracle_price_b: &Price<B>,
     ): Decimal {
@@ -453,13 +453,13 @@ module slamm::omm {
             let vol_accumulated = self.inner().ema.accumulator;
 
             let reference_val = vol_accumulated.mul(reduction_factor);
-            let reference_price = new_instant_price_oracle_(oracle_price_a, oracle_price_b);
+            let reference_price = new_instant_price_oracle(oracle_price_a, oracle_price_b);
             return (reference_price, reference_val, current_ms)
         };
 
         if (time_elapsed > state.decay_period) {
             let reference_val = decimal::from(0);
-            let reference_price = new_instant_price_oracle_(oracle_price_a, oracle_price_b);
+            let reference_price = new_instant_price_oracle(oracle_price_a, oracle_price_b);
             return (reference_price, reference_val, current_ms)
         };
 
