@@ -16,7 +16,7 @@ module slamm::test_utils {
     use suilend::test_sui::{TEST_SUI};
     use suilend::lending_market::{Self, LENDING_MARKET};
     use suilend::reserve_config;
-    use slamm::oracle_wrapper::{Self, OraclePrice, Price};
+    use slamm::oracle_wrapper::{Self, OraclePrice};
     use slamm::pyth::{Self as pyth_wrapper};
 
     public fun e9(amt: u64): u64 {
@@ -181,8 +181,8 @@ module slamm::test_utils {
     
     public fun update_pool_oracle_price_ahead_of_trade<A, B, W: drop>(
         pool: &mut Pool<A, B, OmmHook<W>, OmmState>,
-        oracle_a: Price<A>,
-        oracle_b: Price<B>,
+        oracle_a: OraclePrice<A>,
+        oracle_b: OraclePrice<B>,
         amount_in: u64,
         a2b: bool,
         clock_bump_seconds: u64,
@@ -215,5 +215,15 @@ module slamm::test_utils {
     ) {
         let clock_time = clock.timestamp_ms();
         clock.set_for_testing(clock_time + (clock_bump_seconds * 1_000));
+    }
+    
+    public fun new_price_for_testing<CoinType>(
+        base: u64,
+        exponent: u64,
+        has_negative_exponent: bool,
+    ): OraclePrice<CoinType> {
+        oracle_wrapper::new_oracle_price_for_testing<CoinType>(
+            base, exponent, has_negative_exponent, min_confidence_interval(), max_staleness_seconds()
+        )
     }
 }
