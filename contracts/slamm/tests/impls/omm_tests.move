@@ -15,7 +15,7 @@ module slamm::omm_tests {
     use sui::test_utils::{destroy, assert_eq};
     use suilend::lending_market::{Self, LENDING_MARKET};
     use suilend::decimal;
-    use slamm::omm::{Self, min_confidence_interval, max_staleness_seconds};
+    use slamm::omm;
     use slamm::test_utils;
 
     const ADMIN: address = @0x10;
@@ -41,8 +41,8 @@ module slamm::omm_tests {
         let ctx = ctx(&mut scenario);
 
         
-        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
         
         let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
             Wit {},
@@ -84,8 +84,8 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, TRADER);
         let ctx = ctx(&mut scenario);
 
-        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let mut coin_a = coin::mint_for_testing<SUI>(e9(200), ctx);
         let mut coin_b = coin::mint_for_testing<COIN>(0, ctx);
@@ -141,8 +141,8 @@ module slamm::omm_tests {
         let (clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         let ctx = ctx(&mut scenario);
 
-        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
             Wit {},
@@ -220,8 +220,8 @@ module slamm::omm_tests {
 
         // min_confidence_interval
         // max_staleness_seconds
-        let price_info_a = test_utils::new_price_for_testing<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_price_for_testing<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         while (len > 0) {
             let (quote, _, _, vol, _) = omm::quote_swap_impl(
@@ -310,8 +310,8 @@ module slamm::omm_tests {
         let ctx = ctx(&mut scenario);
 
         
-        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
             Wit {},
@@ -352,8 +352,8 @@ module slamm::omm_tests {
         // Swap
         test_scenario::next_tx(&mut scenario, TRADER);
 
-        let price_info_a = test_utils::new_price_for_testing<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_price_for_testing<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
         
         let (_, _, _, vol, _) = omm::quote_swap_impl(
             &pool,
@@ -394,8 +394,8 @@ module slamm::omm_tests {
         set_clock_time(&mut clock);
         let ctx = ctx(&mut scenario);
 
-        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
             Wit {},
@@ -438,8 +438,8 @@ module slamm::omm_tests {
 
         bump_clock_seconds(&mut clock, 1); // 1 seconds
 
-        let price_info_a = test_utils::new_price_for_testing<SUI>(5, 0, false); // price = 5
-        let price_info_b = test_utils::new_price_for_testing<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(5, 0, false, &clock); // price = 5
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let (_, _, _, vol, _) = omm::quote_swap_impl(
             &pool,
@@ -469,7 +469,7 @@ module slamm::omm_tests {
     }
     
     #[test]
-    #[expected_failure(abort_code = wrapper_pyth::EPriceStale)]
+    #[expected_failure(abort_code = oracle_wrapper::EPriceStale)]
     fun test_handle_fail_to_refresh_price() {
         let mut scenario = test_scenario::begin(ADMIN);
 
@@ -514,17 +514,11 @@ module slamm::omm_tests {
         let price_info_a = wrapper_pyth::get_updated_price(
             &mut oracle_a,
             &pyth_oracle_a,
-            min_confidence_interval(),
-            max_staleness_seconds(),
-            &clock,
         );
         
         let price_info_b = wrapper_pyth::get_updated_price(
             &mut oracle_b,
             &pyth_oracle_b,
-            min_confidence_interval(),
-            max_staleness_seconds(),
-            &clock,
         );
 
         // oracle_info: &mut OracleInfo<CoinType>,
@@ -575,8 +569,8 @@ module slamm::omm_tests {
         // Swap
         test_scenario::next_tx(&mut scenario, TRADER);
 
-        let price_info_a = test_utils::new_price_for_testing<SUI>(5, 0, false); // price = 5
-        let price_info_b = test_utils::new_price_for_testing<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(5, 0, false, &clock); // price = 5
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let new_ts = clock.timestamp_ms() + 1000 * 16; // 16 seconds
         clock.set_for_testing(new_ts);
@@ -630,8 +624,8 @@ module slamm::omm_tests {
         let ctx = ctx(&mut scenario);
 
         
-        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
             Wit {},
@@ -680,8 +674,8 @@ module slamm::omm_tests {
         let initial_reference_vol = pool.inner().ema().reference_val();
         let initial_accumulator = pool.inner().ema().accumulator();
 
-        let price_info_a = test_utils::new_price_for_testing<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_price_for_testing<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let (price_info_a, price_info_b) = update_pool_oracle_price_ahead_of_trade(
             &mut pool,
@@ -814,8 +808,8 @@ module slamm::omm_tests {
         let (mut clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         let ctx = ctx(&mut scenario);
         
-        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
             Wit {},
@@ -864,8 +858,8 @@ module slamm::omm_tests {
         let initial_reference_vol = pool.inner().ema().reference_val();
         let initial_accumulator = pool.inner().ema().accumulator();
 
-        let price_info_a = test_utils::new_price_for_testing<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_price_for_testing<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let (price_info_a, price_info_b) = update_pool_oracle_price_ahead_of_trade(
             &mut pool,
@@ -1013,8 +1007,8 @@ module slamm::omm_tests {
         let ctx = ctx(&mut scenario);
 
         
-        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
             Wit {},
@@ -1063,8 +1057,8 @@ module slamm::omm_tests {
         let initial_reference_vol = pool.inner().ema().reference_val();
         let initial_accumulator = pool.inner().ema().accumulator();
 
-        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let swap_intent = pool.omm_intent_swap(
             price_info_a,
@@ -1085,7 +1079,7 @@ module slamm::omm_tests {
         );
 
         bump_clock_seconds(&mut clock, 1);
-        let (price_info_a, price_info_b) = set_oracle_price_as_internal_for_testing(&mut pool);
+        let (price_info_a, price_info_b) = set_oracle_price_as_internal_for_testing(&mut pool, &clock);
 
         assert_eq(initial_reference_price, pool.inner().reference_price());
         assert_eq(initial_reference_vol, pool.inner().ema().reference_val());
@@ -1111,7 +1105,7 @@ module slamm::omm_tests {
         );
 
         bump_clock_seconds(&mut clock, 1);
-        let (price_info_a, price_info_b) = set_oracle_price_as_internal_for_testing(&mut pool);
+        let (price_info_a, price_info_b) = set_oracle_price_as_internal_for_testing(&mut pool, &clock);
 
         let mid_accumulator_2 = pool.inner().ema().accumulator();
         assert!(mid_accumulator_2.gt(mid_accumulator));
@@ -1176,8 +1170,8 @@ module slamm::omm_tests {
         let (mut clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         let ctx = ctx(&mut scenario);
 
-        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
             Wit {},
@@ -1226,8 +1220,8 @@ module slamm::omm_tests {
         let initial_reference_vol = pool.inner().ema().reference_val();
         let initial_accumulator = pool.inner().ema().accumulator();
 
-        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let swap_intent = pool.omm_intent_swap(
             price_info_a,
@@ -1248,7 +1242,7 @@ module slamm::omm_tests {
         );
 
         bump_clock_seconds(&mut clock, 1);
-        let (price_info_a, price_info_b) = set_oracle_price_as_internal_for_testing(&mut pool);
+        let (price_info_a, price_info_b) = set_oracle_price_as_internal_for_testing(&mut pool, &clock);
 
         let mid_accumulator = pool.inner().ema().accumulator();
         let fee_rate_1 = swap_result.to_quote().output_fee_rate();
@@ -1275,7 +1269,7 @@ module slamm::omm_tests {
         );
 
         bump_clock_seconds(&mut clock, 1);
-        let (price_info_a, price_info_b) = set_oracle_price_as_internal_for_testing(&mut pool);
+        let (price_info_a, price_info_b) = set_oracle_price_as_internal_for_testing(&mut pool, &clock);
 
         let mid_accumulator_2 = pool.inner().ema().accumulator();
         let fee_rate_2 = swap_result.to_quote().output_fee_rate();
@@ -1345,8 +1339,8 @@ module slamm::omm_tests {
         let ctx = ctx(&mut scenario);
 
         
-        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
             Wit {},
@@ -1391,8 +1385,8 @@ module slamm::omm_tests {
         let mut coin_a = coin::mint_for_testing<SUI>(100_000_000, ctx);
         let mut coin_b = coin::mint_for_testing<COIN>(0, ctx);
 
-        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
         
         // Initial trade to create some accumulated volatility
         let swap_intent = pool.omm_intent_swap(
@@ -1418,8 +1412,8 @@ module slamm::omm_tests {
         let initial_accumulator = pool.inner().ema().accumulator();
 
         // Move beyond the filter period of 60 seconds
-        let price_info_a = test_utils::new_price_for_testing<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_price_for_testing<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let (price_info_a, price_info_b) = update_pool_oracle_price_ahead_of_trade(
             &mut pool,
@@ -1592,8 +1586,8 @@ module slamm::omm_tests {
         let (mut clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         let ctx = ctx(&mut scenario);
 
-        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
             Wit {},
@@ -1639,8 +1633,8 @@ module slamm::omm_tests {
         let mut coin_b = coin::mint_for_testing<COIN>(0, ctx);
 
         // Initial trade to create some accumulated volatility
-        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let swap_intent = pool.omm_intent_swap(
             price_info_a,
@@ -1661,8 +1655,8 @@ module slamm::omm_tests {
         );
 
         // Move to decay period
-        let price_info_a = test_utils::new_price_for_testing<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_price_for_testing<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let (price_info_a, price_info_b) = update_pool_oracle_price_ahead_of_trade(
             &mut pool,
@@ -1846,8 +1840,8 @@ module slamm::omm_tests {
         let ctx = ctx(&mut scenario);
 
         
-        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
             Wit {},
@@ -1896,8 +1890,8 @@ module slamm::omm_tests {
         let mut i = 1;
         let mut previous_reference_price = 10_000; // 1
 
-        let mut oracle_a = test_utils::new_price_for_testing<SUI>(1, 1, false); // price = 10
-        let mut oracle_b = test_utils::new_price_for_testing<COIN>(1, 1, false); // price = 10
+        let mut oracle_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let mut oracle_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         while (trades > 0) {
             (oracle_a, oracle_b) = update_pool_oracle_price_ahead_of_trade(
@@ -1970,8 +1964,8 @@ module slamm::omm_tests {
         let ctx = ctx(&mut scenario);
 
         
-        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
             Wit {},
@@ -2012,8 +2006,8 @@ module slamm::omm_tests {
         // Swap
         test_scenario::next_tx(&mut scenario, TRADER);
 
-        let price_info_a = test_utils::new_price_for_testing<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_price_for_testing<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
         
         let (_quote_1, vol_1, _, _, _) = omm::quote_swap_impl(
             &pool,
@@ -2064,8 +2058,8 @@ module slamm::omm_tests {
         let ctx = ctx(&mut scenario);
 
         
-        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
             Wit {},
@@ -2110,8 +2104,8 @@ module slamm::omm_tests {
         let mut trades = 1_000;
         let precision_err = decimal::from(1);
         
-        let price_info_a = test_utils::new_price_for_testing<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_price_for_testing<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         while (trades > 0) {
             let amount_in = rng.generate_u64_in_range(1_000, 500_000_000);
@@ -2179,8 +2173,8 @@ module slamm::omm_tests {
         let (clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         let ctx = ctx(&mut scenario);
 
-        let price_info_a = test_utils::new_oracle_price<SUI>(0, 0, false);
-        let price_info_b = test_utils::new_oracle_price<COIN>(0, 0, false);
+        let price_info_a = test_utils::new_oracle_price<SUI>(0, 0, false, &clock);
+        let price_info_b = test_utils::new_oracle_price<COIN>(0, 0, false, &clock);
 
         let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
             Wit {},
@@ -2225,8 +2219,8 @@ module slamm::omm_tests {
         let mut coin_a = coin::mint_for_testing<SUI>(e9(200), ctx);
         let mut coin_b = coin::mint_for_testing<COIN>(0, ctx);
 
-        let price_info_a = test_utils::new_oracle_price<SUI>(0, 0, false);
-        let price_info_b = test_utils::new_oracle_price<COIN>(0, 0, false);
+        let price_info_a = test_utils::new_oracle_price<SUI>(0, 0, false, &clock);
+        let price_info_b = test_utils::new_oracle_price<COIN>(0, 0, false, &clock);
 
         let swap_intent = pool.omm_intent_swap(
             price_info_a,
@@ -2278,8 +2272,8 @@ module slamm::omm_tests {
         let ctx = ctx(&mut scenario);
 
         
-        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let (mut pool_1, pool_cap_1) = omm::new<SUI, COIN, Wit>(
             Wit {},
@@ -2296,8 +2290,8 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
         
         let (mut pool_2, pool_cap_2) = omm::new<SUI, COIN, Wit>(
             Wit {},
@@ -2354,8 +2348,8 @@ module slamm::omm_tests {
         let mut coin_a = coin::mint_for_testing<SUI>(100_000_000, ctx);
         let mut coin_b = coin::mint_for_testing<COIN>(0, ctx);
 
-        let price_info_a = test_utils::new_price_for_testing<SUI>(1, 1, false); // price = 10
-        let price_info_b = test_utils::new_price_for_testing<COIN>(1, 1, false); // price = 10
+        let price_info_a = test_utils::new_oracle_price<SUI>(1, 1, false, &clock); // price = 10
+        let price_info_b = test_utils::new_oracle_price<COIN>(1, 1, false, &clock); // price = 10
 
         let (price_info_a, price_info_b) = update_pool_oracle_price_ahead_of_trade(
             &mut pool_1,

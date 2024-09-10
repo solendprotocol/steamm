@@ -2,7 +2,7 @@
 module slamm::test_utils {
     use slamm::cpmm::{Self, State as CpmmState, Hook as CpmmHook};
     use slamm::registry;
-    use slamm::omm::{Self, Hook as OmmHook, State as OmmState, min_confidence_interval, max_staleness_seconds};
+    use slamm::omm::{Self, Hook as OmmHook, State as OmmState};
     use slamm::bank::{Self, Bank};
     use slamm::pool::{Pool};
     use slamm::oracle_wrapper::OracleInfo;
@@ -145,8 +145,11 @@ module slamm::test_utils {
         base: u64,
         exponent: u64,
         has_negative_exponent: bool,
+        clock: &Clock,
     ): OraclePrice<CoinType> {
-        oracle_wrapper::new_oracle_price_for_testing<CoinType>(base, exponent, has_negative_exponent, min_confidence_interval(), max_staleness_seconds())
+        let cur_time_s = clock.timestamp_ms() / 1000;
+
+        oracle_wrapper::new_oracle_price_for_testing<CoinType>(base, exponent, has_negative_exponent, 0, cur_time_s)
     }
     
     // #[test_only]
@@ -169,12 +172,13 @@ module slamm::test_utils {
 
     public fun set_oracle_price_as_internal_for_testing<A, B, W: drop>(
         pool: &mut Pool<A, B, OmmHook<W>, OmmState>,
+        clock: &Clock,
     ): (OraclePrice<A>, OraclePrice<B>) {
         let a = pool.total_funds_a();
         let b = pool.total_funds_b();
         
-        let price_info_a = new_oracle_price<A>(a, 0, false);
-        let price_info_b = new_oracle_price<B>(b, 0, false);
+        let price_info_a = new_oracle_price<A>(a, 0, false, clock);
+        let price_info_b = new_oracle_price<B>(b, 0, false, clock);
         
         (price_info_a, price_info_b)
     }
@@ -203,8 +207,8 @@ module slamm::test_utils {
         let a = if (a2b) {pool.total_funds_a() + quote.amount_in()} else {pool.total_funds_a() - quote.amount_out()};
         let b = if (a2b) {pool.total_funds_b() - quote.amount_out()} else {pool.total_funds_b() + quote.amount_in()};
 
-        let price_info_a = new_oracle_price<A>(a, 0, false);
-        let price_info_b = new_oracle_price<B>(b, 0, false);
+        let price_info_a = new_oracle_price<A>(a, 0, false, clock);
+        let price_info_b = new_oracle_price<B>(b, 0, false, clock);
         
         (price_info_a, price_info_b)
     }
@@ -215,15 +219,5 @@ module slamm::test_utils {
     ) {
         let clock_time = clock.timestamp_ms();
         clock.set_for_testing(clock_time + (clock_bump_seconds * 1_000));
-    }
-    
-    public fun new_price_for_testing<CoinType>(
-        base: u64,
-        exponent: u64,
-        has_negative_exponent: bool,
-    ): OraclePrice<CoinType> {
-        oracle_wrapper::new_oracle_price_for_testing<CoinType>(
-            base, exponent, has_negative_exponent, min_confidence_interval(), max_staleness_seconds()
-        )
     }
 }

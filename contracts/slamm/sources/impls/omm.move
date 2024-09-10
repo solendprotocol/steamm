@@ -21,8 +21,8 @@ module slamm::omm {
 
     const CURRENT_VERSION: u16 = 1;
     const BPS: u64 = 10_000;
-    // min confidence ratio of X means that the confidence interval must be less than (100/x)% of the price
-    const MIN_CONFIDENCE_INTERVAL: u64 = 10;
+    // 500 bos => 5%, which is equal to (1-5%) = 95% confidence interval
+    const MAX_CONFIDENCE_BPS: u64 = 500;
     const MAX_STALENESS_SECONDS: u64 = 60;
 
     // ===== Errors =====
@@ -117,8 +117,8 @@ module slamm::omm {
         clock: &Clock,
         ctx: &mut TxContext,
     ): (Pool<A, B, Hook<W>, State>, PoolCap<A, B, Hook<W>, State>) {
-        price_a.check_price(MIN_CONFIDENCE_INTERVAL, MAX_STALENESS_SECONDS);
-        price_b.check_price(MIN_CONFIDENCE_INTERVAL, MAX_STALENESS_SECONDS);
+        price_a.check_price(MAX_CONFIDENCE_BPS, MAX_STALENESS_SECONDS, clock);
+        price_b.check_price(MAX_CONFIDENCE_BPS, MAX_STALENESS_SECONDS, clock);
 
         let reference_price = new_instant_price_oracle(&price_a, &price_b);
         
@@ -156,8 +156,8 @@ module slamm::omm {
         a2b: bool,
         clock: &Clock,
     ): Intent<A, B, Hook<W>, State> {
-        price_a.check_price(MIN_CONFIDENCE_INTERVAL, MAX_STALENESS_SECONDS);
-        price_b.check_price(MIN_CONFIDENCE_INTERVAL, MAX_STALENESS_SECONDS);
+        price_a.check_price(MAX_CONFIDENCE_BPS, MAX_STALENESS_SECONDS, clock);
+        price_b.check_price(MAX_CONFIDENCE_BPS, MAX_STALENESS_SECONDS, clock);
 
         self.inner_mut().version.assert_version_and_upgrade(CURRENT_VERSION);
 
@@ -410,7 +410,7 @@ module slamm::omm {
     public fun filter_period(self: &State): u64 { self.filter_period }
     public fun decay_period(self: &State): u64 { self.decay_period }
     public fun fee_control(self: &State): Decimal { self.fee_control }
-    public fun min_confidence_interval(): u64 { MIN_CONFIDENCE_INTERVAL }
+    public fun max_confidence_bps(): u64 { MAX_CONFIDENCE_BPS }
     public fun max_staleness_seconds(): u64 { MAX_STALENESS_SECONDS }
     
     // ===== Private Functions =====

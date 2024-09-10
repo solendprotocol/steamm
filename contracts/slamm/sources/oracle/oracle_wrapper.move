@@ -4,6 +4,7 @@ module slamm::oracle_wrapper {
         bag::{Self, Bag},
     };
     use sui::{
+        clock::Clock,
         transfer::share_object,
     };
 
@@ -18,8 +19,8 @@ module slamm::oracle_wrapper {
     // ===== Errors =====
 
     const EIncorrectVersion: u64 = 0;
-    const EInvalidStaleness: u64 = 1;
-    const EInvalidConfidenceInterval: u64 = 2;
+    const EPriceStale: u64 = 1;
+    const EPriceOutsideConfidence: u64 = 2;
 
     // ===== Structs =====
 
@@ -50,8 +51,8 @@ module slamm::oracle_wrapper {
         base: u64,
         exponent: u64,
         has_negative_exponent: bool,
-        confidence_interval_bps: u64,
-        staleness_seconds: u64,
+        confidence: u64,
+        timestamp_s: u64,
     }
 
     // ===== Init function =====
@@ -118,15 +119,15 @@ module slamm::oracle_wrapper {
         base: u64,
         exponent: u64,
         has_negative_exponent: bool,
-        confidence_interval_bps: u64,
-        staleness_seconds: u64,
+        confidence: u64,
+        timestamp_s: u64,
     ): OraclePrice<CoinType> {
         OraclePrice {
             base,
             exponent,
             has_negative_exponent,
-            confidence_interval_bps,
-            staleness_seconds,
+            confidence,
+            timestamp_s,
         }
         
     }
@@ -145,20 +146,27 @@ module slamm::oracle_wrapper {
     public fun price_base<CoinType>(price: &OraclePrice<CoinType>): u64 { price.base }
     public fun price_exponent<CoinType>(price: &OraclePrice<CoinType>): u64 { price.exponent }
     public fun price_has_negative_exponent<CoinType>(price: &OraclePrice<CoinType>): bool { price.has_negative_exponent }
-    public fun confidence_interval_bps<CoinType>(price: &OraclePrice<CoinType>): u64 { price.confidence_interval_bps }
-    public fun staleness_seconds<CoinType>(price: &OraclePrice<CoinType>): u64 { price.staleness_seconds }
+    public fun confidence<CoinType>(price: &OraclePrice<CoinType>): u64 { price.confidence }
+    public fun timestamp_seconds<CoinType>(price: &OraclePrice<CoinType>): u64 { price.timestamp_s }
 
     public fun check_price<CoinType>(
-        oracle_price: &OraclePrice<CoinType>,
-        min_confidence_interval_bps: u64,
+        price: &OraclePrice<CoinType>,
+        max_confidence_bps: u64,
         max_staleness_seconds: u64,
+        clock: &Clock,
     ) {
+        // confidence check
+        // max_absolute_confidence = price_mag * max_confidence_bps / 10_000;
+        // asserts that conf <= max_absolute_confidence
         assert!(
-            oracle_price.staleness_seconds <= max_staleness_seconds, EInvalidStaleness
+            price.confidence * 10_000 <= price.base * max_confidence_bps, EPriceOutsideConfidence
         );
-        
+
+        // check current sui time against pythnet publish time. there can be some issues that arise because the
+        // timestamps are from different sources and may get out of sync, but that's why we have a fallback oracle
+        let cur_time_s = clock.timestamp_ms() / 1000;
         assert!(
-            oracle_price.confidence_interval_bps >= min_confidence_interval_bps, EInvalidConfidenceInterval
+            cur_time_s <= price.timestamp_s || cur_time_s - price.timestamp_s <= max_staleness_seconds, EPriceStale
         );
     }
     
@@ -233,8 +241,8 @@ module slamm::oracle_wrapper {
             base: oracle_price.base,
             exponent: oracle_price.exponent,
             has_negative_exponent: oracle_price.has_negative_exponent,
-            confidence_interval_bps: oracle_price.confidence_interval_bps,
-            staleness_seconds: oracle_price.staleness_seconds,
+            confidence: oracle_price.confidence,
+            timestamp_s: oracle_price.timestamp_s,
         }
     }
     
@@ -243,15 +251,15 @@ module slamm::oracle_wrapper {
         base: u64,
         exponent: u64,
         has_negative_exponent: bool,
-        confidence_interval_bps: u64,
-        staleness_seconds: u64,
+        confidence: u64,
+        timestamp_s: u64,
     ): OraclePrice<CoinType> {
         OraclePrice<CoinType> {
             base,
             exponent,
             has_negative_exponent,
-            confidence_interval_bps,
-            staleness_seconds,
+            confidence,
+            timestamp_s,
         }
     }
     
