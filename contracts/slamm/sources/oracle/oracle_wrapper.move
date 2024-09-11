@@ -154,7 +154,7 @@ module slamm::oracle_wrapper {
         max_confidence_bps: u64,
         max_staleness_seconds: u64,
         clock: &Clock,
-    ) {
+    ) { 
         // confidence check
         // max_absolute_confidence = price_mag * max_confidence_bps / 10_000;
         // asserts that conf <= max_absolute_confidence
@@ -165,6 +165,9 @@ module slamm::oracle_wrapper {
         // check current sui time against pythnet publish time. there can be some issues that arise because the
         // timestamps are from different sources and may get out of sync, but that's why we have a fallback oracle
         let cur_time_s = clock.timestamp_ms() / 1000;
+
+        // print(&(cur_time_s <= price.timestamp_s));
+        // print(&(cur_time_s - price.timestamp_s <= max_staleness_seconds));
         assert!(
             cur_time_s <= price.timestamp_s || cur_time_s - price.timestamp_s <= max_staleness_seconds, EPriceStale
         );
@@ -212,6 +215,7 @@ module slamm::oracle_wrapper {
     use sui::{
         test_scenario::{Self, ctx},
         test_utils::destroy,
+        clock,
     };
 
 
@@ -282,6 +286,201 @@ module slamm::oracle_wrapper {
 
         destroy(registry);
         destroy(admin);
+        destroy(scenario);
+    }
+
+    #[test]
+    fun test_check_price_at_max_confidence() {
+        let mut scenario = test_scenario::begin(@0x0);
+        test_scenario::next_tx(&mut scenario, @0x0);
+        let clock = clock::create_for_testing(ctx(&mut scenario));
+        let current_ts = clock.timestamp_ms();
+
+        let price = new_oracle_price_for_testing<TestCoin>(
+            550, // base
+            1, // exponent
+            true, // has_negative_exponent
+            11, // confidence
+            current_ts, // timestamp_s
+        );
+
+        price.check_price(
+            200, // 5 / 54 = 9.25% confidence = 925 bps
+            30, // 30 seconds
+            &clock,
+        );
+
+        destroy(price);
+        destroy(clock);
+        destroy(scenario);
+    }
+
+    #[test]
+    fun test_check_price_below_max_confidence() {
+        let mut scenario = test_scenario::begin(@0x0);
+        test_scenario::next_tx(&mut scenario, @0x0);
+        let clock = clock::create_for_testing(ctx(&mut scenario));
+        let current_ts = clock.timestamp_ms();
+
+        let mut confidence = 10;
+
+        while (confidence > 0) {
+            let price = new_oracle_price_for_testing<TestCoin>(
+                550, // base
+                1, // exponent
+                true, // has_negative_exponent
+                confidence, // confidence
+                current_ts, // timestamp_s
+            );
+
+            price.check_price(
+                200, // 5 / 54 = 9.25% confidence = 925 bps
+                30, // 30 seconds
+                &clock,
+            );
+
+            confidence = confidence - 1;
+        };
+
+        destroy(clock);
+        destroy(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EPriceOutsideConfidence)]
+    fun test_fail_check_price_above_max_confidence() {
+        let mut scenario = test_scenario::begin(@0x0);
+        test_scenario::next_tx(&mut scenario, @0x0);
+        let clock = clock::create_for_testing(ctx(&mut scenario));
+        let current_ts = clock.timestamp_ms();
+
+        let price = new_oracle_price_for_testing<TestCoin>(
+            550, // base
+            1, // exponent
+            true, // has_negative_exponent
+            11 + 1, // confidence
+            current_ts, // timestamp_s
+        );
+
+        price.check_price(
+            200, // 5 / 54 = 9.25% confidence = 925 bps
+            30, // 30 seconds
+            &clock,
+        );
+
+        destroy(price);
+        destroy(clock);
+        destroy(scenario);
+    }
+
+    #[test]
+    fun test_check_price_at_max_staleness() {
+        let mut scenario = test_scenario::begin(@0x0);
+        test_scenario::next_tx(&mut scenario, @0x0);
+        let mut clock = clock::create_for_testing(ctx(&mut scenario));
+        let current_ts = clock.timestamp_ms();
+
+        let price = new_oracle_price_for_testing<TestCoin>(
+            550, // base
+            1, // exponent
+            true, // has_negative_exponent
+            0, // confidence
+            current_ts, // timestamp_s
+        );
+
+        clock.increment_for_testing(1 * 1_000);
+
+        price.check_price(
+            200, // 5 / 54 = 9.25% confidence = 925 bps
+            1, // 1 second
+            &clock,
+        );
+
+        destroy(price);
+        destroy(clock);
+        destroy(scenario);
+    }
+    
+    #[test]
+    fun test_check_price_at_below_staleness() {
+        let mut scenario = test_scenario::begin(@0x0);
+        test_scenario::next_tx(&mut scenario, @0x0);
+        let mut clock = clock::create_for_testing(ctx(&mut scenario));
+        let current_ts = clock.timestamp_ms();
+
+        let price = new_oracle_price_for_testing<TestCoin>(
+            550, // base
+            1, // exponent
+            true, // has_negative_exponent
+            0, // confidence
+            current_ts, // timestamp_s
+        );
+
+        clock.increment_for_testing(1 * 1_000);
+
+        price.check_price(
+            200, // 5 / 54 = 9.25% confidence = 925 bps
+            2, // 2 seconds
+            &clock,
+        );
+
+        destroy(price);
+        destroy(clock);
+        destroy(scenario);
+    }
+    
+    #[test]
+    fun test_check_price_at_no_staleness() {
+        let mut scenario = test_scenario::begin(@0x0);
+        test_scenario::next_tx(&mut scenario, @0x0);
+        let clock = clock::create_for_testing(ctx(&mut scenario));
+        let current_ts = clock.timestamp_ms();
+
+        let price = new_oracle_price_for_testing<TestCoin>(
+            550, // base
+            1, // exponent
+            true, // has_negative_exponent
+            0, // confidence
+            current_ts, // timestamp_s
+        );
+
+        price.check_price(
+            200, // 5 / 54 = 9.25% confidence = 925 bps
+            0, // 0 seconds
+            &clock,
+        );
+
+        destroy(price);
+        destroy(clock);
+        destroy(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EPriceStale)]
+    fun test_fail_check_price_above_max_staleness() {
+        let mut scenario = test_scenario::begin(@0x0);
+        test_scenario::next_tx(&mut scenario, @0x0);
+        let mut clock = clock::create_for_testing(ctx(&mut scenario));
+        let current_ts = clock.timestamp_ms();
+
+        let price = new_oracle_price_for_testing<TestCoin>(
+            550, // base
+            1, // exponent
+            true, // has_negative_exponent
+            0, // confidence
+            current_ts, // timestamp_s
+        );
+
+        clock.increment_for_testing(3 * 1_000);
+
+        price.check_price(
+            200, // 5 / 54 = 9.25% confidence = 925 bps
+            2, // 2 seconds
+            &clock,
+        );
+
+        destroy(price);
+        destroy(clock);
         destroy(scenario);
     }
 }
