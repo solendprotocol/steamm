@@ -151,6 +151,17 @@ module slamm::test_utils {
 
         oracle_wrapper::new_oracle_price_for_testing<CoinType>(base, exponent, has_negative_exponent, 0, cur_time_s)
     }
+
+    #[test_only]
+    public fun new_oracle_price_with_confidence_and_timestamp<CoinType>(
+        base: u64,
+        exponent: u64,
+        has_negative_exponent: bool,
+        confidence: u64,
+        timestamp: u64,
+    ): OraclePrice<CoinType> {
+        oracle_wrapper::new_oracle_price_for_testing<CoinType>(base, exponent, has_negative_exponent, confidence, timestamp)
+    }
     
     // #[test_only]
     // public fun zero_price_info<CoinType>(
