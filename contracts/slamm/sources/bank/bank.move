@@ -1,4 +1,3 @@
-#[allow(lint(share_owned))]
 module slamm::bank {
     use std::{
         option::{none},

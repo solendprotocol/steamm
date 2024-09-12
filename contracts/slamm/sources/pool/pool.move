@@ -610,7 +610,7 @@ module slamm::pool {
         pool.pool_fee_config = fees::new_config(swap_fee_bps, BPS_DENOMINATOR, 0);
     }
     
-    public fun set_redemption_swap_fees<A, B, Hook: drop, State: store>(
+    public fun set_redemption_fees<A, B, Hook: drop, State: store>(
         pool: &mut Pool<A, B, Hook, State>,
         _pool_cap: &PoolCap<A, B, Hook, State>,
         redemption_fee_bps: u64,

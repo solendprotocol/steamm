@@ -1,0 +1,36 @@
+import * as bank from "./bank/structs";
+import * as cpmm from "./cpmm/structs";
+import * as events from "./events/structs";
+import * as fees from "./fees/structs";
+import * as globalAdmin from "./global-admin/structs";
+import * as pool from "./pool/structs";
+import * as quote from "./quote/structs";
+import * as registry from "./registry/structs";
+import * as version from "./version/structs";
+import {StructClassLoader} from "../_framework/loader";
+
+export function registerClasses(loader: StructClassLoader) { loader.register(version.Version);
+loader.register(globalAdmin.GlobalAdmin);
+loader.register(registry.Registry);
+loader.register(bank.Bank);
+loader.register(bank.Lending);
+loader.register(quote.DepositQuote);
+loader.register(quote.RedeemQuote);
+loader.register(quote.SwapFee);
+loader.register(quote.SwapQuote);
+loader.register(fees.FeeConfig);
+loader.register(fees.Fees);
+loader.register(events.Event);
+loader.register(pool.DepositResult);
+loader.register(pool.Intent);
+loader.register(pool.LP);
+loader.register(pool.NewPoolResult);
+loader.register(pool.Pool);
+loader.register(pool.PoolCap);
+loader.register(pool.RedeemResult);
+loader.register(pool.SwapResult);
+loader.register(pool.TotalFunds);
+loader.register(pool.TradingData);
+loader.register(cpmm.Hook);
+loader.register(cpmm.State);
+ }

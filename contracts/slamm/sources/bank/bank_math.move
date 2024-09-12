@@ -1,4 +1,3 @@
-#[allow(lint(share_owned))]
 module slamm::bank_math {
     // ===== Errors =====
 

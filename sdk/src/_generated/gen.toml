@@ -1,0 +1,2 @@
+[packages]
+slamm = { local = "../../../contracts/slamm" }
