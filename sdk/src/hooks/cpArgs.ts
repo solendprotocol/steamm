@@ -1,0 +1,18 @@
+import {
+  TransactionArgument,
+  TransactionObjectInput,
+} from "@mysten/sui/transactions";
+import {
+  PoolExecuteSwapArgs,
+  PoolIntentSwapArgs,
+  PoolNewArgs,
+  PoolQuoteSwap,
+} from "../clientArgs";
+
+export type CpNewArgs = PoolNewArgs & {
+  offset: bigint | TransactionArgument;
+};
+
+export type CpIntentSwapArgs = PoolIntentSwapArgs & {};
+export type CpExecuteSwapArgs = PoolExecuteSwapArgs & {};
+export type CpPoolQuoteSwap = PoolQuoteSwap & {};
