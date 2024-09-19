@@ -55,31 +55,18 @@ module slamm::bank {
 
     // ====== Entry Functions =====
 
+    #[allow(lint(share_owned))]
     public entry fun create_bank_and_share<P, T>(
         registry: &mut Registry,
         ctx: &mut TxContext,
-    ) {
+    ): ID {
         let bank = create_bank<P, T>(registry, ctx);
+        let bank_id = object::id(&bank);
         share_object(bank);
+        bank_id
     }
     
     // ====== Public Functions =====
-
-    public fun create_bank<P, T>(
-        registry: &mut Registry,
-        ctx: &mut TxContext,
-    ): Bank<P, T> {
-        let bank = Bank<P, T> {
-            id: object::new(ctx),
-            funds_available: balance::zero(),
-            lending: none(),
-            version: version::new(CURRENT_VERSION),
-        };
-
-        registry.add_bank(&bank);
-
-        bank
-    }
     
     public fun init_lending<P, T>(
         self: &mut Bank<P, T>,
@@ -444,6 +431,23 @@ module slamm::bank {
     public fun reserve_array_index<P, T>(self: &Bank<P, T>): u64 { self.lending.borrow().reserve_array_index }
 
     // ===== Test-Only Functions =====
+
+    #[test_only]
+    public(package) fun create_bank<P, T>(
+        registry: &mut Registry,
+        ctx: &mut TxContext,
+    ): Bank<P, T> {
+        let bank = Bank<P, T> {
+            id: object::new(ctx),
+            funds_available: balance::zero(),
+            lending: none(),
+            version: version::new(CURRENT_VERSION),
+        };
+
+        registry.add_bank(&bank);
+
+        bank
+    }
     
     #[test_only]
     public(package) fun mock_amount_lent<P, T>(self: &mut Bank<P, T>, amount: u64){ self.lending.borrow_mut().funds_deployed = amount; }
