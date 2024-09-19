@@ -35,6 +35,7 @@ import {
   PoolSetPoolSwapFeesArgs,
   PoolSetRedemptionFeesArgs,
 } from "./clientArgs";
+import { createBankAndShare } from "./_generated/slamm/bank/functions";
 
 export abstract class PoolClient<
   A extends PhantomTypeArgument,
@@ -196,6 +197,7 @@ export abstract class PoolClient<
 
     quoteRedeem(tx, this.typeArgs(), callArgs);
   }
+
   public prepareBankForPendingWithdraw(
     args: PoolPrepareBankForPendingWithdrawArgs,
     tx: Transaction = new Transaction()
@@ -211,6 +213,7 @@ export abstract class PoolClient<
 
     prepareBankForPendingWithdraw(tx, this.typeArgsWithP(), callArgs);
   }
+
   public needsLendingActionOnSwap(
     args: PoolNeedsLendingActionOnSwapArgs,
     tx: Transaction = new Transaction()
@@ -224,6 +227,7 @@ export abstract class PoolClient<
 
     needsLendingActionOnSwap(tx, this.typeArgsWithP(), callArgs);
   }
+
   public setPoolSwapFees(
     args: PoolSetPoolSwapFeesArgs,
     tx: Transaction = new Transaction()
@@ -236,6 +240,7 @@ export abstract class PoolClient<
 
     setPoolSwapFees(tx, this.typeArgs(), callArgs);
   }
+
   public setRedemptionFees(
     args: PoolSetRedemptionFeesArgs,
     tx: Transaction = new Transaction()
@@ -258,5 +263,16 @@ export abstract class PoolClient<
   public typeArgs(): [string, string, string, string] {
     const [typeA, typeB, typeHook, typeState] = this.pool.$typeArgs;
     return [`${typeA}`, `${typeB}`, `${typeHook}`, `${typeState}`];
+  }
+
+  public static createBank(
+    pType: string,
+    tType: string,
+    registryID: string,
+    tx: Transaction = new Transaction()
+  ) {
+    const registry = tx.object(registryID);
+
+    createBankAndShare(tx, [pType, tType], registry);
   }
 }

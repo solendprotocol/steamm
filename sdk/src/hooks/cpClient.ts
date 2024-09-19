@@ -106,11 +106,12 @@ export class CpClient<
       offset: args.offset,
     };
 
-    if (callArgs.offset === (0 || tx.pure.u64(0))) {
-      newWithOffset(tx, this.rawTypeArgs(), callArgs);
-    } else {
-      new_(tx, this.rawTypeArgs(), callArgs);
-    }
+    const pool =
+      callArgs.offset === (0 || tx.pure.u64(0))
+        ? newWithOffset(tx, this.rawTypeArgs(), callArgs)
+        : new_(tx, this.rawTypeArgs(), callArgs);
+
+    tx.shareObject(pool, this.poolType());
 
     return tx;
   }
@@ -153,6 +154,10 @@ export class CpClient<
     };
 
     quoteSwap(tx, this.rawTypeArgs(), callArgs);
+  }
+
+  public poolType(): [string] {
+    return [`${this.pool.$fullTypeName}`];
   }
 
   public rawTypeArgs(): [string, string, string] {
