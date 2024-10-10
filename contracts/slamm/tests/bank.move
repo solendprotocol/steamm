@@ -14,6 +14,7 @@ module slamm::bank_tests {
     use suilend::{
         lending_market::{Self, LENDING_MARKET},
     };
+    use sui::coin;
     use suilend::test_usdc::{TEST_USDC};
 
     public struct FAKE_LENDING has drop {}
@@ -250,5 +251,163 @@ module slamm::bank_tests {
         destroy(bag);
         destroy(clock);
         test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_bank_rebalance_deploy() {
+        let mut scenario = test_scenario::begin(@0x0);
+
+        let mut registry = registry::init_for_testing(ctx(&mut scenario));
+        let (clock, lend_cap, mut lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
+
+        // Create bank
+        let mut bank = bank::create_bank<LENDING_MARKET, TEST_USDC>(&mut registry, ctx(&mut scenario));
+        let global_admin = global_admin::init_for_testing(ctx(&mut scenario));
+
+        bank.init_lending<LENDING_MARKET, TEST_USDC>(
+            &global_admin,
+            &mut lending_market,
+            5_000, 
+            1_000, 
+            ctx(&mut scenario),
+        );
+
+        bank.deposit_for_testing(100 * 1_000_000);
+
+        assert!(bank.funds_available().value() == 100 * 1_000_000, 0);
+        assert!(bank.funds_deployed() == 0, 0);
+        assert!(bank.total_funds() == 100 * 1_000_000, 0);
+        // assert!(bank.ctokens() == 0, 0);
+        assert!(bank.effective_utilisation_rate() == 0, 0);
+
+        bank.rebalance(
+            &mut lending_market,
+            &clock,
+            ctx(&mut scenario),
+        );
+
+        assert!(bank.funds_available().value() == 50 * 1_000_000, 0);
+        assert!(bank.funds_deployed() == 50 * 1_000_000, 0);
+        assert!(bank.total_funds() == 100 * 1_000_000, 0);
+        assert!(bank.effective_utilisation_rate() == 5_000, 0);
+
+        destroy(clock);
+        destroy(bank);
+        destroy(prices);
+        destroy(bag);
+        destroy(lend_cap);
+        destroy(registry);
+        destroy(global_admin);
+        destroy(lending_market);
+        destroy(scenario);
+    }
+
+    #[test]
+    fun test_bank_rebalance_recall() {
+        let mut scenario = test_scenario::begin(@0x0);
+
+        let mut registry = registry::init_for_testing(ctx(&mut scenario));
+        let (clock, lend_cap, mut lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
+
+        // Create bank
+        let mut bank = bank::create_bank<LENDING_MARKET, TEST_USDC>(&mut registry, ctx(&mut scenario));
+        let global_admin = global_admin::init_for_testing(ctx(&mut scenario));
+
+        bank.init_lending<LENDING_MARKET, TEST_USDC>(
+            &global_admin,
+            &mut lending_market,
+            5_000, 
+            1_000, 
+            ctx(&mut scenario),
+        );
+
+        bank.deposit_for_testing(100 * 1_000_000);
+        bank.rebalance(
+            &mut lending_market,
+            &clock,
+            ctx(&mut scenario),
+        );
+
+        assert!(bank.funds_available().value() == 50 * 1_000_000, 0);
+        assert!(bank.funds_deployed() == 50 * 1_000_000, 0);
+        assert!(bank.total_funds() == 100 * 1_000_000, 0);
+        assert!(bank.effective_utilisation_rate() == 5_000, 0);
+
+        bank.set_utilisation_rate(&global_admin, 0, 0);
+        bank.rebalance(
+            &mut lending_market,
+            &clock,
+            ctx(&mut scenario),
+        );
+
+        assert!(bank.funds_available().value() == 100 * 1_000_000, 0);
+        assert!(bank.funds_deployed() == 0, 0);
+        assert!(bank.total_funds() == 100 * 1_000_000, 0);
+        assert!(bank.effective_utilisation_rate() == 0, 0);
+
+        destroy(clock);
+        destroy(bank);
+        destroy(prices);
+        destroy(bag);
+        destroy(lend_cap);
+        destroy(registry);
+        destroy(global_admin);
+        destroy(lending_market);
+        destroy(scenario);
+    }
+
+    #[test]
+    fun test_bank_prepare_bank_for_pending_withdraw() {
+        let mut scenario = test_scenario::begin(@0x0);
+
+        let mut registry = registry::init_for_testing(ctx(&mut scenario));
+        let (clock, lend_cap, mut lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
+
+        // Create bank
+        let mut bank = bank::create_bank<LENDING_MARKET, TEST_USDC>(&mut registry, ctx(&mut scenario));
+        let global_admin = global_admin::init_for_testing(ctx(&mut scenario));
+
+        bank.init_lending<LENDING_MARKET, TEST_USDC>(
+            &global_admin,
+            &mut lending_market,
+            5_000, 
+            1_000, 
+            ctx(&mut scenario),
+        );
+
+        bank.deposit_for_testing(100 * 1_000_000);
+        bank.rebalance(
+            &mut lending_market,
+            &clock,
+            ctx(&mut scenario),
+        );
+        assert!(bank.funds_available().value() == 50 * 1_000_000, 0);
+        assert!(bank.funds_deployed() == 50 * 1_000_000, 0);
+        assert!(bank.total_funds() == 100 * 1_000_000, 0);
+        assert!(bank.effective_utilisation_rate() == 5_000, 0);
+
+        bank.prepare_bank_for_pending_withdraw_(
+            &mut lending_market,
+            20 * 1_000_000,
+            &clock,
+            ctx(&mut scenario),
+        );
+        let usdc = bank.withdraw_for_testing(20 * 1_000_000);
+
+        assert!(bank.funds_available().value() == 40 * 1_000_000, 0);
+        assert!(bank.funds_deployed() == 40 * 1_000_000, 0);
+        assert!(bank.total_funds() == 80 * 1_000_000, 0);
+        assert!(bank.effective_utilisation_rate() == 5_000, 0);
+
+        destroy(clock);
+        destroy(bank);
+        destroy(prices);
+        destroy(bag);
+        destroy(lend_cap);
+        destroy(registry);
+        destroy(global_admin);
+        destroy(lending_market);
+        destroy(usdc);
+        destroy(scenario);
     }
 }
