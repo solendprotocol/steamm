@@ -593,7 +593,7 @@ module slamm::lend_tests {
         let mut coin_a = coin::mint_for_testing<TEST_USDC>(200_000, ctx);
         let mut coin_b = coin::mint_for_testing<TEST_SUI>(0, ctx);
 
-        let mut swap_intent = pool.cpmm_intent_swap(
+        let swap_intent = pool.cpmm_intent_swap(
             200_000,
             true, // a2b
         );
@@ -602,7 +602,7 @@ module slamm::lend_tests {
             &mut bank_a,
             &mut bank_b,
             &mut lending_market,
-            &mut swap_intent,
+            &swap_intent,
             &clock,
             ctx,
         );
@@ -1232,7 +1232,7 @@ module slamm::lend_tests {
         let mut coin_a = coin::mint_for_testing<TEST_USDC>(0, ctx);
         let mut coin_b = coin::mint_for_testing<COIN>(10, ctx);
 
-        let mut swap_intent = intent_swap(
+        let swap_intent = intent_swap(
             &mut pool,
             10,
             false, // a2b
@@ -1242,7 +1242,7 @@ module slamm::lend_tests {
             &mut bank_a,
             &mut bank_b,
             &mut lending_market,
-            &mut swap_intent,
+            &swap_intent,
             &clock,
             ctx,
         );
@@ -1344,7 +1344,7 @@ module slamm::lend_tests {
         let mut coin_a = coin::mint_for_testing<TEST_USDC>(0, ctx);
         let mut coin_b = coin::mint_for_testing<COIN>(20_000, ctx);
 
-        let mut swap_intent = intent_swap(
+        let swap_intent = intent_swap(
             &mut pool,
             20_000,
             false, // a2b
@@ -1354,7 +1354,7 @@ module slamm::lend_tests {
             &mut bank_a,
             &mut bank_b,
             &mut lending_market,
-            &mut swap_intent,
+            &swap_intent,
             &clock,
             ctx,
         );
@@ -1458,7 +1458,7 @@ module slamm::lend_tests {
         let mut coin_a = coin::mint_for_testing<TEST_USDC>(0, ctx);
         let mut coin_b = coin::mint_for_testing<COIN>(30_000, ctx);
 
-        let mut swap_intent = intent_swap(
+        let swap_intent = intent_swap(
             &mut pool,
             30_000,
             false, // a2b
@@ -1468,7 +1468,7 @@ module slamm::lend_tests {
             &mut bank_a,
             &mut bank_b,
             &mut lending_market,
-            &mut swap_intent,
+            &swap_intent,
             &clock,
             ctx,
         );

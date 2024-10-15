@@ -1,8 +1,10 @@
 /// Constant-Product AMM Hook implementation
 module slamm::cpmm {
-    // TODO: Not expose intents
     use std::option::none;
-    use sui::coin::Coin;
+    use sui::{
+        coin::Coin,
+        clock::Clock,
+    };
     use slamm::{
         global_admin::GlobalAdmin,
         registry::{Registry},
@@ -12,6 +14,7 @@ module slamm::cpmm {
         version::{Self, Version},
         math::{safe_mul_div, checked_mul_div}
     };
+    use suilend::lending_market::LendingMarket;
 
     // ===== Constants =====
 
@@ -105,6 +108,42 @@ module slamm::cpmm {
         ctx: &mut TxContext,
     ): SwapResult {
         let intent = intent_swap(self, amount_in, a2b);
+
+        execute_swap(
+            self,
+            bank_a,
+            bank_b,
+            intent,
+            coin_a,
+            coin_b,
+            min_amount_out,
+            ctx,
+        )
+    }
+    
+    public fun swap_with_lending_market<A, B, W: drop, P>(
+        self: &mut Pool<A, B, Hook<W>, State>,
+        lending_market: &mut LendingMarket<P>,
+        bank_a: &mut Bank<P, A>,
+        bank_b: &mut Bank<P, B>,
+        coin_a: &mut Coin<A>,
+        coin_b: &mut Coin<B>,
+        amount_in: u64,
+        min_amount_out: u64,
+        a2b: bool,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ): SwapResult {
+        let mut intent = intent_swap(self, amount_in, a2b);
+
+        pool::prepare_bank_for_pending_withdraw(
+            bank_a,
+            bank_b,
+            lending_market,
+            &intent,
+            clock,
+            ctx,
+        );
 
         execute_swap(
             self,

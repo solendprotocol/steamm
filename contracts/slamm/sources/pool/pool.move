@@ -544,7 +544,7 @@ module slamm::pool {
         bank_a: &mut Bank<P, A>,
         bank_b: &mut Bank<P, B>,
         lending_market: &mut LendingMarket<P>,
-        intent: &mut Intent<A, B, Hook, State>,
+        intent: &Intent<A, B, Hook, State>,
         clock: &Clock,
         ctx: &mut TxContext,
     ) {
