@@ -42,6 +42,11 @@ export interface PoolRedeemLiquidityArgs {
   minB: bigint | TransactionArgument;
 }
 
+export interface QuoteDepositArgs {
+  idealA: bigint | TransactionArgument;
+  idealB: bigint | TransactionArgument;
+}
+
 export interface PoolPrepareBankForPendingWithdrawArgs {
   intent: TransactionObjectInput;
 }
@@ -50,15 +55,28 @@ export interface PoolQuoteRedeemArgs {
   lpTokens: bigint | TransactionArgument;
 }
 
-export interface PoolNeedsLendingActionOnSwapArgs {
-  quote: TransactionObjectInput;
-}
-
 export interface PoolSetPoolSwapFeesArgs {
   poolCap: TransactionObjectInput;
   swapFeeBps: bigint | TransactionArgument;
 }
+
 export interface PoolSetRedemptionFeesArgs {
   poolCap: TransactionObjectInput;
   redemptionFeeBps: bigint | TransactionArgument;
+}
+
+export interface CollectRedemptionFeesArgs {
+  poolCap: TransactionObjectInput;
+}
+
+export interface CollectProtocolFeesArgs {
+  globalAdmin: TransactionObjectInput;
+}
+
+export interface MigrateArgs {
+  poolCap: TransactionObjectInput;
+}
+
+export interface MigrateAsGlobalAdminArgs {
+  globalAdmin: TransactionObjectInput;
 }

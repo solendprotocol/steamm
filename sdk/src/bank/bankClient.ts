@@ -1,5 +1,5 @@
 import { SuiClient } from "@mysten/sui/client";
-import { Transaction, TransactionResult } from "@mysten/sui/transactions";
+import { Transaction, TransactionArgument } from "@mysten/sui/transactions";
 import { SUI_CLOCK_OBJECT_ID } from "@mysten/sui/utils";
 import {
   CTokenAmountArgs,
@@ -88,7 +88,7 @@ export abstract class BankClient<
   public cTokenAmount(
     args: CTokenAmountArgs,
     tx: Transaction = new Transaction()
-  ): TransactionResult {
+  ): TransactionArgument {
     const callArgs = {
       bank: tx.object(this.bank.id),
       lendingMarket: tx.object(this.lendingMarket.id),
@@ -126,13 +126,13 @@ export abstract class BankClient<
 
   // Getters
 
-  public viewLending(tx: Transaction = new Transaction()): TransactionResult {
+  public viewLending(tx: Transaction = new Transaction()): TransactionArgument {
     return BankFunctions.lending(tx, this.typeArgs(), tx.object(this.bank.id));
   }
 
   public viewTotalFunds(
     tx: Transaction = new Transaction()
-  ): TransactionResult {
+  ): TransactionArgument {
     return BankFunctions.totalFunds(
       tx,
       this.typeArgs(),
@@ -142,7 +142,7 @@ export abstract class BankClient<
 
   public viewEffectiveUtilisationBps(
     tx: Transaction = new Transaction()
-  ): TransactionResult {
+  ): TransactionArgument {
     return BankFunctions.effectiveUtilisationBps(
       tx,
       this.typeArgs(),
@@ -152,7 +152,7 @@ export abstract class BankClient<
 
   public viewFundsDeployed(
     tx: Transaction = new Transaction()
-  ): TransactionResult {
+  ): TransactionArgument {
     return BankFunctions.fundsDeployed(
       tx,
       this.typeArgs(),
@@ -162,7 +162,7 @@ export abstract class BankClient<
 
   public viewFundsAvailable(
     tx: Transaction = new Transaction()
-  ): TransactionResult {
+  ): TransactionArgument {
     return BankFunctions.fundsAvailable(
       tx,
       this.typeArgs(),
@@ -172,7 +172,7 @@ export abstract class BankClient<
 
   public viewTargetUtilisationBps(
     tx: Transaction = new Transaction()
-  ): TransactionResult {
+  ): TransactionArgument {
     return BankFunctions.targetUtilisationBps(
       tx,
       this.typeArgs(),
@@ -182,7 +182,7 @@ export abstract class BankClient<
 
   public viewUtilisationBufferBps(
     tx: Transaction = new Transaction()
-  ): TransactionResult {
+  ): TransactionArgument {
     return BankFunctions.utilisationBufferBps(
       tx,
       this.typeArgs(),
@@ -192,7 +192,7 @@ export abstract class BankClient<
 
   public viewFundsDeployedUnchecked(
     tx: Transaction = new Transaction()
-  ): TransactionResult {
+  ): TransactionArgument {
     return BankFunctions.fundsDeployedUnchecked(
       tx,
       this.typeArgs(),
@@ -202,7 +202,7 @@ export abstract class BankClient<
 
   public viewTargetUtilisationBpsUnchecked(
     tx: Transaction = new Transaction()
-  ): TransactionResult {
+  ): TransactionArgument {
     return BankFunctions.targetUtilisationBpsUnchecked(
       tx,
       this.typeArgs(),
@@ -212,7 +212,7 @@ export abstract class BankClient<
 
   public viewUtilisationBufferBpsUnchecked(
     tx: Transaction = new Transaction()
-  ): TransactionResult {
+  ): TransactionArgument {
     return BankFunctions.utilisationBufferBpsUnchecked(
       tx,
       this.typeArgs(),
@@ -222,7 +222,7 @@ export abstract class BankClient<
 
   public viewReserveArrayIndex(
     tx: Transaction = new Transaction()
-  ): TransactionResult {
+  ): TransactionArgument {
     return BankFunctions.reserveArrayIndex(
       tx,
       this.typeArgs(),

@@ -6,4 +6,6 @@ export {
   Reified,
   PhantomReified,
   ToTypeArgument,
+  ToPhantomTypeArgument,
+  ToTypeStr,
 } from "./_generated/_framework/reified";
