@@ -93,18 +93,18 @@ module slamm::cpmm {
     }
 
     public fun intent_swap<A, B, W: drop>(
-        self: &mut Pool<A, B, Hook<W>, State>,
+        pool: &mut Pool<A, B, Hook<W>, State>,
         amount_in: u64,
         a2b: bool,
     ): Intent<A, B, Hook<W>, State> {
-        self.inner_mut().version.assert_version_and_upgrade(CURRENT_VERSION);
-        let quote = quote_swap(self, amount_in, a2b);
+        pool.inner_mut().version.assert_version_and_upgrade(CURRENT_VERSION);
+        let quote = quote_swap(pool, amount_in, a2b);
 
-        quote.as_intent(self)
+        quote.as_intent(pool)
     }
 
     public fun execute_swap<A, B, W: drop, P>(
-        self: &mut Pool<A, B, Hook<W>, State>,
+        pool: &mut Pool<A, B, Hook<W>, State>,
         bank_a: &mut Bank<P, A>,
         bank_b: &mut Bank<P, B>,
         intent: Intent<A, B, Hook<W>, State>,
@@ -113,11 +113,11 @@ module slamm::cpmm {
         min_amount_out: u64,
         ctx: &mut TxContext,
     ): SwapResult {
-        self.inner_mut().version.assert_version_and_upgrade(CURRENT_VERSION);
+        pool.inner_mut().version.assert_version_and_upgrade(CURRENT_VERSION);
 
-        let k0 = k(self, offset(self));
+        let k0 = k(pool, offset(pool));
 
-        let response = self.swap(
+        let response = pool.swap(
             Hook<W> {},
             bank_a,
             bank_b,
@@ -129,7 +129,7 @@ module slamm::cpmm {
         );
 
         // Recompute invariant
-        check_invariance(self, k0, offset(self));
+        check_invariance(pool, k0, offset(pool));
 
         response
     }
@@ -137,21 +137,21 @@ module slamm::cpmm {
     // cpmm return price, take price that's best for LPs, on top we add dynamic fee
     // fees should always be computed on the output amount;
     public fun quote_swap<A, B, W: drop>(
-        self: &Pool<A, B, Hook<W>, State>,
+        pool: &Pool<A, B, Hook<W>, State>,
         amount_in: u64,
         a2b: bool,
     ): SwapQuote {
-        let (reserve_a, reserve_b) = self.total_funds();
+        let (reserve_a, reserve_b) = pool.total_funds();
 
         let amount_out = quote_swap_impl(
             reserve_a,
             reserve_b,
             amount_in,
-            self.inner().offset,
+            pool.inner().offset,
             a2b,
         );
 
-        self.get_quote(amount_in, amount_out, a2b)
+        pool.get_quote(amount_in, amount_out, a2b)
     }
     
     public(package) fun quote_swap_impl(
@@ -188,57 +188,57 @@ module slamm::cpmm {
 
     // ===== View Functions =====
     
-    public fun offset<A, B, W: drop>(self: &Pool<A, B, Hook<W>, State>): u64 {
-        self.inner().offset
+    public fun offset<A, B, W: drop>(pool: &Pool<A, B, Hook<W>, State>): u64 {
+        pool.inner().offset
     }
     
     public fun k<A, B, Hook: drop, State: store>(
-        self: &Pool<A, B, Hook, State>,
+        pool: &Pool<A, B, Hook, State>,
         offset: u64,
     ): u128 {
-        let (total_funds_a, total_funds_b) = self.total_funds();
+        let (total_funds_a, total_funds_b) = pool.total_funds();
         ((total_funds_a as u128) * ((total_funds_b + offset) as u128))
     }
 
     // ===== Versioning =====
     
     entry fun migrate<A, B, W>(
-        self: &mut Pool<A, B, Hook<W>, State>,
+        pool: &mut Pool<A, B, Hook<W>, State>,
         _cap: &PoolCap<A, B, Hook<W>, State>,
     ) {
-        migrate_(self);
+        migrate_(pool);
     }
     
     entry fun migrate_as_global_admin<A, B, W>(
-        self: &mut Pool<A, B, Hook<W>, State>,
+        pool: &mut Pool<A, B, Hook<W>, State>,
         _admin: &GlobalAdmin,
     ) {
-        migrate_(self);
+        migrate_(pool);
     }
 
     fun migrate_<A, B, W>(
-        self: &mut Pool<A, B, Hook<W>, State>,
+        pool: &mut Pool<A, B, Hook<W>, State>,
     ) {
-        self.inner_mut().version.migrate_(CURRENT_VERSION);
+        pool.inner_mut().version.migrate_(CURRENT_VERSION);
     }
 
     // ===== Package Functions =====
     
     public(package) fun check_invariance<A, B, Hook: drop, State: store>(
-        self: &Pool<A, B, Hook, State>,
+        pool: &Pool<A, B, Hook, State>,
         k0: u128,
         offset: u64,
     ) {
-        let k1 = k(self, offset);
+        let k1 = k(pool, offset);
         assert!(k1 > 0, EZeroInvariant);
         assert!(k1 >= k0, EInvariantViolation);
     }
 
     public(package) fun max_amount_in_on_a2b<A, B, W: drop>(
-        self: &Pool<A, B, Hook<W>, State>,
+        pool: &Pool<A, B, Hook<W>, State>,
     ): Option<u64> {
-        let (reserve_in, reserve_out) = self.total_funds();
-        let offset = offset(self);
+        let (reserve_in, reserve_out) = pool.total_funds();
+        let offset = offset(pool);
 
         if (offset == 0) {
             return none()
