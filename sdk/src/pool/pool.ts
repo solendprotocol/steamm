@@ -31,6 +31,7 @@ import {
   ToTypeArgument,
   Reified,
 } from "..";
+import { Bank } from "../bank/bank";
 
 export abstract class Pool<
   A extends PhantomTypeArgument,
@@ -40,14 +41,14 @@ export abstract class Pool<
   P extends PhantomTypeArgument
 > {
   public pool: PoolObj<A, B, Hook, State>;
-  public bankA: BankObj<P, A>;
-  public bankB: BankObj<P, B>;
+  public bankA: Bank<P, A>;
+  public bankB: Bank<P, B>;
   public lendingMarket: LendingMarketObj<P>;
 
   constructor(
     pool: PoolObj<A, B, Hook, State>,
-    bankA: BankObj<P, A>,
-    bankB: BankObj<P, B>,
+    bankA: Bank<P, A>,
+    bankB: Bank<P, B>,
     lendingMarket: LendingMarketObj<P>
   ) {
     this.pool = pool;
@@ -133,8 +134,8 @@ export abstract class Pool<
   ): [TransactionArgument, TransactionArgument] {
     const callArgs = {
       pool: tx.object(this.pool.id),
-      bankA: tx.object(this.bankA.id),
-      bankB: tx.object(this.bankB.id),
+      bankA: tx.object(this.bankA.bank.id),
+      bankB: tx.object(this.bankB.bank.id),
       coinA: args.coinA,
       coinB: args.coinB,
       maxA: args.maxA,
@@ -157,8 +158,8 @@ export abstract class Pool<
   ): [TransactionArgument, TransactionArgument, TransactionArgument] {
     const callArgs = {
       pool: tx.object(this.pool.id),
-      bankA: tx.object(this.bankA.id),
-      bankB: tx.object(this.bankB.id),
+      bankA: tx.object(this.bankA.bank.id),
+      bankB: tx.object(this.bankB.bank.id),
       lpTokens: args.lpTokens,
       minA: args.minA,
       minB: args.minB,
@@ -205,8 +206,8 @@ export abstract class Pool<
   ) {
     const callArgs = {
       pool: tx.object(this.pool.id),
-      bankA: tx.object(this.bankA.id),
-      bankB: tx.object(this.bankB.id),
+      bankA: tx.object(this.bankA.bank.id),
+      bankB: tx.object(this.bankB.bank.id),
       lendingMarket: tx.object(this.lendingMarket.id),
       intent: args.intent,
       clock: tx.object(SUI_CLOCK_OBJECT_ID),
@@ -315,7 +316,7 @@ export abstract class Pool<
 
   public typeArgsWithP(): [string, string, string, string, string] {
     const [typeA, typeB, typeHook, typeState] = this.pool.$typeArgs;
-    const [typeP, _] = this.bankA.$typeArgs;
+    const [typeP, _] = this.bankA.bank.$typeArgs;
     return [`${typeA}`, `${typeB}`, `${typeHook}`, `${typeState}`, `${typeP}`];
   }
 
@@ -335,6 +336,7 @@ export abstract class Pool<
       tx.object(this.pool.id)
     );
   }
+
   public viewTotalFundsA(
     tx: Transaction = new Transaction()
   ): TransactionArgument {

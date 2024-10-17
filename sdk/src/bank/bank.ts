@@ -16,9 +16,9 @@ import {
   PhantomTypeArgument,
 } from "..";
 
-export abstract class Bank<
-  T extends PhantomTypeArgument,
-  P extends PhantomTypeArgument
+export class Bank<
+  P extends PhantomTypeArgument,
+  T extends PhantomTypeArgument
 > {
   public bank: BankObj<P, T>;
   public lendingMarket: LendingMarketObj<P>;
@@ -28,9 +28,9 @@ export abstract class Bank<
     this.lendingMarket = lendingMarket;
   }
 
-  protected static async fetchState<
-    T extends PhantomTypeArgument,
-    P extends PhantomTypeArgument
+  static async fetchState<
+    P extends PhantomTypeArgument,
+    T extends PhantomTypeArgument
   >(
     coinType: T,
     lendingMarketType: P,

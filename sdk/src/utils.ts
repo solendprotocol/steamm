@@ -4,6 +4,8 @@ import {
   ToPhantomTypeArgument,
   ToTypeStr,
 } from ".";
+import { SerializedBcs } from "@mysten/bcs";
+import { TransactionArgument } from "@mysten/sui/dist/cjs/transactions";
 
 export type GenericHookType<T extends StructClass> = ToPhantomTypeArgument<
   PhantomReified<ToTypeStr<T>>
@@ -23,4 +25,13 @@ export interface ObjectIds {
   bankAId: string;
   bankBId: string;
   lendingMarketId: string;
+}
+
+declare module "@mysten/sui/dist/cjs/transactions" {
+  interface Transaction {
+    shareObject(
+      object: TransactionArgument | SerializedBcs<any>,
+      typeArgs: string[]
+    ): void;
+  }
 }

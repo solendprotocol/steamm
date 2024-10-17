@@ -7,7 +7,7 @@ import {
   PoolIntentSwapArgs,
   PoolNewArgs,
   PoolQuoteSwap,
-} from "../clientArgs";
+} from "../pool/poolArgs";
 
 export type CpNewArgs = PoolNewArgs & {
   offset: bigint | TransactionArgument;

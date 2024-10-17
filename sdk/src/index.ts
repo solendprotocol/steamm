@@ -1,5 +1,6 @@
 export * as BankFunctions from "./_codegen/bankFunctions";
 export * as PoolFunctions from "./_codegen/poolFunctions";
+export * as ConstantProductFunctions from "./_codegen/constantProductFunctions";
 export * as BankArgs from "./_codegen/bankArgs";
 export * from "./_codegen/typeUtils";
 export { Bank as BankObj } from "./_codegen/_generated/slamm/bank/structs";
