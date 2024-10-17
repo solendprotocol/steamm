@@ -11,3 +11,5 @@ grcov.log
 .env
 package-lock.json
 yarn.lock
+
+sui/*

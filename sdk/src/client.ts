@@ -1,6 +1,6 @@
 import { SuiClient } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
-import { Pool } from "./_generated/slamm/pool/structs";
+import { Pool } from "./codegen/_generated/slamm/pool/structs";
 import {
   PhantomTypeArgument,
   TypeArgument,
@@ -9,18 +9,17 @@ import {
   Reified,
   PhantomReified,
   ToTypeArgument,
-} from "./_generated/_framework/reified";
-import { Bank } from "./_generated/slamm/bank/structs";
+} from "./codegen/_generated/_framework/reified";
+import { Bank } from "./codegen/_generated/slamm/bank/structs";
 import {
   depositLiquidity,
-  needsLendingActionOnSwap,
   prepareBankForPendingWithdraw,
   quoteRedeem,
   redeemLiquidity,
   setPoolSwapFees,
   setRedemptionFees,
-} from "./_generated/slamm/pool/functions";
-import { LendingMarket } from "./_generated/_dependencies/source/0xf95b06141ed4a174f239417323bde3f209b972f5930d8521ea38a52aff3a6ddf/lending-market/structs";
+} from "./codegen/_generated/slamm/pool/functions";
+import { LendingMarket } from "./codegen/_generated/_dependencies/source/0xf95b06141ed4a174f239417323bde3f209b972f5930d8521ea38a52aff3a6ddf/lending-market/structs";
 import { SUI_CLOCK_OBJECT_ID } from "@mysten/sui/dist/cjs/utils";
 import {
   PoolDepositLiquidityArgs,
@@ -35,7 +34,7 @@ import {
   PoolSetPoolSwapFeesArgs,
   PoolSetRedemptionFeesArgs,
 } from "./clientArgs";
-import { createBankAndShare } from "./_generated/slamm/bank/functions";
+import { createBankAndShare } from "./codegen/_generated/slamm/bank/functions";
 
 export abstract class PoolClient<
   A extends PhantomTypeArgument,
@@ -140,7 +139,7 @@ export abstract class PoolClient<
     tx: Transaction = new Transaction()
   ) {
     const callArgs = {
-      self: tx.object(this.pool.id),
+      pool: tx.object(this.pool.id),
       bankA: tx.object(this.bankA.id),
       bankB: tx.object(this.bankB.id),
       coinA: args.coinA,
@@ -159,7 +158,7 @@ export abstract class PoolClient<
     tx: Transaction = new Transaction()
   ) {
     const callArgs = {
-      self: tx.object(this.pool.id),
+      pool: tx.object(this.pool.id),
       bankA: tx.object(this.bankA.id),
       bankB: tx.object(this.bankB.id),
       lpTokens: args.lpTokens,
@@ -175,7 +174,7 @@ export abstract class PoolClient<
     tx: Transaction = new Transaction()
   ) {
     const callArgs = {
-      self: tx.object(this.pool.id),
+      pool: tx.object(this.pool.id),
       bankA: tx.object(this.bankA.id),
       bankB: tx.object(this.bankB.id),
       lpTokens: args.lpTokens,
@@ -191,7 +190,7 @@ export abstract class PoolClient<
     tx: Transaction = new Transaction()
   ) {
     const callArgs = {
-      self: tx.object(this.pool.id),
+      pool: tx.object(this.pool.id),
       lpTokens: args.lpTokens,
     };
 
@@ -203,7 +202,7 @@ export abstract class PoolClient<
     tx: Transaction = new Transaction()
   ) {
     const callArgs = {
-      self: tx.object(this.pool.id),
+      pool: tx.object(this.pool.id),
       bankA: tx.object(this.bankA.id),
       bankB: tx.object(this.bankB.id),
       lendingMarket: tx.object(this.lendingMarket.id),
@@ -212,20 +211,6 @@ export abstract class PoolClient<
     };
 
     prepareBankForPendingWithdraw(tx, this.typeArgsWithP(), callArgs);
-  }
-
-  public needsLendingActionOnSwap(
-    args: PoolNeedsLendingActionOnSwapArgs,
-    tx: Transaction = new Transaction()
-  ) {
-    const callArgs = {
-      self: tx.object(this.pool.id),
-      bankA: tx.object(this.bankA.id),
-      bankB: tx.object(this.bankB.id),
-      quote: args.quote,
-    };
-
-    needsLendingActionOnSwap(tx, this.typeArgsWithP(), callArgs);
   }
 
   public setPoolSwapFees(

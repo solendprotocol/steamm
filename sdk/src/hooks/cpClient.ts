@@ -1,13 +1,13 @@
 import { SuiClient } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
-import { Pool } from "./../_generated/slamm/pool/structs";
+import { Pool } from "../codegen/_generated/slamm/pool/structs";
 import {
   PhantomTypeArgument,
   ToTypeArgument,
   PhantomToTypeStr,
-} from "./../_generated/_framework/reified";
-import { Bank } from "./../_generated/slamm/bank/structs";
-import { LendingMarket } from "./../_generated/_dependencies/source/0xf95b06141ed4a174f239417323bde3f209b972f5930d8521ea38a52aff3a6ddf/lending-market/structs";
+} from "../codegen/_generated/_framework/reified";
+import { Bank } from "../codegen/_generated/slamm/bank/structs";
+import { LendingMarket } from "../codegen/_generated/_dependencies/source/0xf95b06141ed4a174f239417323bde3f209b972f5930d8521ea38a52aff3a6ddf/lending-market/structs";
 import { PoolClient } from "../client";
 import {
   CpExecuteSwapArgs,
@@ -21,14 +21,14 @@ import {
   new_,
   newWithOffset,
   quoteSwap,
-} from "../_generated/slamm/cpmm/functions";
+} from "../codegen/_generated/slamm/cpmm/functions";
 import {
   Hook,
   State,
   StateFields,
   StateReified,
-} from "../_generated/slamm/cpmm/structs";
-import { PKG_V1 } from "../_generated/slamm";
+} from "../codegen/_generated/slamm/cpmm/structs";
+import { PKG_V1 } from "../codegen/_generated/slamm";
 import { GenericHookType, ObjectIds, PoolTypes } from "../utils";
 
 export type HookType<W extends PhantomTypeArgument> = GenericHookType<Hook<W>>;

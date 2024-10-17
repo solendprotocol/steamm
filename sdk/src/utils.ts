@@ -3,7 +3,7 @@ import {
   StructClass,
   ToPhantomTypeArgument,
   ToTypeStr,
-} from "./_generated/_framework/reified";
+} from "./codegen/_generated/_framework/reified";
 
 export type GenericHookType<T extends StructClass> = ToPhantomTypeArgument<
   PhantomReified<ToTypeStr<T>>
