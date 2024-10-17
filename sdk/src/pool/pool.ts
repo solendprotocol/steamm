@@ -17,12 +17,12 @@ import {
   PoolSetPoolSwapFeesArgs,
   PoolSetRedemptionFeesArgs,
   QuoteDepositArgs,
-} from "./poolClientArgs";
+} from "./poolArgs";
 import {
   PoolFunctions,
-  Pool,
-  Bank,
-  LendingMarket,
+  PoolObj,
+  BankObj,
+  LendingMarketObj,
   phantom,
   PhantomReified,
   PhantomTypeArgument,
@@ -32,28 +32,25 @@ import {
   Reified,
 } from "..";
 
-export abstract class PoolClient<
+export abstract class Pool<
   A extends PhantomTypeArgument,
   B extends PhantomTypeArgument,
   Hook extends PhantomTypeArgument,
   State extends TypeArgument,
   P extends PhantomTypeArgument
 > {
-  public client: SuiClient;
-  public pool: Pool<A, B, Hook, State>;
-  public bankA: Bank<P, A>;
-  public bankB: Bank<P, B>;
-  public lendingMarket: LendingMarket<P>;
+  public pool: PoolObj<A, B, Hook, State>;
+  public bankA: BankObj<P, A>;
+  public bankB: BankObj<P, B>;
+  public lendingMarket: LendingMarketObj<P>;
 
   constructor(
-    pool: Pool<A, B, Hook, State>,
-    client: SuiClient,
-    bankA: Bank<P, A>,
-    bankB: Bank<P, B>,
-    lendingMarket: LendingMarket<P>
+    pool: PoolObj<A, B, Hook, State>,
+    bankA: BankObj<P, A>,
+    bankB: BankObj<P, B>,
+    lendingMarket: LendingMarketObj<P>
   ) {
     this.pool = pool;
-    this.client = client;
     this.bankA = bankA;
     this.bankB = bankB;
     this.lendingMarket = lendingMarket;
@@ -86,10 +83,10 @@ export abstract class PoolClient<
     client: SuiClient
   ): Promise<
     [
-      Pool<A, B, HookType, ToTypeArgument<State>>,
-      Bank<P, A>,
-      Bank<P, B>,
-      LendingMarket<P>
+      PoolObj<A, B, HookType, ToTypeArgument<State>>,
+      BankObj<P, A>,
+      BankObj<P, B>,
+      LendingMarketObj<P>
     ]
   > {
     const poolTypeArgs: [
@@ -99,7 +96,7 @@ export abstract class PoolClient<
       State
     ] = [phantom(aType), phantom(bType), phantom(hookType), state];
 
-    const pool = await Pool.fetch<
+    const pool = await PoolObj.fetch<
       PhantomReified<A>,
       PhantomReified<B>,
       PhantomReified<HookType>,
@@ -116,10 +113,10 @@ export abstract class PoolClient<
       phantom(bType),
     ];
 
-    const bankA = await Bank.fetch(client, bankATypeArgs, bankAId);
-    const bankB = await Bank.fetch(client, bankBTypeArgs, bankBId);
+    const bankA = await BankObj.fetch(client, bankATypeArgs, bankAId);
+    const bankB = await BankObj.fetch(client, bankBTypeArgs, bankBId);
 
-    const lendingMarket = await LendingMarket.fetch(
+    const lendingMarket = await LendingMarketObj.fetch(
       client,
       phantom(pType),
       lendingMarketId

@@ -6,30 +6,24 @@ import {
   InitLendingArgs,
   MigrateAsGlobalAdminArgs,
   SetUtilisationBpsArgs,
-} from "./bankClientArgs";
+} from "./bankArgs";
 import {
-  Bank,
+  BankObj,
   BankFunctions,
-  LendingMarket,
+  LendingMarketObj,
   phantom,
   PhantomReified,
   PhantomTypeArgument,
 } from "..";
 
-export abstract class BankClient<
+export abstract class Bank<
   T extends PhantomTypeArgument,
   P extends PhantomTypeArgument
 > {
-  public client: SuiClient;
-  public bank: Bank<P, T>;
-  public lendingMarket: LendingMarket<P>;
+  public bank: BankObj<P, T>;
+  public lendingMarket: LendingMarketObj<P>;
 
-  constructor(
-    client: SuiClient,
-    bank: Bank<P, T>,
-    lendingMarket: LendingMarket<P>
-  ) {
-    this.client = client;
+  constructor(bank: BankObj<P, T>, lendingMarket: LendingMarketObj<P>) {
     this.bank = bank;
     this.lendingMarket = lendingMarket;
   }
@@ -43,15 +37,15 @@ export abstract class BankClient<
     bankId: string,
     lendingMarketId: string,
     client: SuiClient
-  ): Promise<[Bank<P, T>, LendingMarket<P>]> {
+  ): Promise<[BankObj<P, T>, LendingMarketObj<P>]> {
     const bankTypeArgs: [PhantomReified<P>, PhantomReified<T>] = [
       phantom(lendingMarketType),
       phantom(coinType),
     ];
 
-    const bank = await Bank.fetch(client, bankTypeArgs, bankId);
+    const bank = await BankObj.fetch(client, bankTypeArgs, bankId);
 
-    const lendingMarket = await LendingMarket.fetch(
+    const lendingMarket = await LendingMarketObj.fetch(
       client,
       phantom(lendingMarketType),
       lendingMarketId
