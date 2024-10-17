@@ -549,54 +549,20 @@ module slamm::pool {
         ctx: &mut TxContext,
     ) {
         if (intent.quote.a2b()) {
-            bank_b.prepare_bank_for_pending_withdraw_(
+            bank_b.prepare_for_pending_withdraw_(
                 lending_market,
                 intent.quote.amount_out_net_of_pool_fees(), // output amount - pool fees
                 clock,
                 ctx
             );
         } else {
-            bank_a.prepare_bank_for_pending_withdraw_(
+            bank_a.prepare_for_pending_withdraw_(
                 lending_market,
                 intent.quote.amount_out_net_of_pool_fees(),
                 clock,
                 ctx
             );
         };
-    }
-
-    public fun needs_lending_action_on_swap<A, B, Hook: drop, State: store, P>(
-        _self: &Pool<A, B, Hook, State>,
-        bank_a: &mut Bank<P, A>,
-        bank_b: &mut Bank<P, B>,
-        quote: SwapQuote,
-    ): bool {
-        if (quote.a2b()) {
-            needs_lending_action_on_swap_(
-                bank_a,
-                bank_b,
-                quote.amount_in(),
-                quote.amount_out_net_of_protocol_fees(),
-            )
-        } else {
-            needs_lending_action_on_swap_(
-                bank_b,
-                bank_a,
-                quote.amount_in(),
-                quote.amount_out_net_of_protocol_fees(),
-            )
-        }
-    }
-    
-    fun needs_lending_action_on_swap_<In, Out, P>(
-        bank_in: &Bank<P, In>,
-        bank_out: &Bank<P, Out>,
-        amount_in: u64,
-        amount_out: u64,
-    ): bool {
-        bank_in.needs_lending_action(amount_in, true)
-        || 
-        bank_out.needs_lending_action(amount_out, false)
     }
 
     // ===== Pool Cap Adming Endpoints =====

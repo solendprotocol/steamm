@@ -45,12 +45,14 @@ module slamm::lend_tests {
 
         let mut bank_a = bank::create_bank<LENDING_MARKET, TEST_USDC>(&mut registry, ctx(&mut scenario));
         let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx(&mut scenario));
+        bank_a.mock_min_token_block_size(10);
+        bank_b.mock_min_token_block_size(10);
 
         bank_a.init_lending<LENDING_MARKET, TEST_USDC>(
             &global_admin,
             &mut lending_market,
-            8_000, // utilisation_rate
-            1_000, // utilisation_buffer
+            8_000, // utilisation_bps
+            1_000, // utilisation_bps
             ctx(&mut scenario),
         );
 
@@ -139,12 +141,14 @@ module slamm::lend_tests {
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
         let mut bank_a = bank::create_bank<LENDING_MARKET, TEST_USDC>(&mut registry, ctx(&mut scenario));
         let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx(&mut scenario));
+        bank_a.mock_min_token_block_size(10);
+        bank_b.mock_min_token_block_size(10);
 
         bank_a.init_lending<LENDING_MARKET, TEST_USDC>(
             &global_admin,
             &mut lending_market,
-            8_000, // utilisation_rate
-            1_000, // utilisation_buffer
+            8_000, // utilisation_bps
+            1_000, // utilisation_bps
             ctx(&mut scenario),
         );
 
@@ -262,20 +266,22 @@ module slamm::lend_tests {
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
         let mut bank_a = bank::create_bank<LENDING_MARKET, TEST_USDC>(&mut registry, ctx(&mut scenario));
         let mut bank_b = bank::create_bank<LENDING_MARKET, TEST_SUI>(&mut registry, ctx(&mut scenario));
+        bank_a.mock_min_token_block_size(10);
+        bank_b.mock_min_token_block_size(10);
 
         bank_a.init_lending<LENDING_MARKET, TEST_USDC>(
             &global_admin,
             &mut lending_market,
-            8_000, // utilisation_rate
-            1_000, // utilisation_buffer
+            8_000, // utilisation_bps
+            1_000, // utilisation_bps
             ctx(&mut scenario)
         );
         
         bank_b.init_lending<LENDING_MARKET, TEST_SUI>(
             &global_admin,
             &mut lending_market,
-            8_000, // utilisation_rate
-            1_000, // utilisation_buffer
+            8_000, // utilisation_bps
+            1_000, // utilisation_bps
             ctx(&mut scenario),
         );
 
@@ -365,20 +371,22 @@ module slamm::lend_tests {
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
         let mut bank_a = bank::create_bank<LENDING_MARKET, TEST_USDC>(&mut registry, ctx(&mut scenario));
         let mut bank_b = bank::create_bank<LENDING_MARKET, TEST_SUI>(&mut registry, ctx(&mut scenario));
+        bank_a.mock_min_token_block_size(10);
+        bank_b.mock_min_token_block_size(10);
 
         bank_a.init_lending<LENDING_MARKET, TEST_USDC>(
             &global_admin,
             &mut lending_market,
-            8_000, // utilisation_rate
-            1_000, // utilisation_buffer
+            8_000, // utilisation_bps
+            1_000, // utilisation_bps
             ctx(&mut scenario),
         );
         
         bank_b.init_lending<LENDING_MARKET, TEST_SUI>(
             &global_admin,
             &mut lending_market,
-            8_000, // utilisation_rate
-            1_000, // utilisation_buffer
+            8_000, // utilisation_bps
+            1_000, // utilisation_bps
             ctx(&mut scenario),
         );
 
@@ -501,20 +509,22 @@ module slamm::lend_tests {
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
         let mut bank_a = bank::create_bank<LENDING_MARKET, TEST_USDC>(&mut registry, ctx(&mut scenario));
         let mut bank_b = bank::create_bank<LENDING_MARKET, TEST_SUI>(&mut registry, ctx(&mut scenario));
+        bank_a.mock_min_token_block_size(10);
+        bank_b.mock_min_token_block_size(10);
 
         bank_a.init_lending<LENDING_MARKET, TEST_USDC>(
             &global_admin,
             &mut lending_market,
-            8_000, // utilisation_rate
-            1_000, // utilisation_buffer
+            8_000, // utilisation_bps
+            1_000, // utilisation_bps
             ctx(&mut scenario),
         );
         
         bank_b.init_lending<LENDING_MARKET, TEST_SUI>(
             &global_admin,
             &mut lending_market,
-            8_000, // utilisation_rate
-            1_000, // utilisation_buffer
+            8_000, // utilisation_bps
+            1_000, // utilisation_bps
             ctx(&mut scenario),
         );
 
@@ -647,12 +657,14 @@ module slamm::lend_tests {
 
         let mut bank_a = bank::create_bank<LENDING_MARKET, TEST_USDC>(&mut registry, ctx(&mut scenario));
         let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx(&mut scenario));
+        bank_a.mock_min_token_block_size(10);
+        bank_b.mock_min_token_block_size(10);
 
         bank_a.init_lending<LENDING_MARKET, TEST_USDC>(
             &global_admin,
             &mut lending_market,
-            8_000, // utilisation_rate
-            500, // utilisation_buffer
+            8_000, // utilisation_bps
+            500, // utilisation_bps
             ctx(&mut scenario),
         );
 
@@ -707,8 +719,7 @@ module slamm::lend_tests {
         assert_eq(bank_a.funds_available().value(), 20_000); // 500_000 * 20%
         assert_eq(bank_b.funds_available().value(), 100_000);
         
-        assert_eq(bank_a.effective_utilisation_rate(), 8000); // 80% target liquidity
-        assert!(bank_a.needs_lending_action(0, true) == false, 0);
+        assert_eq(bank_a.effective_utilisation_bps(), 8000); // 80% target liquidity
 
         destroy(coin_a);
         destroy(coin_b);
@@ -752,9 +763,8 @@ module slamm::lend_tests {
         assert_eq(bank_a.funds_available().value(), 25_000); // 100_000 * 20% + 5_000
         assert_eq(bank_b.funds_available().value(), 105_000);
         
-        assert!(bank_a.effective_utilisation_rate() < bank_a.target_utilisation_rate(), 0);
-        assert!(bank_a.effective_utilisation_rate() > bank_a.target_utilisation_rate() -  bank_a.utilisation_buffer(), 0);
-        assert!(bank_a.needs_lending_action(0, true) == false, 0);
+        assert!(bank_a.effective_utilisation_bps() < bank_a.target_utilisation_bps(), 0);
+        assert!(bank_a.effective_utilisation_bps() > bank_a.target_utilisation_bps() -  bank_a.utilisation_buffer_bps(), 0);
 
         destroy(coin_a);
         destroy(coin_b);
@@ -798,8 +808,7 @@ module slamm::lend_tests {
         assert_eq(bank_a.funds_available().value(), 1_021_000); // 5_125_000 * 20%
         assert_eq(bank_b.funds_available().value(), 5_105_000);
         
-        assert_eq(bank_a.effective_utilisation_rate(), 8000); // 80% target liquidity
-        assert!(bank_a.needs_lending_action(0, true) == false, 0);
+        assert_eq(bank_a.effective_utilisation_bps(), 8000); // 80% target liquidity
 
         destroy(coin_a);
         destroy(coin_b);
@@ -831,12 +840,14 @@ module slamm::lend_tests {
 
         let mut bank_a = bank::create_bank<LENDING_MARKET, TEST_USDC>(&mut registry, ctx(&mut scenario));
         let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx(&mut scenario));
+        bank_a.mock_min_token_block_size(10);
+        bank_b.mock_min_token_block_size(10);
 
         bank_a.init_lending<LENDING_MARKET, TEST_USDC>(
             &global_admin,
             &mut lending_market,
-            8_000, // utilisation_rate
-            500, // utilisation_buffer
+            8_000, // utilisation_bps
+            500, // utilisation_bps
             ctx(&mut scenario),
         );
 
@@ -918,9 +929,8 @@ module slamm::lend_tests {
             );
 
             assert!(
-                bank_a.effective_utilisation_rate().max(8000) - bank_a.effective_utilisation_rate().min(8000) <= 1
+                bank_a.effective_utilisation_bps().max(8000) - bank_a.effective_utilisation_bps().min(8000) <= 1
             ); // 80% target liquidity (with 0.001% deviation from rounding err)
-            assert!(bank_a.needs_lending_action(0, true) == false, 0);
 
             destroy(coin_a);
             destroy(coin_b);
@@ -955,12 +965,14 @@ module slamm::lend_tests {
 
         let mut bank_a = bank::create_bank<LENDING_MARKET, TEST_USDC>(&mut registry, ctx(&mut scenario));
         let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx(&mut scenario));
+        bank_a.mock_min_token_block_size(10);
+        bank_b.mock_min_token_block_size(10);
 
         bank_a.init_lending<LENDING_MARKET, TEST_USDC>(
             &global_admin,
             &mut lending_market,
-            8_000, // utilisation_rate
-            500, // utilisation_buffer
+            8_000, // utilisation_bps
+            500, // utilisation_bps
             ctx(&mut scenario),
         );
 
@@ -1015,8 +1027,7 @@ module slamm::lend_tests {
         assert_eq(bank_a.funds_available().value(), 20_000); // 100_000 * 20%
         assert_eq(bank_b.funds_available().value(), 100_000);
         
-        assert_eq(bank_a.effective_utilisation_rate(), 8000); // 80% target liquidity
-        assert!(bank_a.needs_lending_action(0, true) == false, 0);
+        assert_eq(bank_a.effective_utilisation_bps(), 8000); // 80% target liquidity
 
         destroy(coin_a);
         destroy(coin_b);
@@ -1053,9 +1064,8 @@ module slamm::lend_tests {
         assert_eq(bank_a.funds_available().value(), 19_900); // 100_000 * 20% - 100
         assert_eq(bank_b.funds_available().value(), 100_000 - 100);
         
-        assert!(bank_a.effective_utilisation_rate() > bank_a.target_utilisation_rate(), 0);
-        assert!(bank_a.effective_utilisation_rate() < bank_a.target_utilisation_rate() + bank_a.utilisation_buffer(), 0);
-        assert!(bank_a.needs_lending_action(0, true) == false, 0);
+        assert!(bank_a.effective_utilisation_bps() > bank_a.target_utilisation_bps(), 0);
+        assert!(bank_a.effective_utilisation_bps() < bank_a.target_utilisation_bps() + bank_a.utilisation_buffer_bps(), 0);
 
         destroy(coin_a);
         destroy(coin_b);
@@ -1086,12 +1096,14 @@ module slamm::lend_tests {
 
         let mut bank_a = bank::create_bank<LENDING_MARKET, TEST_USDC>(&mut registry, ctx(&mut scenario));
         let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx(&mut scenario));
+        bank_a.mock_min_token_block_size(10);
+        bank_b.mock_min_token_block_size(10);
 
         bank_a.init_lending<LENDING_MARKET, TEST_USDC>(
             &global_admin,
             &mut lending_market,
-            8_000, // utilisation_rate
-            500, // utilisation_buffer
+            8_000, // utilisation_bps
+            500, // utilisation_bps
             ctx(&mut scenario),
         );
 
@@ -1175,12 +1187,14 @@ module slamm::lend_tests {
 
         let mut bank_a = bank::create_bank<LENDING_MARKET, TEST_USDC>(&mut registry, ctx(&mut scenario));
         let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx(&mut scenario));
+        bank_a.mock_min_token_block_size(10);
+        bank_b.mock_min_token_block_size(10);
 
         bank_a.init_lending<LENDING_MARKET, TEST_USDC>(
             &global_admin,
             &mut lending_market,
-            8_000, // utilisation_rate
-            500, // utilisation_buffer
+            8_000, // utilisation_bps
+            500, // utilisation_bps
             ctx(&mut scenario),
         );
 
@@ -1273,12 +1287,14 @@ module slamm::lend_tests {
 
         let mut bank_a = bank::create_bank<LENDING_MARKET, TEST_USDC>(&mut registry, ctx(&mut scenario));
         let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx(&mut scenario));
+        bank_a.mock_min_token_block_size(10);
+        bank_b.mock_min_token_block_size(10);
 
         bank_a.init_lending<LENDING_MARKET, TEST_USDC>(
             &global_admin,
             &mut lending_market,
-            8_000, // utilisation_rate
-            500, // utilisation_buffer
+            8_000, // utilisation_bps
+            500, // utilisation_bps
             ctx(&mut scenario),
         );
 
@@ -1354,7 +1370,7 @@ module slamm::lend_tests {
             ctx,
         );
 
-        assert!(bank_a.effective_utilisation_rate() == bank_a.target_utilisation_rate(), 0);
+        assert!(bank_a.effective_utilisation_bps() == bank_a.target_utilisation_bps(), 0);
         
         destroy(coin_a);
         destroy(coin_b);
@@ -1385,12 +1401,14 @@ module slamm::lend_tests {
 
         let mut bank_a = bank::create_bank<LENDING_MARKET, TEST_USDC>(&mut registry, ctx(&mut scenario));
         let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx(&mut scenario));
+        bank_a.mock_min_token_block_size(10);
+        bank_b.mock_min_token_block_size(10);
 
         bank_a.init_lending<LENDING_MARKET, TEST_USDC>(
             &global_admin,
             &mut lending_market,
-            8_000, // utilisation_rate
-            500, // utilisation_buffer
+            8_000, // utilisation_bps
+            500, // utilisation_bps
             ctx(&mut scenario),
         );
 
@@ -1474,8 +1492,7 @@ module slamm::lend_tests {
         assert_eq(bank_a.funds_available().value(), (100_000 - 30_000) * 20 / 100);
         assert_eq(bank_b.funds_available().value(), 100_000 + 30_000);
         
-        assert!(bank_a.effective_utilisation_rate() == bank_a.target_utilisation_rate(), 0);
-        assert!(bank_a.needs_lending_action(0, true) == false, 0);
+        assert!(bank_a.effective_utilisation_bps() == bank_a.target_utilisation_bps(), 0);
         
         destroy(coin_a);
         destroy(coin_b);
@@ -1504,14 +1521,15 @@ module slamm::lend_tests {
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
         let global_admin = global_admin::init_for_testing(ctx(&mut scenario));
         let mut bank_sui = bank::create_bank<LENDING_MARKET, TEST_SUI>(&mut registry, ctx(&mut scenario));
+        bank_sui.mock_min_token_block_size(10);
 
         bank_sui.deposit_for_testing(1_000_000);
         
         bank_sui.init_lending<LENDING_MARKET, TEST_SUI>(
             &global_admin,
             &mut lending_market,
-            8_000, // utilisation_rate
-            1_000, // utilisation_buffer
+            8_000, // utilisation_bps
+            1_000, // utilisation_bps
             ctx(&mut scenario),
         );
         
@@ -1636,6 +1654,7 @@ module slamm::lend_tests {
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
         let global_admin = global_admin::init_for_testing(ctx(&mut scenario));
         let mut bank_sui = bank::create_bank<LENDING_MARKET, TEST_SUI>(&mut registry, ctx(&mut scenario));
+        bank_sui.mock_min_token_block_size(10);
 
         clock::set_for_testing(&mut clock, 1 * 1000);
 
@@ -1683,8 +1702,8 @@ module slamm::lend_tests {
         bank_sui.init_lending<LENDING_MARKET, TEST_SUI>(
             &global_admin,
             &mut lending_market,
-            10_000, // utilisation_rate
-            0, // utilisation_buffer
+            10_000, // utilisation_bps
+            0, // utilisation_bps
             ctx(&mut scenario),
         );
 
@@ -1697,10 +1716,10 @@ module slamm::lend_tests {
             ctx(&mut scenario),
         );
 
-        bank_sui.set_utilisation_rate(
+        bank_sui.set_utilisation_bps(
             &global_admin,
-            0, // utilisation_rate
-            0, // utilisation_buffer
+            0, // utilisation_bps
+            0, // utilisation_bps
         );
 
         // Withdraw
@@ -1724,8 +1743,7 @@ module slamm::lend_tests {
     }
     
     #[test]
-    #[expected_failure(abort_code = bank::EDeployAmountTooLow)]
-    public fun test_fail_below_min_deploy_amount() {
+    public fun test_no_op_below_min_deploy_amount() {
         let owner = @0x26;
         let mut scenario = test_scenario::begin(owner);
         let (clock, owner_cap, mut lending_market, prices, type_to_index) = lending_market::setup(reserve_args_2(&mut scenario), &mut scenario).destruct_state();
@@ -1733,21 +1751,28 @@ module slamm::lend_tests {
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
         let global_admin = global_admin::init_for_testing(ctx(&mut scenario));
         let mut bank_sui = bank::create_bank<LENDING_MARKET, TEST_SUI>(&mut registry, ctx(&mut scenario));
+        bank_sui.mock_min_token_block_size(10);
 
         bank_sui.deposit_for_testing(1);
         bank_sui.init_lending<LENDING_MARKET, TEST_SUI>(
             &global_admin,
             &mut lending_market,
-            10_000, // utilisation_rate
-            0, // utilisation_buffer
+            10_000, // utilisation_bps
+            0, // utilisation_bps
             ctx(&mut scenario),
         );
+
+        let effective_utilisation_bps_before = bank_sui.effective_utilisation_bps();
 
         bank_sui.rebalance(
             &mut lending_market,
             &clock,
             ctx(&mut scenario),
         );
+
+        let effective_utilisation_bps_after = bank_sui.effective_utilisation_bps();
+
+        assert!(effective_utilisation_bps_before == effective_utilisation_bps_after, 0);
 
         test_utils::destroy(owner_cap);
         test_utils::destroy(lending_market);

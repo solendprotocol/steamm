@@ -23,7 +23,7 @@ module slamm::bank {
     // ===== Constants =====
 
     const CURRENT_VERSION: u16 = 1;
-    const MIN_AMOUNT_TO_DEPLOY: u64 = 10; // TODO: Define amount
+    const MIN_TOKEN_BLOCK_SIZE: u64 = 1_000_000_000;
 
     // ===== Errors =====
 
@@ -33,18 +33,21 @@ module slamm::bank {
     const ELendingAlreadyActive: u64 = 4;
     const EInsufficientFundsInBank: u64 = 5;
     const EInvalidCTokenRatio: u64 = 6;
-    const EDeployAmountTooLow: u64 = 7;
+    const ECTokenRatioTooLow: u64 = 7;
     const ELendingNotActive: u64 = 8;
 
     public struct Bank<phantom P, phantom T> has key {
         id: UID,
         funds_available: Balance<T>,
         lending: Option<Lending<P>>,
+        min_token_block_size: u64,
         version: Version,
     }
 
     public struct Lending<phantom P> has store {
-        lending_market: ID,
+        /// Tracks the total amount of funds deposited into the bank,
+        /// and does not account for the interest generated
+        /// by depositing into suilend.
         funds_deployed: u64,
         ctokens: u64,
         target_utilisation_bps: u16,
@@ -66,8 +69,6 @@ module slamm::bank {
         bank_id
     }
     
-    // ====== Public Functions =====
-    
     public fun init_lending<P, T>(
         self: &mut Bank<P, T>,
         _: &GlobalAdmin,
@@ -85,7 +86,6 @@ module slamm::bank {
         let reserve_array_index = lending_market.reserve_array_index<P, T>();
 
         self.lending.fill(Lending {
-            lending_market: object::id(lending_market),
             funds_deployed: 0,
             ctokens: 0,
             target_utilisation_bps,
@@ -107,15 +107,15 @@ module slamm::bank {
             return
         };
 
-        let effective_utilisation = bank.effective_utilisation_rate();
-        let target_utilisation = bank.target_utilisation_rate_unchecked();
-        let buffer = bank.utilisation_buffer();
+        let effective_utilisation_bps = bank.effective_utilisation_bps();
+        let target_utilisation_bps = bank.target_utilisation_bps_unchecked();
+        let buffer_bps = bank.utilisation_buffer_bps();
 
-        if (effective_utilisation < target_utilisation - buffer) {
+        if (effective_utilisation_bps < target_utilisation_bps - buffer_bps) {
             let amount_to_deploy = bank_math::compute_amount_to_deploy(
                 bank.funds_available.value(),
                 bank.funds_deployed_unchecked(),
-                target_utilisation,
+                target_utilisation_bps,
             );
 
             bank.deploy(
@@ -124,14 +124,12 @@ module slamm::bank {
                 clock,
                 ctx,
             );
-        };
-
-        if (effective_utilisation > target_utilisation + buffer) {
+        } else if (effective_utilisation_bps > target_utilisation_bps + buffer_bps) {
             let amount_to_recall = bank_math::compute_amount_to_recall(
                 bank.funds_available.value(),
                 0,
                 bank.funds_deployed_unchecked(),
-                target_utilisation,
+                target_utilisation_bps,
             );
 
             bank.recall(
@@ -143,38 +141,26 @@ module slamm::bank {
         };
     }
 
+    // Given how much tokens we want to withdraw form the lending market,
+    // how many ctokens do we need to burn
     public fun ctoken_amount<P, T>(
         bank: &Bank<P, T>,
         lending_market: &LendingMarket<P>,
         amount: u64,
     ): u64 {
-        bank.ctoken_amount_(lending_market, amount)
-    }
-
-    public fun needs_lending_action<P, T>(
-        bank: &Bank<P, T>,
-        amount: u64,
-        is_input: bool,
-    ): bool {
-        if (bank.lending.is_none()) {
-            return false
-        };
-
+        let reserves = lending_market.reserves();
         let lending = bank.lending.borrow();
+        let reserve = reserves.borrow(lending.reserve_array_index);
+        let ctoken_ratio = reserve.ctoken_ratio();
 
-        needs_lending_action_(
-            bank.funds_available.value(),
-            lending.funds_deployed,
-            lending.target_utilisation_bps as u64,
-            lending.utilisation_buffer_bps as u64,
-            amount,
-            is_input,
-        )
+        let ctoken_amount = decimal::from(amount).div(ctoken_ratio).floor();
+        
+        ctoken_amount
     }
 
     // ====== Admin Functions =====
 
-    public fun set_utilisation_rate<P, T>(
+    public fun set_utilisation_bps<P, T>(
         self: &mut Bank<P, T>,
         _: &GlobalAdmin,
         target_utilisation_bps: u16,
@@ -199,8 +185,25 @@ module slamm::bank {
     }
     
     // ====== Package Functions =====
+
+    public(package) fun create_bank<P, T>(
+        registry: &mut Registry,
+        ctx: &mut TxContext,
+    ): Bank<P, T> {
+        let bank = Bank<P, T> {
+            id: object::new(ctx),
+            funds_available: balance::zero(),
+            lending: none(),
+            min_token_block_size: MIN_TOKEN_BLOCK_SIZE,
+            version: version::new(CURRENT_VERSION),
+        };
+
+        registry.add_bank(&bank);
+
+        bank
+    }
     
-    public(package) fun prepare_bank_for_pending_withdraw_<P, T>(
+    public(package) fun prepare_for_pending_withdraw_<P, T>(
         bank: &mut Bank<P, T>,
         lending_market: &mut LendingMarket<P>,
         withdraw_amount: u64,
@@ -241,12 +244,12 @@ module slamm::bank {
             return
         };
 
-        let effective_utilisation = bank.effective_utilisation_rate();
-        let target_utilisation = bank.target_utilisation_rate_unchecked();
-        let buffer = bank.utilisation_buffer_unchecked();
+        let effective_utilisation_bps = bank.effective_utilisation_bps();
+        let target_utilisation_bps = bank.target_utilisation_bps_unchecked();
+        let buffer_bps = bank.utilisation_buffer_bps_unchecked();
 
         assert!(
-            effective_utilisation <= target_utilisation + buffer,
+            effective_utilisation_bps <= target_utilisation_bps + buffer_bps,
             EUtilisationRateOffTarget
         );
     }
@@ -272,11 +275,9 @@ module slamm::bank {
     ) {
         let lending = bank.lending.borrow();
 
-        if (amount_to_deploy == 0) {
+        if (amount_to_deploy < bank.min_token_block_size ) {
             return
         };
-
-        assert!(amount_to_deploy >= MIN_AMOUNT_TO_DEPLOY, EDeployAmountTooLow);
 
         let balance_to_lend = bank.funds_available.split(amount_to_deploy);
 
@@ -315,7 +316,8 @@ module slamm::bank {
             return
         };
 
-        let mut ctoken_amount = bank.ctoken_amount_(lending_market, amount_to_recall);
+        let amount_to_recall = amount_to_recall.max(bank.min_token_block_size);
+        let mut ctoken_amount = bank.ctoken_amount(lending_market, amount_to_recall);
 
         let ctokens: Coin<CToken<P, T>> = lending_market.withdraw_ctokens(
             lending.reserve_array_index,
@@ -338,59 +340,16 @@ module slamm::bank {
         assert!(ctoken_amount * lending.funds_deployed <= lending.ctokens * coin.value() , EInvalidCTokenRatio);
 
         let lending = bank.lending.borrow_mut();
-        lending.funds_deployed = lending.funds_deployed - amount_to_recall;
+        lending.funds_deployed = lending.funds_deployed - coin.value();
         lending.ctokens = lending.ctokens - ctoken_amount;
 
         bank.funds_available.join(coin.into_balance());
-    }
 
-    // Given how much tokens we want to withdraw form the lending market,
-    // how many ctokens do we need to burn
-    fun ctoken_amount_<P, T>(
-        bank: &Bank<P, T>,
-        lending_market: &LendingMarket<P>,
-        amount: u64,
-    ): u64 {
         let reserves = lending_market.reserves();
-        let lending = bank.lending.borrow();
         let reserve = reserves.borrow(lending.reserve_array_index);
         let ctoken_ratio = reserve.ctoken_ratio();
 
-        let ctoken_amount = decimal::from(amount).div(ctoken_ratio).floor();
-        
-        ctoken_amount
-    }
-
-    fun needs_lending_action_(
-        funds_available: u64,
-        funds_deployed: u64,
-        target_utilisation: u64,
-        utilisation_buffer: u64,
-        amount: u64,
-        is_input: bool,
-    ): bool {
-        if (!is_input) {
-            bank_math::assert_output(funds_available, funds_deployed, amount);
-
-            // If the amount is bigger than the reserve, then it's clear that
-            // we need to recall
-            if (amount > funds_available) {
-                return true
-            }
-        };
-
-        let funds_available = if (is_input) { funds_available + amount } else { funds_available - amount };
-        let effective_utilisation = bank_math::compute_utilisation_rate(funds_available, funds_deployed);
-
-        if (effective_utilisation < target_utilisation - utilisation_buffer) {
-            return true
-        };
-
-        if (effective_utilisation > target_utilisation + utilisation_buffer) {
-            return true
-        };
-
-        false
+        assert!(decimal::from(lending.ctokens).mul(ctoken_ratio).floor() >= lending.funds_deployed, ECTokenRatioTooLow);
     }
 
     // ====== Getters Functions =====
@@ -401,8 +360,8 @@ module slamm::bank {
         self.funds_available.value() + self.funds_deployed()
     }
 
-    public fun effective_utilisation_rate<P, T>(self: &Bank<P, T>): u64 { 
-        bank_math::compute_utilisation_rate(self.funds_available.value(), self.funds_deployed())
+    public fun effective_utilisation_bps<P, T>(self: &Bank<P, T>): u64 { 
+        bank_math::compute_utilisation_bps(self.funds_available.value(), self.funds_deployed())
     }
     
     public fun funds_deployed<P, T>(self: &Bank<P, T>): u64 {
@@ -411,46 +370,31 @@ module slamm::bank {
         } else { 0 }
     }
     
-    public fun target_utilisation_rate<P, T>(self: &Bank<P, T>): u64 {
+    public fun target_utilisation_bps<P, T>(self: &Bank<P, T>): u64 {
         if (self.lending.is_some()) {
-            self.target_utilisation_rate_unchecked()
+            self.target_utilisation_bps_unchecked()
         } else { 0 }
     }
     
-    public fun utilisation_buffer<P, T>(self: &Bank<P, T>): u64 {
+    public fun utilisation_buffer_bps<P, T>(self: &Bank<P, T>): u64 {
         if (self.lending.is_some()) {
-            self.utilisation_buffer_unchecked()
+            self.utilisation_buffer_bps_unchecked()
         } else { 0 }
     }
     
-    public fun lending_market<P, T>(self: &Bank<P, T>): ID { self.lending.borrow().lending_market }
     public fun funds_available<P, T>(self: &Bank<P, T>): &Balance<T> { &self.funds_available }
     public fun funds_deployed_unchecked<P, T>(self: &Bank<P, T>): u64 { self.lending.borrow().funds_deployed }
-    public fun target_utilisation_rate_unchecked<P, T>(self: &Bank<P, T>): u64 { self.lending.borrow().target_utilisation_bps as u64}
-    public fun utilisation_buffer_unchecked<P, T>(self: &Bank<P, T>): u64 { self.lending.borrow().utilisation_buffer_bps as u64 }
+    public fun target_utilisation_bps_unchecked<P, T>(self: &Bank<P, T>): u64 { self.lending.borrow().target_utilisation_bps as u64}
+    public fun utilisation_buffer_bps_unchecked<P, T>(self: &Bank<P, T>): u64 { self.lending.borrow().utilisation_buffer_bps as u64 }
     public fun reserve_array_index<P, T>(self: &Bank<P, T>): u64 { self.lending.borrow().reserve_array_index }
 
     // ===== Test-Only Functions =====
 
     #[test_only]
-    public(package) fun create_bank<P, T>(
-        registry: &mut Registry,
-        ctx: &mut TxContext,
-    ): Bank<P, T> {
-        let bank = Bank<P, T> {
-            id: object::new(ctx),
-            funds_available: balance::zero(),
-            lending: none(),
-            version: version::new(CURRENT_VERSION),
-        };
-
-        registry.add_bank(&bank);
-
-        bank
-    }
+    public(package) fun mock_amount_lent<P, T>(self: &mut Bank<P, T>, amount: u64){ self.lending.borrow_mut().funds_deployed = amount; }
     
     #[test_only]
-    public(package) fun mock_amount_lent<P, T>(self: &mut Bank<P, T>, amount: u64){ self.lending.borrow_mut().funds_deployed = amount; }
+    public(package) fun mock_min_token_block_size<P, T>(self: &mut Bank<P, T>, amount: u64){ self.min_token_block_size = amount; }
     
     #[test_only]
     public(package) fun deposit_for_testing<P, T>(self: &mut Bank<P, T>, amount: u64) {
@@ -464,89 +408,5 @@ module slamm::bank {
         self.funds_available.split(
             amount
         )
-    }
-
-    // ===== Tests =====
-
-    #[test_only]
-    use sui::test_utils::assert_eq;
-    
-    #[test]
-    #[expected_failure(abort_code = bank_math::EOutputExceedsTotalBankReserves)]
-    fun test_fail_compute_recall_with_output_too_big() {
-        needs_lending_action_(2_000, 2_000, 1_000, 500, 4001, false);
-    }
-    
-    #[test]
-    fun test_compute_lending_action() {
-        // Reserve, Lent, Utilisation Ratio
-        assert_eq(
-            needs_lending_action_(0, 8_000, 8_000, 500, 0, false),
-            true, // some(LendingAction { amount: 1_600, is_lend: false })
-        );
-        assert_eq(
-            needs_lending_action_(500, 8_000, 8_000, 500, 0, false),
-            true, // some(LendingAction { amount: 1_200, is_lend: false })
-        );
-        assert_eq(
-            needs_lending_action_(1_000, 8_000, 8_000, 500, 0, false),
-            true, // some(LendingAction { amount: 800, is_lend: false })
-        );
-        assert_eq(
-            needs_lending_action_(1_500, 8_000, 8_000, 500, 0, false),
-            false, // none()
-        );
-        assert_eq(
-            needs_lending_action_(2_000, 8_000, 8_000, 500, 0, false),
-            false, // none()
-        );
-        assert_eq(
-            needs_lending_action_(2_500, 8_000, 8_000, 500, 0, false),
-            false, // none()
-        );
-        assert_eq(
-            needs_lending_action_(3_000, 8_000, 8_000, 500, 0, false),
-            true, // some(LendingAction { amount: 800, is_lend: true })
-        );
-        assert_eq(
-            needs_lending_action_(3_500, 8_000, 8_000, 500, 0, false),
-            true, // some(LendingAction { amount: 1_200, is_lend: true })
-        );
-        assert_eq(
-            needs_lending_action_(4_000, 8_000, 8_000, 500, 0, false),
-            true, // some(LendingAction { amount: 1_600, is_lend: true })
-        );
-        assert_eq(
-            needs_lending_action_(4_500, 8_000, 8_000, 500, 0, false),
-            true, // some(LendingAction { amount: 2_000, is_lend: true })
-        );
-        assert_eq(
-            needs_lending_action_(5_000, 8_000, 8_000, 500, 0, false),
-            true, // some(LendingAction { amount: 2_400, is_lend: true })
-        );
-        assert_eq(
-            needs_lending_action_(5_500, 8_000, 8_000, 500, 0, false),
-            true, // some(LendingAction { amount: 2_800, is_lend: true })
-        );
-        assert_eq(
-            needs_lending_action_(6_000, 8_000, 8_000, 500, 0, false),
-            true, // some(LendingAction { amount: 3_200, is_lend: true })
-        );
-        assert_eq(
-            needs_lending_action_(6_500, 8_000, 8_000, 500, 0, false),
-            true, // some(LendingAction { amount: 3_600, is_lend: true })
-        );
-        assert_eq(
-            needs_lending_action_(7_000, 8_000, 8_000, 500, 0, false),
-            true, // some(LendingAction { amount: 4_000, is_lend: true })
-        );
-        assert_eq(
-            needs_lending_action_(7_500, 8_000, 8_000, 500, 0, false),
-            true, // some(LendingAction { amount: 4_400, is_lend: true })
-        );
-        assert_eq(
-            needs_lending_action_(8_000, 8_000, 8_000, 500, 0, false),
-            true, // some(LendingAction { amount: 4_800, is_lend: true })
-        );
     }
 }
