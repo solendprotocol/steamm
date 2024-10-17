@@ -53,7 +53,7 @@ module slamm::dummy_hook {
     }
 
     public fun swap<A, B, W: drop, P>(
-        self: &mut Pool<A, B, Hook<W>, State>,
+        pool: &mut Pool<A, B, Hook<W>, State>,
         bank_a: &mut Bank<P, A>,
         bank_b: &mut Bank<P, B>,
         coin_a: &mut Coin<A>,
@@ -64,13 +64,13 @@ module slamm::dummy_hook {
         ctx: &mut TxContext,
     ): SwapResult {
         let intent = intent_swap(
-            self,
+            pool,
             amount_in,
             a2b,
         );
 
         let result = execute_swap(
-            self,
+            pool,
             bank_a,
             bank_b,
             intent,
@@ -84,17 +84,17 @@ module slamm::dummy_hook {
     }
 
     public fun intent_swap<A, B, W: drop>(
-        self: &mut Pool<A, B, Hook<W>, State>,
+        pool: &mut Pool<A, B, Hook<W>, State>,
         amount_in: u64,
         a2b: bool,
     ): Intent<A, B, Hook<W>, State> {
-        let quote = quote_swap(self, amount_in, a2b);
+        let quote = quote_swap(pool, amount_in, a2b);
 
-        quote.as_intent(self)
+        quote.as_intent(pool)
     }
 
     public fun execute_swap<A, B, W: drop, P>(
-        self: &mut Pool<A, B, Hook<W>, State>,
+        pool: &mut Pool<A, B, Hook<W>, State>,
         bank_a: &mut Bank<P, A>,
         bank_b: &mut Bank<P, B>,
         intent: Intent<A, B, Hook<W>, State>,
@@ -103,7 +103,7 @@ module slamm::dummy_hook {
         min_amount_out: u64,
         ctx: &mut TxContext,
     ): SwapResult {
-        let response = self.swap(
+        let response = pool.swap(
             Hook<W> {},
             bank_a,
             bank_b,
@@ -118,12 +118,12 @@ module slamm::dummy_hook {
     }
 
     public fun quote_swap<A, B, W: drop>(
-        self: &Pool<A, B, Hook<W>, State>,
+        pool: &Pool<A, B, Hook<W>, State>,
         amount_in: u64,
         a2b: bool,
     ): SwapQuote {
         let amount_out = amount_in;
 
-        self.get_quote(amount_in, amount_out, a2b)
+        pool.get_quote(amount_in, amount_out, a2b)
     }
 }
