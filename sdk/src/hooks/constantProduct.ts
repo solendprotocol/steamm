@@ -10,6 +10,8 @@ import {
   CpIntentSwapArgs,
   CpNewArgs,
   CpPoolQuoteSwap,
+  CpSwapArgs,
+  SwapQuote,
 } from "./constantProductArgs";
 import { PKG_V1 } from "../_codegen/_generated/slamm";
 import {
@@ -121,17 +123,27 @@ export class ConstantProductPool<
     return tx;
   }
 
+  public swap(args: CpSwapArgs, tx: Transaction = new Transaction()) {
+    const intent = this.intentSwap(args, tx);
+    this.executeSwap({ ...args, intent }, tx);
+  }
+
   public intentSwap(
     args: CpIntentSwapArgs,
     tx: Transaction = new Transaction()
-  ) {
+  ): TransactionArgument {
     const callArgs = {
       pool: tx.object(this.pool.id),
       amountIn: args.amountIn,
       a2B: args.a2b,
     };
 
-    ConstantProductFunctions.intentSwap(tx, this.rawTypeArgs(), callArgs);
+    const intent = ConstantProductFunctions.intentSwap(
+      tx,
+      this.rawTypeArgs(),
+      callArgs
+    );
+    return intent;
   }
 
   public executeSwap(
@@ -151,14 +163,54 @@ export class ConstantProductPool<
     ConstantProductFunctions.executeSwap(tx, this.rawTypeArgsWithP(), callArgs);
   }
 
-  public quoteSwap(args: CpPoolQuoteSwap, tx: Transaction = new Transaction()) {
+  public async computeSwapQuote(
+    provider: SuiClient,
+    sender: string,
+    args: CpPoolQuoteSwap
+  ): Promise<SwapQuote> {
+    const txb = new Transaction();
+    const quote = this.quoteSwap(args, txb);
+    txb.moveCall({
+      target: `0x2::event::emit`,
+      typeArguments: [`${PKG_V1}::slamm::quote::SwapQuote`], // TODO: pkg should not be hardcoded
+      arguments: [quote],
+    });
+
+    const result = await provider.devInspectTransactionBlock({
+      transactionBlock: txb,
+      sender,
+    });
+
+    if (result.error) {
+      throw new Error(result.error);
+    }
+    const swapQuoteEvent = result.events.find(
+      (event) => event.type === `${PKG_V1}::slamm::quote::SwapQuote` // TODO: pkg should not be hardcoded
+    );
+
+    if (!swapQuoteEvent || !swapQuoteEvent.parsedJson) {
+      throw new Error("SwapQuote event not found");
+    }
+
+    return swapQuoteEvent.parsedJson as SwapQuote;
+  }
+
+  public quoteSwap(
+    args: CpPoolQuoteSwap,
+    tx: Transaction = new Transaction()
+  ): TransactionArgument {
     const callArgs = {
       pool: tx.object(this.pool.id),
       amountIn: args.amountIn,
       a2B: args.a2b,
     };
 
-    ConstantProductFunctions.quoteSwap(tx, this.rawTypeArgs(), callArgs);
+    const quote = ConstantProductFunctions.quoteSwap(
+      tx,
+      this.rawTypeArgs(),
+      callArgs
+    );
+    return quote;
   }
 
   public poolType(): [string] {

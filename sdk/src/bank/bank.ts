@@ -15,6 +15,8 @@ import {
   PhantomReified,
   PhantomTypeArgument,
 } from "..";
+import BN from "bn.js";
+import { computeUtilisationBps, LendingAction } from "./bankMath";
 
 export class Bank<
   P extends PhantomTypeArgument,
@@ -116,6 +118,47 @@ export class Bank<
     };
 
     BankFunctions.migrateAsGlobalAdmin(tx, this.typeArgs(), callArgs);
+  }
+
+  // Client-side logic
+
+  public checkLendingAction(amount: bigint, isInput: boolean): LendingAction {
+    if (this.bank.lending == null) {
+      return LendingAction.None;
+    } else {
+      if (!isInput) {
+        if (amount > this.bank.fundsAvailable.value) {
+          return LendingAction.Recall;
+        }
+      }
+
+      const fundsAvailableAfter = isInput
+        ? this.bank.fundsAvailable.value + amount
+        : this.bank.fundsAvailable.value - amount;
+
+      const effectiveUtilisation = computeUtilisationBps(
+        fundsAvailableAfter,
+        this.bank.lending.fundsDeployed
+      );
+
+      if (
+        effectiveUtilisation <
+        this.bank.lending.targetUtilisationBps -
+          this.bank.lending.utilisationBufferBps
+      ) {
+        return LendingAction.Recall;
+      }
+
+      if (
+        effectiveUtilisation >
+        this.bank.lending.targetUtilisationBps +
+          this.bank.lending.utilisationBufferBps
+      ) {
+        return LendingAction.Lend;
+      }
+
+      return LendingAction.None;
+    }
   }
 
   // Getters
