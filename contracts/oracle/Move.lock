@@ -2,25 +2,16 @@
 
 [move]
 version = 3
-manifest_digest = "8BE57337DAAEB9F9F2BB644E500FC7EBE0FBB1B36887038938E990D03195D8FB"
-deps_digest = "060AD7E57DFB13104F21BE5F5C3759D03F0553FC3229247D9A7A6B45F50D03A3"
+manifest_digest = "EB8A1FBC2CC4F46F08331E9C3DFB3753234D350C173EB0DB38781DA5C1DC1A22"
+deps_digest = "3C4103934B1E040BB6B23F1D610B4EF9F2F1166A50A104EADCF77467C004C600"
 dependencies = [
-  { id = "Oracle", name = "Oracle" },
+  { id = "Pyth", name = "Pyth" },
   { id = "Sui", name = "Sui" },
-  { id = "suilend", name = "suilend" },
 ]
 
 [[move.package]]
 id = "MoveStdlib"
 source = { git = "https://github.com/MystenLabs/sui.git", rev = "framework/mainnet", subdir = "crates/sui-framework/packages/move-stdlib" }
-
-[[move.package]]
-id = "Oracle"
-source = { local = "../oracle" }
-
-dependencies = [
-  { id = "Sui", name = "Sui" },
-]
 
 [[move.package]]
 id = "Pyth"
@@ -44,15 +35,6 @@ id = "Wormhole"
 source = { git = "https://github.com/solendprotocol/wormhole.git", rev = "e1698d3c72b15cdddd7da98ad43e151f83b72a0a", subdir = "sui/wormhole" }
 
 dependencies = [
-  { id = "Sui", name = "Sui" },
-]
-
-[[move.package]]
-id = "suilend"
-source = { git = "https://github.com/solendprotocol/suilend.git", rev = "expose-test-only-fns", subdir = "contracts" }
-
-dependencies = [
-  { id = "Pyth", name = "Pyth" },
   { id = "Sui", name = "Sui" },
 ]
 

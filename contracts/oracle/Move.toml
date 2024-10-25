@@ -1,0 +1,16 @@
+[package]
+name = "Oracle"
+version = "0.0.1"
+edition="2024.beta"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/mainnet", override = true }
+
+[dependencies.Pyth]
+git = "https://github.com/solendprotocol/pyth-crosschain.git"
+subdir = "target_chains/sui/contracts"
+rev = "98e218c64bb75cf1350eb7b021e1ffcc3aedfd62"
+
+[addresses]
+oracle = "0xff"
+pyth = "0x8d97f1cd6ac663735be08d1d2b6d02a159e711586461306ce60a2b7a6a565a9e"
