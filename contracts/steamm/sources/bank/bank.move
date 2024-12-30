@@ -150,9 +150,10 @@ module steamm::bank {
         // In the edge case where the utilisation is at 100%, the amount withdrawn from
         // suilend might be off by 1 due to rounding, in such case, the amount available
         // will be lower than the amount requested
-        let max_available = bank.funds_available.value();
-        assert!(max_available + 1 >= tokens_to_withdraw, EInsufficientBankFunds);
-        coin::from_balance(bank.funds_available.split(tokens_to_withdraw.min(max_available)), ctx)
+        // let max_available = bank.funds_available.value();
+        // assert!(max_available + 1 >= tokens_to_withdraw, EInsufficientBankFunds);
+        // coin::from_balance(bank.funds_available.split(tokens_to_withdraw.min(max_available)), ctx)
+        coin::from_balance(bank.funds_available.split(tokens_to_withdraw), ctx)
     }
     
     public fun rebalance<P, T>(
