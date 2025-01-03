@@ -1,29 +1,27 @@
 #[test_only]
-module slamm::dummy_hook {
+module steamm::dummy_hook {
     use sui::coin::Coin;
-    use slamm::registry::{Registry};
-    use slamm::quote::SwapQuote;
-    use slamm::bank::Bank;
-    use slamm::pool::{Self, Pool, PoolCap, SwapResult, Intent};
+    use steamm::registry::{Registry};
+    use steamm::quote::SwapQuote;
+    use steamm::bank::{BToken};
+    use steamm::pool::{Self, Pool, PoolCap, SwapResult, Intent};
 
-    public struct Hook<phantom W> has drop {}
-    public struct State has store {}
+    public struct DummyQuoter<phantom W> has store {}
 
     // ===== Public Methods =====
 
-    public fun new_no_fees<A, B, W: drop>(
+    public fun new_no_fees<A, B, W: drop, P>(
         _witness: W,
         registry: &mut Registry,
         swap_fee_bps: u64,
         ctx: &mut TxContext,
-    ): (Pool<A, B, Hook<W>, State>, PoolCap<A, B, Hook<W>, State>) {
-        let inner = State {};
+    ): (Pool<A, B, DummyQuoter<W>, P>, PoolCap<A, B, DummyQuoter<W>, P>) {
+        let quoter = DummyQuoter {};
 
-        let (mut pool, pool_cap) = pool::new<A, B, Hook<W>, State>(
-            Hook<W> {},
+        let (mut pool, pool_cap) = pool::new<A, B, DummyQuoter<W>, P>(
             registry,
             swap_fee_bps,
-            inner,
+            quoter,
             ctx,
         );
 
@@ -33,19 +31,18 @@ module slamm::dummy_hook {
         (pool, pool_cap)
     }
     
-    public fun new<A, B, W: drop>(
+    public fun new<A, B, W: drop, P>(
         _witness: W,
         registry: &mut Registry,
         swap_fee_bps: u64,
         ctx: &mut TxContext,
-    ): (Pool<A, B, Hook<W>, State>, PoolCap<A, B, Hook<W>, State>) {
-        let inner = State {};
+    ): (Pool<A, B, DummyQuoter<W>, P>, PoolCap<A, B, DummyQuoter<W>, P>) {
+        let quoter = DummyQuoter {};
 
-        let (pool, pool_cap) = pool::new<A, B, Hook<W>, State>(
-            Hook<W> {},
+        let (pool, pool_cap) = pool::new<A, B, DummyQuoter<W>, P>(
             registry,
             swap_fee_bps,
-            inner,
+            quoter,
             ctx,
         );
 
@@ -53,11 +50,9 @@ module slamm::dummy_hook {
     }
 
     public fun swap<A, B, W: drop, P>(
-        self: &mut Pool<A, B, Hook<W>, State>,
-        bank_a: &mut Bank<P, A>,
-        bank_b: &mut Bank<P, B>,
-        coin_a: &mut Coin<A>,
-        coin_b: &mut Coin<B>,
+        self: &mut Pool<A, B, DummyQuoter<W>, P>,
+        coin_a: &mut Coin<BToken<P, A>>,
+        coin_b: &mut Coin<BToken<P, B>>,
         amount_in: u64,
         min_amount_out: u64,
         a2b: bool,
@@ -71,8 +66,6 @@ module slamm::dummy_hook {
 
         let result = execute_swap(
             self,
-            bank_a,
-            bank_b,
             intent,
             coin_a,
             coin_b,
@@ -83,30 +76,25 @@ module slamm::dummy_hook {
         result
     }
 
-    public fun intent_swap<A, B, W: drop>(
-        self: &mut Pool<A, B, Hook<W>, State>,
+    public fun intent_swap<A, B, W: drop, P>(
+        self: &mut Pool<A, B, DummyQuoter<W>, P>,
         amount_in: u64,
         a2b: bool,
-    ): Intent<A, B, Hook<W>, State> {
+    ): Intent<A, B, DummyQuoter<W>, P> {
         let quote = quote_swap(self, amount_in, a2b);
 
         quote.as_intent(self)
     }
 
     public fun execute_swap<A, B, W: drop, P>(
-        self: &mut Pool<A, B, Hook<W>, State>,
-        bank_a: &mut Bank<P, A>,
-        bank_b: &mut Bank<P, B>,
-        intent: Intent<A, B, Hook<W>, State>,
-        coin_a: &mut Coin<A>,
-        coin_b: &mut Coin<B>,
+        self: &mut Pool<A, B, DummyQuoter<W>, P>,
+        intent: Intent<A, B, DummyQuoter<W>, P>,
+        coin_a: &mut Coin<BToken<P, A>>,
+        coin_b: &mut Coin<BToken<P, B>>,
         min_amount_out: u64,
         ctx: &mut TxContext,
     ): SwapResult {
         let response = self.swap(
-            Hook<W> {},
-            bank_a,
-            bank_b,
             coin_a,
             coin_b,
             intent,
@@ -117,8 +105,8 @@ module slamm::dummy_hook {
         response
     }
 
-    public fun quote_swap<A, B, W: drop>(
-        self: &Pool<A, B, Hook<W>, State>,
+    public fun quote_swap<A, B, W: drop, P>(
+        self: &Pool<A, B, DummyQuoter<W>, P>,
         amount_in: u64,
         a2b: bool,
     ): SwapQuote {
