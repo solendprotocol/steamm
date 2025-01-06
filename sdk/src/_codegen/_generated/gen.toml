@@ -1,2 +1,2 @@
 [packages]
-slamm = { local = "../../../contracts/slamm" }
+steamm = { local = "../../../contracts/steamm/" }
