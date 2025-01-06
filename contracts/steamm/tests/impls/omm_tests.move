@@ -1,8 +1,8 @@
 #[test_only]
-module slamm::omm_tests {
-    use slamm::registry;
-    use slamm::bank;
-    use slamm::test_utils::{
+module steamm::omm_tests {
+    use steamm::registry;
+    use steamm::bank::BToken;
+    use steamm::test_utils::{
         COIN, reserve_args, update_pyth_price, set_clock_time, bump_clock,
         update_pool_oracle_price_ahead_of_trade,
     };
@@ -11,10 +11,12 @@ module slamm::omm_tests {
     use sui::random;
     use sui::coin::{Self};
     use sui::test_utils::{destroy, assert_eq};
-    use suilend::lending_market::{Self, LENDING_MARKET};
-    use suilend::decimal;
-    use slamm::omm;
-    use slamm::test_utils;
+    use suilend::{
+        lending_market_tests::{LENDING_MARKET, setup as suilend_setup},
+        decimal
+    };
+    use steamm::omm;
+    use steamm::test_utils;
 
     const ADMIN: address = @0x10;
     const POOL_CREATOR: address = @0x11;
@@ -35,14 +37,14 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, POOL_CREATOR);
 
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
-        let (clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
+        let (clock, lend_cap, lending_market, prices, bag) = suilend_setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         let ctx = ctx(&mut scenario);
 
         
         let price_info_a = test_utils::get_price_info(1, 1, 2, &clock, ctx); // price: 10
         let price_info_b = test_utils::get_price_info(2, 1, 2, &clock, ctx); // price: 5
 
-        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
+        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit, LENDING_MARKET>(
             Wit {},
             &mut registry,
             100, // admin fees BPS
@@ -56,22 +58,15 @@ module slamm::omm_tests {
             &clock,
             ctx,
         );
-
-        let mut coin_a = coin::mint_for_testing<SUI>(500_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(500_000, ctx);
-
-        let mut bank_a = bank::create_bank<LENDING_MARKET, SUI>(&mut registry, ctx);
-        let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx);
+        
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(500_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(500_000, ctx);
 
         let (lp_coins, _) = pool.deposit_liquidity(
-            &mut bank_a,
-            &mut bank_b,
             &mut coin_a,
             &mut coin_b,
             500_000,
             500_000,
-            0,
-            0,
             ctx,
         );
 
@@ -82,8 +77,8 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, TRADER);
         let ctx = ctx(&mut scenario);
 
-        let mut coin_a = coin::mint_for_testing<SUI>(e9(200), ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(0, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(e9(200), ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(0, ctx);
 
         let swap_intent = pool.omm_intent_swap(
             50_000,
@@ -92,8 +87,6 @@ module slamm::omm_tests {
         );
 
         pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -101,16 +94,14 @@ module slamm::omm_tests {
             ctx,
         );
 
-        assert_eq(pool.inner().ema().reference_val(), decimal::from(0));
-        assert_eq(pool.inner().ema().accumulator(), decimal::from_scaled_val(189845685556076473)); // 18..%
-        assert_eq(pool.inner().reference_price(), decimal::from(1)); // price = 1
-        assert_eq(pool.inner().reference_price(), decimal::from(1)); // price = 1
-        assert_eq(pool.inner().last_update_ms(), clock.timestamp_ms());
+        assert_eq(pool.quoter().ema().reference_val(), decimal::from(0));
+        assert_eq(pool.quoter().ema().accumulator(), decimal::from_scaled_val(189845685556076473)); // 18..%
+        assert_eq(pool.quoter().reference_price(), decimal::from(1)); // price = 1
+        assert_eq(pool.quoter().reference_price(), decimal::from(1)); // price = 1
+        assert_eq(pool.quoter().last_update_ms(), clock.timestamp_ms());
 
         destroy(coin_a);
         destroy(coin_b);
-        destroy(bank_a);
-        destroy(bank_b);
         destroy(price_info_a);
         destroy(price_info_b);
         destroy(registry);
@@ -133,14 +124,14 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, POOL_CREATOR);
 
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
-        let (clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
+        let (clock, lend_cap, lending_market, prices, bag) = suilend_setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         let ctx = ctx(&mut scenario);
 
         
         let price_info_a = test_utils::get_price_info(1, 1, 2, &clock, ctx); // price: 10
         let price_info_b = test_utils::get_price_info(2, 1, 2, &clock, ctx); // price: 10
 
-        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
+        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit, LENDING_MARKET>(
             Wit {},
             &mut registry,
             0, // swap fees BPS
@@ -157,21 +148,14 @@ module slamm::omm_tests {
 
         pool.no_redemption_fees_for_testing();
 
-        let mut coin_a = coin::mint_for_testing<SUI>(500_000_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(500_000_000, ctx);
-
-        let mut bank_a = bank::create_bank<LENDING_MARKET, SUI>(&mut registry, ctx);
-        let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(500_000_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(500_000_000, ctx);
 
         let (lp_coins, _) = pool.deposit_liquidity(
-            &mut bank_a,
-            &mut bank_b,
             &mut coin_a,
             &mut coin_b,
             500_000_000,
             500_000_000,
-            0,
-            0,
             ctx,
         );
 
@@ -269,8 +253,6 @@ module slamm::omm_tests {
             len = len - 1;
         };
 
-        destroy(bank_a);
-        destroy(bank_b);
         destroy(price_info_a);
         destroy(price_info_b);
         destroy(registry);
@@ -293,14 +275,14 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, POOL_CREATOR);
 
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
-        let (clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
+        let (clock, lend_cap, lending_market, prices, bag) = suilend_setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         let ctx = ctx(&mut scenario);
 
         
         let price_info_a = test_utils::get_price_info(1, 1, 2, &clock, ctx); // price: 10
         let price_info_b = test_utils::get_price_info(2, 1, 2, &clock, ctx); // price: 10
 
-        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
+        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit, LENDING_MARKET>(
             Wit {},
             &mut registry,
             0, // swap fees BPS
@@ -315,21 +297,14 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let mut coin_a = coin::mint_for_testing<SUI>(500_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(500_000, ctx);
-
-        let mut bank_a = bank::create_bank<LENDING_MARKET, SUI>(&mut registry, ctx);
-        let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(500_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(500_000, ctx);
 
         let (lp_coins, _) = pool.deposit_liquidity(
-            &mut bank_a,
-            &mut bank_b,
             &mut coin_a,
             &mut coin_b,
             500_000,
             500_000,
-            0,
-            0,
             ctx,
         );
 
@@ -348,8 +323,6 @@ module slamm::omm_tests {
 
         assert_eq(vol, decimal::from_percent(1));
 
-        destroy(bank_a);
-        destroy(bank_b);
         destroy(price_info_a);
         destroy(price_info_b);
         destroy(registry);
@@ -372,14 +345,14 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, POOL_CREATOR);
 
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
-        let (mut clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
+        let (mut clock, lend_cap, lending_market, prices, bag) = suilend_setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         set_clock_time(&mut clock);
         let ctx = ctx(&mut scenario);
 
         let mut price_info_a = test_utils::get_price_info(1, 1, 2, &clock, ctx); // price: 10
         let price_info_b = test_utils::get_price_info(2, 1, 2, &clock, ctx); // price: 10
 
-        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
+        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit, LENDING_MARKET>(
             Wit {},
             &mut registry,
             0, // swap fees BPS
@@ -394,21 +367,14 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let mut coin_a = coin::mint_for_testing<SUI>(500_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(500_000, ctx);
-
-        let mut bank_a = bank::create_bank<LENDING_MARKET, SUI>(&mut registry, ctx);
-        let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(500_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(500_000, ctx);
 
         let (lp_coins, _) = pool.deposit_liquidity(
-            &mut bank_a,
-            &mut bank_b,
             &mut coin_a,
             &mut coin_b,
             500_000,
             500_000,
-            0,
-            0,
             ctx,
         );
 
@@ -443,8 +409,6 @@ module slamm::omm_tests {
 
         assert_eq(vol, decimal::from_percent(1));
 
-        destroy(bank_a);
-        destroy(bank_b);
         destroy(price_info_a);
         destroy(price_info_b);
         destroy(registry);
@@ -468,14 +432,14 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, POOL_CREATOR);
 
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
-        let (mut clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
+        let (mut clock, lend_cap, lending_market, prices, bag) = suilend_setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         set_clock_time(&mut clock);
         let ctx = ctx(&mut scenario);
 
         let mut price_info_a = test_utils::get_price_info(1, 1, 2, &clock, ctx); // price: 10
         let price_info_b = test_utils::get_price_info(2, 1, 2, &clock, ctx); // price: 10
 
-        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
+        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit, LENDING_MARKET>(
             Wit {},
             &mut registry,
             0, // swap fees BPS
@@ -490,21 +454,14 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let mut coin_a = coin::mint_for_testing<SUI>(500_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(500_000, ctx);
-
-        let mut bank_a = bank::create_bank<LENDING_MARKET, SUI>(&mut registry, ctx);
-        let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(500_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(500_000, ctx);
 
         let (lp_coins, _) = pool.deposit_liquidity(
-            &mut bank_a,
-            &mut bank_b,
             &mut coin_a,
             &mut coin_b,
             500_000,
             500_000,
-            0,
-            0,
             ctx,
         );
 
@@ -533,8 +490,6 @@ module slamm::omm_tests {
 
         assert_eq(vol, decimal::from_percent(1));
 
-        destroy(bank_a);
-        destroy(bank_b);
         destroy(price_info_a);
         destroy(price_info_b);
         destroy(registry);
@@ -565,14 +520,14 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, POOL_CREATOR);
 
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
-        let (mut clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
+        let (mut clock, lend_cap, lending_market, prices, bag) = suilend_setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         let ctx = ctx(&mut scenario);
 
         
         let price_info_a = test_utils::get_price_info(1, 1, 2, &clock, ctx); // price: 10
         let price_info_b = test_utils::get_price_info(2, 1, 2, &clock, ctx); // price: 10
 
-        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
+        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit, LENDING_MARKET>(
             Wit {},
             &mut registry,
             0, // swap fees BPS
@@ -587,21 +542,14 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let mut coin_a = coin::mint_for_testing<SUI>(500_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(500_000, ctx);
-
-        let mut bank_a = bank::create_bank<LENDING_MARKET, SUI>(&mut registry, ctx);
-        let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(500_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(500_000, ctx);
 
         let (lp_coins, _) = pool.deposit_liquidity(
-            &mut bank_a,
-            &mut bank_b,
             &mut coin_a,
             &mut coin_b,
             500_000,
             500_000,
-            0,
-            0,
             ctx,
         );
 
@@ -612,12 +560,12 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, TRADER);
         let ctx = ctx(&mut scenario);
 
-        let mut coin_a = coin::mint_for_testing<SUI>(100_000_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(0, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(100_000_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(0, ctx);
 
-        let initial_reference_price = pool.inner().reference_price();
-        let initial_reference_vol = pool.inner().ema().reference_val();
-        let initial_accumulator = pool.inner().ema().accumulator();
+        let initial_reference_price = pool.quoter().reference_price();
+        let initial_reference_vol = pool.quoter().ema().reference_val();
+        let initial_accumulator = pool.quoter().ema().accumulator();
 
         update_pool_oracle_price_ahead_of_trade(
             &mut pool,
@@ -635,8 +583,6 @@ module slamm::omm_tests {
         );
 
         pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -644,9 +590,9 @@ module slamm::omm_tests {
             ctx,
         );
 
-        assert_eq(initial_reference_price, pool.inner().reference_price());
-        assert_eq(initial_reference_vol, pool.inner().ema().reference_val());
-        let mid_accumulator = pool.inner().ema().accumulator();
+        assert_eq(initial_reference_price, pool.quoter().reference_price());
+        assert_eq(initial_reference_vol, pool.quoter().ema().reference_val());
+        let mid_accumulator = pool.quoter().ema().accumulator();
         assert!(mid_accumulator.gt(initial_accumulator));
 
         update_pool_oracle_price_ahead_of_trade(
@@ -664,8 +610,6 @@ module slamm::omm_tests {
         );
 
         pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -673,10 +617,10 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let mid_accumulator_2 = pool.inner().ema().accumulator();
+        let mid_accumulator_2 = pool.quoter().ema().accumulator();
         assert!(mid_accumulator_2.gt(mid_accumulator));
-        assert_eq(initial_reference_vol, pool.inner().ema().reference_val());
-        assert_eq(initial_reference_price, pool.inner().reference_price());
+        assert_eq(initial_reference_vol, pool.quoter().ema().reference_val());
+        assert_eq(initial_reference_price, pool.quoter().reference_price());
 
         update_pool_oracle_price_ahead_of_trade(
             &mut pool,
@@ -693,8 +637,6 @@ module slamm::omm_tests {
         );
 
         pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -702,15 +644,13 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let end_accumulator = pool.inner().ema().accumulator();
+        let end_accumulator = pool.quoter().ema().accumulator();
         assert!(end_accumulator.lt(mid_accumulator_2));
-        assert_eq(initial_reference_vol, pool.inner().ema().reference_val());
-        assert_eq(initial_reference_price, pool.inner().reference_price());
+        assert_eq(initial_reference_vol, pool.quoter().ema().reference_val());
+        assert_eq(initial_reference_price, pool.quoter().reference_price());
 
         destroy(coin_a);
         destroy(coin_b);
-        destroy(bank_a);
-        destroy(bank_b);
         destroy(price_info_a);
         destroy(price_info_b);
         destroy(registry);
@@ -738,13 +678,13 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, POOL_CREATOR);
 
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
-        let (mut clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
+        let (mut clock, lend_cap, lending_market, prices, bag) = suilend_setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         let ctx = ctx(&mut scenario);
         
         let price_info_a = test_utils::get_price_info(1, 1, 2, &clock, ctx); // price: 10
         let price_info_b = test_utils::get_price_info(2, 1, 2, &clock, ctx); // price: 10
 
-        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
+        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit, LENDING_MARKET>(
             Wit {},
             &mut registry,
             0, // swap fees BPS
@@ -759,21 +699,14 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let mut coin_a = coin::mint_for_testing<SUI>(500_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(500_000, ctx);
-
-        let mut bank_a = bank::create_bank<LENDING_MARKET, SUI>(&mut registry, ctx);
-        let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(500_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(500_000, ctx);
 
         let (lp_coins, _) = pool.deposit_liquidity(
-            &mut bank_a,
-            &mut bank_b,
             &mut coin_a,
             &mut coin_b,
             500_000,
             500_000,
-            0,
-            0,
             ctx,
         );
 
@@ -784,12 +717,12 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, TRADER);
         let ctx = ctx(&mut scenario);
 
-        let mut coin_a = coin::mint_for_testing<SUI>(100_000_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(0, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(100_000_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(0, ctx);
 
-        let initial_reference_price = pool.inner().reference_price();
-        let initial_reference_vol = pool.inner().ema().reference_val();
-        let initial_accumulator = pool.inner().ema().accumulator();
+        let initial_reference_price = pool.quoter().reference_price();
+        let initial_reference_vol = pool.quoter().ema().reference_val();
+        let initial_accumulator = pool.quoter().ema().accumulator();
 
         update_pool_oracle_price_ahead_of_trade(
             &mut pool,
@@ -806,8 +739,6 @@ module slamm::omm_tests {
         );
 
         let swap_result = pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -815,11 +746,11 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let mid_accumulator = pool.inner().ema().accumulator();
+        let mid_accumulator = pool.quoter().ema().accumulator();
         let fee_rate_1 = swap_result.to_quote().output_fee_rate();
 
-        assert_eq(initial_reference_price, pool.inner().reference_price());
-        assert_eq(initial_reference_vol, pool.inner().ema().reference_val());
+        assert_eq(initial_reference_price, pool.quoter().reference_price());
+        assert_eq(initial_reference_vol, pool.quoter().ema().reference_val());
         assert!(mid_accumulator.gt(initial_accumulator));
 
         update_pool_oracle_price_ahead_of_trade(
@@ -837,8 +768,6 @@ module slamm::omm_tests {
         );
 
         let swap_result = pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -846,12 +775,12 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let mid_accumulator_2 = pool.inner().ema().accumulator();
+        let mid_accumulator_2 = pool.quoter().ema().accumulator();
         let fee_rate_2 = swap_result.to_quote().output_fee_rate();
 
         assert!(mid_accumulator_2.gt(mid_accumulator));
-        assert_eq(initial_reference_vol, pool.inner().ema().reference_val());
-        assert_eq(initial_reference_price, pool.inner().reference_price());
+        assert_eq(initial_reference_vol, pool.quoter().ema().reference_val());
+        assert_eq(initial_reference_price, pool.quoter().reference_price());
         assert!(fee_rate_2.gt(fee_rate_1));
 
         update_pool_oracle_price_ahead_of_trade(
@@ -869,8 +798,6 @@ module slamm::omm_tests {
         );
 
         let swap_result = pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -878,18 +805,16 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let end_accumulator = pool.inner().ema().accumulator();
+        let end_accumulator = pool.quoter().ema().accumulator();
         let fee_rate_3 = swap_result.to_quote().output_fee_rate();
 
         assert!(end_accumulator.lt(mid_accumulator_2));
-        assert_eq(initial_reference_vol, pool.inner().ema().reference_val());
-        assert_eq(initial_reference_price, pool.inner().reference_price());
+        assert_eq(initial_reference_vol, pool.quoter().ema().reference_val());
+        assert_eq(initial_reference_price, pool.quoter().reference_price());
         assert!(fee_rate_3.lt(fee_rate_2));
 
         destroy(coin_a);
         destroy(coin_b);
-        destroy(bank_a);
-        destroy(bank_b);
         destroy(price_info_a);
         destroy(price_info_b);
         destroy(registry);
@@ -923,14 +848,14 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, POOL_CREATOR);
 
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
-        let (mut clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
+        let (mut clock, lend_cap, lending_market, prices, bag) = suilend_setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         let ctx = ctx(&mut scenario);
 
         
         let price_info_a = test_utils::get_price_info(1, 1, 2, &clock, ctx); // price: 10
         let price_info_b = test_utils::get_price_info(2, 1, 2, &clock, ctx); // price: 10
 
-        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
+        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit, LENDING_MARKET>(
             Wit {},
             &mut registry,
             0, // swap fees BPS
@@ -945,21 +870,14 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let mut coin_a = coin::mint_for_testing<SUI>(500_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(500_000, ctx);
-
-        let mut bank_a = bank::create_bank<LENDING_MARKET, SUI>(&mut registry, ctx);
-        let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(500_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(500_000, ctx);
 
         let (lp_coins, _) = pool.deposit_liquidity(
-            &mut bank_a,
-            &mut bank_b,
             &mut coin_a,
             &mut coin_b,
             500_000,
             500_000,
-            0,
-            0,
             ctx,
         );
 
@@ -970,12 +888,12 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, TRADER);
         let ctx = ctx(&mut scenario);
 
-        let mut coin_a = coin::mint_for_testing<SUI>(100_000_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(0, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(100_000_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(0, ctx);
 
-        let initial_reference_price = pool.inner().reference_price();
-        let initial_reference_vol = pool.inner().ema().reference_val();
-        let initial_accumulator = pool.inner().ema().accumulator();
+        let initial_reference_price = pool.quoter().reference_price();
+        let initial_reference_vol = pool.quoter().ema().reference_val();
+        let initial_accumulator = pool.quoter().ema().accumulator();
 
         let swap_intent = pool.omm_intent_swap(
             100_000,
@@ -984,8 +902,6 @@ module slamm::omm_tests {
         );
 
         pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -996,9 +912,9 @@ module slamm::omm_tests {
         bump_clock(&mut clock, 1);
         omm::set_oracle_price_as_internal_for_testing(&mut pool, &clock);
 
-        assert_eq(initial_reference_price, pool.inner().reference_price());
-        assert_eq(initial_reference_vol, pool.inner().ema().reference_val());
-        let mid_accumulator = pool.inner().ema().accumulator();
+        assert_eq(initial_reference_price, pool.quoter().reference_price());
+        assert_eq(initial_reference_vol, pool.quoter().ema().reference_val());
+        let mid_accumulator = pool.quoter().ema().accumulator();
         assert!(mid_accumulator.gt(initial_accumulator));
 
         let swap_intent = pool.omm_intent_swap(
@@ -1008,8 +924,6 @@ module slamm::omm_tests {
         );
 
         pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -1020,10 +934,10 @@ module slamm::omm_tests {
         bump_clock(&mut clock, 1);
         omm::set_oracle_price_as_internal_for_testing(&mut pool, &clock);
 
-        let mid_accumulator_2 = pool.inner().ema().accumulator();
+        let mid_accumulator_2 = pool.quoter().ema().accumulator();
         assert!(mid_accumulator_2.gt(mid_accumulator));
-        assert_eq(initial_reference_vol, pool.inner().ema().reference_val());
-        assert_eq(initial_reference_price, pool.inner().reference_price());
+        assert_eq(initial_reference_vol, pool.quoter().ema().reference_val());
+        assert_eq(initial_reference_price, pool.quoter().reference_price());
 
         let swap_intent = pool.omm_intent_swap(
             10_000,
@@ -1032,8 +946,6 @@ module slamm::omm_tests {
         );
 
         pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -1044,16 +956,14 @@ module slamm::omm_tests {
         bump_clock(&mut clock, 1);
         omm::set_oracle_price_as_internal_for_testing(&mut pool, &clock);
 
-        let end_accumulator = pool.inner().ema().accumulator();
+        let end_accumulator = pool.quoter().ema().accumulator();
 
         assert!(end_accumulator.eq(mid_accumulator_2)); // they are equal here
-        assert_eq(initial_reference_vol, pool.inner().ema().reference_val());
-        assert_eq(initial_reference_price, pool.inner().reference_price());
+        assert_eq(initial_reference_vol, pool.quoter().ema().reference_val());
+        assert_eq(initial_reference_price, pool.quoter().reference_price());
 
         destroy(coin_a);
         destroy(coin_b);
-        destroy(bank_a);
-        destroy(bank_b);
         destroy(price_info_a);
         destroy(price_info_b);
         destroy(registry);
@@ -1083,13 +993,13 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, POOL_CREATOR);
 
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
-        let (mut clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
+        let (mut clock, lend_cap, lending_market, prices, bag) = suilend_setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         let ctx = ctx(&mut scenario);
 
         let price_info_a = test_utils::get_price_info(1, 1, 2, &clock, ctx); // price: 10
         let price_info_b = test_utils::get_price_info(2, 1, 2, &clock, ctx); // price: 10
 
-        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
+        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit, LENDING_MARKET>(
             Wit {},
             &mut registry,
             0, // swap fees BPS
@@ -1104,21 +1014,14 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let mut coin_a = coin::mint_for_testing<SUI>(500_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(500_000, ctx);
-
-        let mut bank_a = bank::create_bank<LENDING_MARKET, SUI>(&mut registry, ctx);
-        let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(500_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(500_000, ctx);
 
         let (lp_coins, _) = pool.deposit_liquidity(
-            &mut bank_a,
-            &mut bank_b,
             &mut coin_a,
             &mut coin_b,
             500_000,
             500_000,
-            0,
-            0,
             ctx,
         );
 
@@ -1129,12 +1032,12 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, TRADER);
         let ctx = ctx(&mut scenario);
 
-        let mut coin_a = coin::mint_for_testing<SUI>(100_000_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(0, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(100_000_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(0, ctx);
 
-        let initial_reference_price = pool.inner().reference_price();
-        let initial_reference_vol = pool.inner().ema().reference_val();
-        let initial_accumulator = pool.inner().ema().accumulator();
+        let initial_reference_price = pool.quoter().reference_price();
+        let initial_reference_vol = pool.quoter().ema().reference_val();
+        let initial_accumulator = pool.quoter().ema().accumulator();
 
         let swap_intent = pool.omm_intent_swap(
             100_000,
@@ -1143,8 +1046,6 @@ module slamm::omm_tests {
         );
 
         let swap_result = pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -1155,10 +1056,10 @@ module slamm::omm_tests {
         bump_clock(&mut clock, 1);
         omm::set_oracle_price_as_internal_for_testing(&mut pool, &clock);
 
-        let mid_accumulator = pool.inner().ema().accumulator();
+        let mid_accumulator = pool.quoter().ema().accumulator();
         let fee_rate_1 = swap_result.to_quote().output_fee_rate();
-        assert_eq(initial_reference_price, pool.inner().reference_price());
-        assert_eq(initial_reference_vol, pool.inner().ema().reference_val());
+        assert_eq(initial_reference_price, pool.quoter().reference_price());
+        assert_eq(initial_reference_vol, pool.quoter().ema().reference_val());
         assert!(mid_accumulator.gt(initial_accumulator));
 
         let swap_intent = pool.omm_intent_swap(
@@ -1168,8 +1069,6 @@ module slamm::omm_tests {
         );
 
         let swap_result = pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -1180,10 +1079,10 @@ module slamm::omm_tests {
         bump_clock(&mut clock, 1);
         omm::set_oracle_price_as_internal_for_testing(&mut pool, &clock);
 
-        let mid_accumulator_2 = pool.inner().ema().accumulator();
+        let mid_accumulator_2 = pool.quoter().ema().accumulator();
         let fee_rate_2 = swap_result.to_quote().output_fee_rate();
-        assert_eq(initial_reference_vol, pool.inner().ema().reference_val());
-        assert_eq(initial_reference_price, pool.inner().reference_price());
+        assert_eq(initial_reference_vol, pool.quoter().ema().reference_val());
+        assert_eq(initial_reference_price, pool.quoter().reference_price());
         assert!(mid_accumulator_2.gt(mid_accumulator));
         assert!(fee_rate_2.gt(fee_rate_1));
 
@@ -1194,8 +1093,6 @@ module slamm::omm_tests {
         );
 
         let swap_result = pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -1206,18 +1103,16 @@ module slamm::omm_tests {
         bump_clock(&mut clock, 1);
         omm::set_oracle_price_as_internal_for_testing(&mut pool, &clock);
 
-        let end_accumulator = pool.inner().ema().accumulator();
+        let end_accumulator = pool.quoter().ema().accumulator();
         let fee_rate_3 = swap_result.to_quote().output_fee_rate();
 
-        assert_eq(initial_reference_vol, pool.inner().ema().reference_val());
-        assert_eq(initial_reference_price, pool.inner().reference_price());
+        assert_eq(initial_reference_vol, pool.quoter().ema().reference_val());
+        assert_eq(initial_reference_price, pool.quoter().reference_price());
         assert!(end_accumulator.eq(mid_accumulator_2));
         assert!(fee_rate_3.lt(fee_rate_2));
 
         destroy(coin_a);
         destroy(coin_b);
-        destroy(bank_a);
-        destroy(bank_b);
         destroy(price_info_a);
         destroy(price_info_b);
         destroy(registry);
@@ -1247,14 +1142,14 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, POOL_CREATOR);
 
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
-        let (mut clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
+        let (mut clock, lend_cap, lending_market, prices, bag) = suilend_setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         let ctx = ctx(&mut scenario);
 
         
         let price_info_a = test_utils::get_price_info(1, 1, 2, &clock, ctx); // price: 10
         let price_info_b = test_utils::get_price_info(2, 1, 2, &clock, ctx); // price: 10
 
-        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
+        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit, LENDING_MARKET>(
             Wit {},
             &mut registry,
             0, // swap fees BPS
@@ -1269,21 +1164,14 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let mut coin_a = coin::mint_for_testing<SUI>(500_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(500_000, ctx);
-
-        let mut bank_a = bank::create_bank<LENDING_MARKET, SUI>(&mut registry, ctx);
-        let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(500_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(500_000, ctx);
 
         let (lp_coins, _) = pool.deposit_liquidity(
-            &mut bank_a,
-            &mut bank_b,
             &mut coin_a,
             &mut coin_b,
             500_000,
             500_000,
-            0,
-            0,
             ctx,
         );
 
@@ -1294,8 +1182,8 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, TRADER);
         let ctx = ctx(&mut scenario);
 
-        let mut coin_a = coin::mint_for_testing<SUI>(100_000_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(0, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(100_000_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(0, ctx);
 
         
         // Initial trade to create some accumulated volatility
@@ -1306,8 +1194,6 @@ module slamm::omm_tests {
         );
 
         pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -1315,9 +1201,9 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let initial_reference_price = pool.inner().reference_price();
-        let initial_reference_vol = pool.inner().ema().reference_val();
-        let initial_accumulator = pool.inner().ema().accumulator();
+        let initial_reference_price = pool.quoter().reference_price();
+        let initial_reference_vol = pool.quoter().ema().reference_val();
+        let initial_accumulator = pool.quoter().ema().accumulator();
 
         // Move beyond the filter period of 60 seconds
         update_pool_oracle_price_ahead_of_trade(
@@ -1335,8 +1221,6 @@ module slamm::omm_tests {
         );
 
         pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -1344,9 +1228,9 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let vol_accumulator_1 = pool.inner().ema().accumulator();
-        let ref_price_1 = pool.inner().reference_price();
-        let ref_vol_1 = pool.inner().ema().reference_val();
+        let vol_accumulator_1 = pool.quoter().ema().accumulator();
+        let ref_price_1 = pool.quoter().reference_price();
+        let ref_vol_1 = pool.quoter().ema().reference_val();
         assert!(vol_accumulator_1.lt(initial_accumulator), 0);
         assert!(ref_price_1.gt(initial_reference_price), 0); // reference price gets updated
         assert!(ref_vol_1.gt(initial_reference_vol), 0); // reference vol gets updated
@@ -1367,8 +1251,6 @@ module slamm::omm_tests {
         );
 
         pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -1376,9 +1258,9 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let vol_accumulator_2 = pool.inner().ema().accumulator();
-        let ref_price_2 = pool.inner().reference_price();
-        let ref_vol_2 = pool.inner().ema().reference_val();
+        let vol_accumulator_2 = pool.quoter().ema().accumulator();
+        let ref_price_2 = pool.quoter().reference_price();
+        let ref_vol_2 = pool.quoter().ema().reference_val();
         assert!(vol_accumulator_2.gt(vol_accumulator_1), 0); // vol increases with accumulated directional trades
         assert!(ref_price_2.eq(ref_price_1), 0); // reference price the same
         assert!(ref_vol_2.eq(ref_vol_1), 0); // reference vol the same
@@ -1398,8 +1280,6 @@ module slamm::omm_tests {
         );
 
         pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -1407,9 +1287,9 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let vol_accumulator_3 = pool.inner().ema().accumulator();
-        let ref_price_3 = pool.inner().reference_price();
-        let ref_vol_3 = pool.inner().ema().reference_val();
+        let vol_accumulator_3 = pool.quoter().ema().accumulator();
+        let ref_price_3 = pool.quoter().reference_price();
+        let ref_vol_3 = pool.quoter().ema().reference_val();
 
         assert!(vol_accumulator_3.gt(vol_accumulator_2), 0); // vol increases with accumulated directional trades
         assert!(ref_price_3.eq(ref_price_1), 0); // reference price the same
@@ -1431,8 +1311,6 @@ module slamm::omm_tests {
         );
 
         pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -1440,9 +1318,9 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let vol_accumulator_4 = pool.inner().ema().accumulator();
-        let ref_price_4 = pool.inner().reference_price();
-        let ref_vol_4 = pool.inner().ema().reference_val();
+        let vol_accumulator_4 = pool.quoter().ema().accumulator();
+        let ref_price_4 = pool.quoter().reference_price();
+        let ref_vol_4 = pool.quoter().ema().reference_val();
 
         assert!(vol_accumulator_4.lt(vol_accumulator_3), 0); // vol decreases with opposite direction trade
         assert!(ref_price_4.eq(ref_price_1), 0); // reference price the same
@@ -1450,8 +1328,6 @@ module slamm::omm_tests {
 
         destroy(coin_a);
         destroy(coin_b);
-        destroy(bank_a);
-        destroy(bank_b);
         destroy(price_info_a);
         destroy(price_info_b);
         destroy(registry);
@@ -1474,14 +1350,14 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, POOL_CREATOR);
 
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
-        let (mut clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
+        let (mut clock, lend_cap, lending_market, prices, bag) = suilend_setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         let ctx = ctx(&mut scenario);
 
         
         let price_info_a = test_utils::get_price_info(1, 1, 2, &clock, ctx); // price: 10
         let price_info_b = test_utils::get_price_info(2, 1, 2, &clock, ctx); // price: 10
 
-        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
+        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit, LENDING_MARKET>(
             Wit {},
             &mut registry,
             0, // swap fees BPS
@@ -1496,21 +1372,14 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let mut coin_a = coin::mint_for_testing<SUI>(500_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(500_000, ctx);
-
-        let mut bank_a = bank::create_bank<LENDING_MARKET, SUI>(&mut registry, ctx);
-        let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(500_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(500_000, ctx);
 
         let (lp_coins, _) = pool.deposit_liquidity(
-            &mut bank_a,
-            &mut bank_b,
             &mut coin_a,
             &mut coin_b,
             500_000,
             500_000,
-            0,
-            0,
             ctx,
         );
 
@@ -1521,8 +1390,8 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, TRADER);
         let ctx = ctx(&mut scenario);
 
-        let mut coin_a = coin::mint_for_testing<SUI>(100_000_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(0, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(100_000_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(0, ctx);
 
         
         // Initial trade to create some accumulated volatility
@@ -1533,8 +1402,6 @@ module slamm::omm_tests {
         );
 
         pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -1558,8 +1425,6 @@ module slamm::omm_tests {
         );
 
         pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -1568,9 +1433,9 @@ module slamm::omm_tests {
         );
 
 
-        let initial_accumulator = pool.inner().ema().accumulator();
-        let initial_reference_price = pool.inner().reference_price();
-        let initial_reference_vol = pool.inner().ema().reference_val();
+        let initial_accumulator = pool.quoter().ema().accumulator();
+        let initial_reference_price = pool.quoter().reference_price();
+        let initial_reference_vol = pool.quoter().ema().reference_val();
 
         assert!(initial_reference_vol.gt(decimal::from(0)), 0);
         assert!(initial_reference_price.gt(decimal::from(0)), 0);
@@ -1592,8 +1457,6 @@ module slamm::omm_tests {
         );
 
         pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -1601,9 +1464,9 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let new_vol_accumulator = pool.inner().ema().accumulator();
-        let new_reference_price = pool.inner().reference_price();
-        let new_reference_vol = pool.inner().ema().reference_val();
+        let new_vol_accumulator = pool.quoter().ema().accumulator();
+        let new_reference_price = pool.quoter().reference_price();
+        let new_reference_vol = pool.quoter().ema().reference_val();
         assert!(new_reference_vol.eq(decimal::from(0)), 0);
         assert!(new_vol_accumulator.eq(decimal::from(0)), 0);
         assert_eq(new_reference_price, omm::new_instant_price_oracle(&pool));
@@ -1624,8 +1487,6 @@ module slamm::omm_tests {
         );
 
         pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -1633,9 +1494,9 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let new_vol_accumulator_2 = pool.inner().ema().accumulator();
-        let new_reference_price_2 = pool.inner().reference_price();
-        let new_reference_vol_2 = pool.inner().ema().reference_val();
+        let new_vol_accumulator_2 = pool.quoter().ema().accumulator();
+        let new_reference_price_2 = pool.quoter().reference_price();
+        let new_reference_vol_2 = pool.quoter().ema().reference_val();
 
         assert!(new_reference_vol_2.eq(decimal::from(0)), 0); // ref vol still reset
         assert!(new_vol_accumulator.eq(decimal::from(0)), 0); // new vol accumulator > 0
@@ -1657,8 +1518,6 @@ module slamm::omm_tests {
         );
 
         pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -1666,17 +1525,15 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let new_vol_accumulator_3 = pool.inner().ema().accumulator();
-        let new_reference_price_3 = pool.inner().reference_price();
-        let new_reference_vol_3 = pool.inner().ema().reference_val();
+        let new_vol_accumulator_3 = pool.quoter().ema().accumulator();
+        let new_reference_price_3 = pool.quoter().reference_price();
+        let new_reference_vol_3 = pool.quoter().ema().reference_val();
         assert!(new_vol_accumulator_3.gt(new_vol_accumulator_2), 0);
         assert!(new_reference_price_3.eq(new_reference_price_2), 0);
         assert!(new_reference_vol_3.eq(decimal::from(0)), 0);
 
         destroy(coin_a);
         destroy(coin_b);
-        destroy(bank_a);
-        destroy(bank_b);
         destroy(price_info_a);
         destroy(price_info_b);
         destroy(registry);
@@ -1702,14 +1559,14 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, POOL_CREATOR);
 
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
-        let (mut clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
+        let (mut clock, lend_cap, lending_market, prices, bag) = suilend_setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         let ctx = ctx(&mut scenario);
 
         
         let price_info_a = test_utils::get_price_info(1, 1, 2, &clock, ctx); // price: 10
         let price_info_b = test_utils::get_price_info(2, 1, 2, &clock, ctx); // price: 10
 
-        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
+        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit, LENDING_MARKET>(
             Wit {},
             &mut registry,
             0, // swap fees BPS
@@ -1724,21 +1581,14 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let mut coin_a = coin::mint_for_testing<SUI>(500_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(500_000, ctx);
-
-        let mut bank_a = bank::create_bank<LENDING_MARKET, SUI>(&mut registry, ctx);
-        let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(500_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(500_000, ctx);
 
         let (lp_coins, _) = pool.deposit_liquidity(
-            &mut bank_a,
-            &mut bank_b,
             &mut coin_a,
             &mut coin_b,
             500_000,
             500_000,
-            0,
-            0,
             ctx,
         );
 
@@ -1749,8 +1599,8 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, TRADER);
         let ctx = ctx(&mut scenario);
 
-        let mut coin_a = coin::mint_for_testing<SUI>(100_000_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(0, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(100_000_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(0, ctx);
         
         let mut trades = 60;
         let mut i = 1;
@@ -1772,8 +1622,6 @@ module slamm::omm_tests {
             );
 
             pool.omm_execute_swap(
-                &mut bank_a,
-                &mut bank_b,
                 swap_intent,
                 &mut coin_a,
                 &mut coin_b,
@@ -1781,7 +1629,7 @@ module slamm::omm_tests {
                 ctx,
             );
 
-            let ref_price = pool.inner().reference_price().mul(decimal::from(10_000)).floor();
+            let ref_price = pool.quoter().reference_price().mul(decimal::from(10_000)).floor();
 
             if (i % 6 == 0) {
                 assert!(ref_price > previous_reference_price, 0);
@@ -1797,8 +1645,6 @@ module slamm::omm_tests {
 
         destroy(coin_a);
         destroy(coin_b);
-        destroy(bank_a);
-        destroy(bank_b);
         destroy(price_info_a);
         destroy(price_info_b);
         destroy(registry);
@@ -1821,14 +1667,14 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, POOL_CREATOR);
 
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
-        let (clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
+        let (clock, lend_cap, lending_market, prices, bag) = suilend_setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         let ctx = ctx(&mut scenario);
 
         
         let price_info_a = test_utils::get_price_info(1, 1, 2, &clock, ctx); // price: 10
         let price_info_b = test_utils::get_price_info(2, 1, 2, &clock, ctx); // price: 10
 
-        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
+        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit, LENDING_MARKET>(
             Wit {},
             &mut registry,
             0, // swap fees BPS
@@ -1843,21 +1689,14 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let mut coin_a = coin::mint_for_testing<SUI>(500_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(500_000, ctx);
-
-        let mut bank_a = bank::create_bank<LENDING_MARKET, SUI>(&mut registry, ctx);
-        let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(500_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(500_000, ctx);
 
         let (lp_coins, _) = pool.deposit_liquidity(
-            &mut bank_a,
-            &mut bank_b,
             &mut coin_a,
             &mut coin_b,
             500_000,
             500_000,
-            0,
-            0,
             ctx,
         );
 
@@ -1884,8 +1723,6 @@ module slamm::omm_tests {
         // we divide by ten to remove the rounding difference in the last digit
         assert_eq(vol_1.div(decimal::from(10)), vol_2.div(decimal::from(10)));
 
-        destroy(bank_a);
-        destroy(bank_b);
         destroy(price_info_a);
         destroy(price_info_b);
         destroy(registry);
@@ -1908,14 +1745,14 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, POOL_CREATOR);
 
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
-        let (clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
+        let (clock, lend_cap, lending_market, prices, bag) = suilend_setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         let ctx = ctx(&mut scenario);
 
         
         let price_info_a = test_utils::get_price_info(1, 1, 2, &clock, ctx); // price: 10
         let price_info_b = test_utils::get_price_info(2, 1, 2, &clock, ctx); // price: 10
 
-        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
+        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit, LENDING_MARKET>(
             Wit {},
             &mut registry,
             0, // swap fees BPS
@@ -1930,21 +1767,14 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let mut coin_a = coin::mint_for_testing<SUI>(500_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(500_000, ctx);
-
-        let mut bank_a = bank::create_bank<LENDING_MARKET, SUI>(&mut registry, ctx);
-        let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(500_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(500_000, ctx);
 
         let (lp_coins, _) = pool.deposit_liquidity(
-            &mut bank_a,
-            &mut bank_b,
             &mut coin_a,
             &mut coin_b,
             500_000,
             500_000,
-            0,
-            0,
             ctx,
         );
 
@@ -1992,8 +1822,6 @@ module slamm::omm_tests {
             trades = trades - 1;
         };
 
-        destroy(bank_a);
-        destroy(bank_b);
         destroy(price_info_a);
         destroy(price_info_b);
         destroy(registry);
@@ -2017,14 +1845,14 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, POOL_CREATOR);
 
         let mut registry = registry::init_for_testing(ctx(&mut scenario));
-        let (clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
+        let (clock, lend_cap, lending_market, prices, bag) = suilend_setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         let ctx = ctx(&mut scenario);
 
         
         let price_info_a = test_utils::zero_price_info(1, &clock, ctx);
         let price_info_b = test_utils::zero_price_info(2, &clock, ctx);
 
-        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit>(
+        let (mut pool, pool_cap) = omm::new<SUI, COIN, Wit, LENDING_MARKET>(
             Wit {},
             &mut registry,
             100, // admin fees BPS
@@ -2039,21 +1867,14 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let mut coin_a = coin::mint_for_testing<SUI>(500_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(500_000, ctx);
-
-        let mut bank_a = bank::create_bank<LENDING_MARKET, SUI>(&mut registry, ctx);
-        let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(500_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(500_000, ctx);
 
         let (lp_coins, _) = pool.deposit_liquidity(
-            &mut bank_a,
-            &mut bank_b,
             &mut coin_a,
             &mut coin_b,
             500_000,
             500_000,
-            0,
-            0,
             ctx,
         );
 
@@ -2064,8 +1885,8 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, TRADER);
         let ctx = ctx(&mut scenario);
 
-        let mut coin_a = coin::mint_for_testing<SUI>(e9(200), ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(0, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(e9(200), ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(0, ctx);
 
         let swap_intent = pool.omm_intent_swap(
             50_000,
@@ -2074,8 +1895,6 @@ module slamm::omm_tests {
         );
 
         pool.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -2085,8 +1904,6 @@ module slamm::omm_tests {
 
         destroy(coin_a);
         destroy(coin_b);
-        destroy(bank_a);
-        destroy(bank_b);
         destroy(price_info_a);
         destroy(price_info_b);
         destroy(registry);
@@ -2112,14 +1929,14 @@ module slamm::omm_tests {
 
         let mut registry_1 = registry::init_for_testing(ctx(&mut scenario));
         let mut registry_2 = registry::init_for_testing(ctx(&mut scenario));
-        let (mut clock, lend_cap, lending_market, prices, bag) = lending_market::setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
+        let (mut clock, lend_cap, lending_market, prices, bag) = suilend_setup(reserve_args(&mut scenario), &mut scenario).destruct_state();
         let ctx = ctx(&mut scenario);
 
         
         let price_info_a = test_utils::get_price_info(1, 1, 2, &clock, ctx); // price: 10
         let price_info_b = test_utils::get_price_info(2, 1, 2, &clock, ctx); // price: 10
 
-        let (mut pool_1, pool_cap_1) = omm::new<SUI, COIN, Wit>(
+        let (mut pool_1, pool_cap_1) = omm::new<SUI, COIN, Wit, LENDING_MARKET>(
             Wit {},
             &mut registry_1,
             0, // swap fees BPS
@@ -2134,7 +1951,7 @@ module slamm::omm_tests {
             ctx,
         );
         
-        let (mut pool_2, pool_cap_2) = omm::new<SUI, COIN, Wit>(
+        let (mut pool_2, pool_cap_2) = omm::new<SUI, COIN, Wit, LENDING_MARKET>(
             Wit {},
             &mut registry_2,
             0, // swap fees BPS
@@ -2149,33 +1966,22 @@ module slamm::omm_tests {
             ctx,
         );
 
-        let mut coin_a = coin::mint_for_testing<SUI>(1_000_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(1_000_000, ctx);
-
-        let mut bank_a = bank::create_bank<LENDING_MARKET, SUI>(&mut registry_1, ctx);
-        let mut bank_b = bank::create_bank<LENDING_MARKET, COIN>(&mut registry_2, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(1_000_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(1_000_000, ctx);
 
         let (lp_coins_1, _) = pool_1.deposit_liquidity(
-            &mut bank_a,
-            &mut bank_b,
             &mut coin_a,
             &mut coin_b,
             500_000,
             500_000,
-            0,
-            0,
             ctx,
         );
         
         let (lp_coins_2, _) = pool_2.deposit_liquidity(
-            &mut bank_a,
-            &mut bank_b,
             &mut coin_a,
             &mut coin_b,
             500_000,
             500_000,
-            0,
-            0,
             ctx,
         );
 
@@ -2186,8 +1992,8 @@ module slamm::omm_tests {
         test_scenario::next_tx(&mut scenario, TRADER);
         let ctx = ctx(&mut scenario);
 
-        let mut coin_a = coin::mint_for_testing<SUI>(100_000_000, ctx);
-        let mut coin_b = coin::mint_for_testing<COIN>(0, ctx);
+        let mut coin_a = coin::mint_for_testing<BToken<LENDING_MARKET, SUI>>(100_000_000, ctx);
+        let mut coin_b = coin::mint_for_testing<BToken<LENDING_MARKET, COIN>>(0, ctx);
 
         update_pool_oracle_price_ahead_of_trade(
             &mut pool_1,
@@ -2206,8 +2012,6 @@ module slamm::omm_tests {
         );
 
         pool_2.omm_execute_swap(
-            &mut bank_a,
-            &mut bank_b,
             swap_intent,
             &mut coin_a,
             &mut coin_b,
@@ -2220,8 +2024,6 @@ module slamm::omm_tests {
 
         destroy(coin_a);
         destroy(coin_b);
-        destroy(bank_a);
-        destroy(bank_b);
         destroy(price_info_a);
         destroy(price_info_b);
         destroy(registry_1);

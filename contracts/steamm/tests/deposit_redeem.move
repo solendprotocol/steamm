@@ -1,10 +1,10 @@
 #[test_only]
-module slamm::deposit_redeem {
-    use slamm::pool_math::{Self, quote_deposit_test, quote_redeem_test};
-    use slamm::test_utils;
-    use sui::test_utils::{destroy, assert_eq};
+module steamm::deposit_redeem {
     use std::u128::sqrt;
-    use slamm::math::{Self as slamm_math};
+    use sui::test_utils::{destroy, assert_eq};
+    use steamm::test_utils;
+    use steamm::pool_math::{Self, quote_deposit_test, quote_redeem_test};
+    use steamm::math::{Self as steamm_math};
 
     #[test]
     fun test_initial_deposit() {
@@ -18,8 +18,6 @@ module slamm::deposit_redeem {
         let quote = pool.quote_deposit_impl_test(
             5, // max_base
             5, // max_quote,
-            0, // min_a
-            0, // min_b
         );
 
         assert_eq(quote.initial_deposit(), true);
@@ -44,8 +42,6 @@ module slamm::deposit_redeem {
         let quote = pool.quote_deposit_impl_test(
             5, // max_base
             5, // max_quote,
-            0, // min_a
-            0, // min_b
         );
 
         assert_eq(quote.initial_deposit(), false);
@@ -160,8 +156,6 @@ module slamm::deposit_redeem {
             1_000_000_000, // lp_supply
             50_000_000, // max_base
             250_000_000, // max_quote,
-            0, // min_a
-            0, // min_b
         );
 
         assert_eq(delta_a, 50_000_000);
@@ -174,8 +168,6 @@ module slamm::deposit_redeem {
             1_000_000_000, // lp_supply
             993561515, // max_base
             4685420547, // max_quote,
-            0, // min_a
-            0, // min_b
         );
 
         assert_eq(delta_a, 993561515);
@@ -189,8 +181,6 @@ module slamm::deposit_redeem {
             1_000_000_000, // lp_supply
             167814009, // max_base
             5776084236, // max_quote,
-            0, // min_a
-            0, // min_b
         );
 
         assert_eq(delta_a, 167814009);
@@ -204,8 +194,6 @@ module slamm::deposit_redeem {
             1_000_000_000, // lp_supply
             5792262291, // max_base
             6821001626, // max_quote,
-            0, // min_a
-            0, // min_b
         );
 
         assert_eq(delta_a, 5792262291);
@@ -218,69 +206,45 @@ module slamm::deposit_redeem {
             1_000_000_000, // lp_supply
             1432889520, // max_base
             1335572325, // max_quote,
-            0, // min_a
-            0, // min_b
         );
 
         assert_eq(delta_a, 187021833);
         assert_eq(delta_b, 1335572325);
         assert_eq(lp_tokens, 29543417);
 
-        let (delta_a, delta_b, lp_tokens) = quote_deposit_test(420297244854, 316982205287, 6_606_760_618_411_090, 4995214965, 3570130297, 0, 0);
+        let (delta_a, delta_b, lp_tokens) = quote_deposit_test(420297244854, 316982205287, 6_606_760_618_411_090, 4995214965, 3570130297);
 
         assert_eq(delta_a, 4733754459);
         assert_eq(delta_b, 3570130297);
         assert_eq(lp_tokens, 74411105277849);
 
-        let (delta_a, delta_b, lp_tokens) = quote_deposit_test(413062764570, 603795453491, 1_121_070_850_572_460, 1537859755, 8438693476, 0, 0);
+        let (delta_a, delta_b, lp_tokens) = quote_deposit_test(413062764570, 603795453491, 1_121_070_850_572_460, 1537859755, 8438693476);
 
         assert_eq(delta_a, 1537859755);
         assert_eq(delta_b, 2247970062);
         assert_eq(lp_tokens, 4173820279815);
 
-        let (delta_a, delta_b, lp_tokens) = quote_deposit_test(307217683947, 761385620952, 4_042_886_943_071_790, 3998100768, 108790920, 0, 0);
+        let (delta_a, delta_b, lp_tokens) = quote_deposit_test(307217683947, 761385620952, 4_042_886_943_071_790, 3998100768, 108790920);
 
         assert_eq(delta_a, 43896935);
         assert_eq(delta_b, 108790920);
         assert_eq(lp_tokens, 577669682601);
 
-        let (delta_a, delta_b, lp_tokens) = quote_deposit_test(42698336282, 948435467841, 2_431_942_296_016_960, 6236994835, 8837546234, 0, 0);
+        let (delta_a, delta_b, lp_tokens) = quote_deposit_test(42698336282, 948435467841, 2_431_942_296_016_960, 6236994835, 8837546234);
 
         assert_eq(delta_a, 397864203);
         assert_eq(delta_b, 8837546234);
         assert_eq(lp_tokens, 22660901250767);
 
-        let (delta_a, delta_b, lp_tokens) = quote_deposit_test(861866936755, 638476503150, 244_488_474_179_102, 886029611, 7520096624, 0, 0);
+        let (delta_a, delta_b, lp_tokens) = quote_deposit_test(861866936755, 638476503150, 244_488_474_179_102, 886029611, 7520096624);
 
         assert_eq(delta_a, 886029611);
         assert_eq(delta_b, 656376366);
         assert_eq(lp_tokens, 251342775123);
     }
-    
-    #[test]
-    #[expected_failure(abort_code = pool_math::EDepositRatioLeadsToZeroB)]
-    fun test_fail_deposit_ratio_leads_to_zero() {
-        let (pool, bank_a, bank_b) = test_utils::new_for_testing(
-            5,
-            0,
-            sqrt(5 as u128) as u64,
-            0,
-        );
-
-        let _quote = pool.quote_deposit_impl_test(
-            5, // max_base
-            5, // max_quote,
-            0, // min_a
-            0, // min_b
-        );
-
-        destroy(pool);
-        destroy(bank_a);
-        destroy(bank_b);
-    }
 
     #[test]
-    #[expected_failure(abort_code = pool_math::EDepositMaxParamsCantBeZero)]
+    #[expected_failure(abort_code = pool_math::EDepositMaxAParamCantBeZero)]
     fun test_fail_max_params_as_zero() {
         let (pool, bank_a, bank_b) = test_utils::new_for_testing(
             5,
@@ -292,8 +256,7 @@ module slamm::deposit_redeem {
         let _quote = pool.quote_deposit_impl_test(
             0, // max_base
             0, // max_quote,
-            0, // min_a
-            0, // min_b
+
         );
 
         destroy(pool);
@@ -302,7 +265,7 @@ module slamm::deposit_redeem {
     }
     
     #[test]
-    #[expected_failure(abort_code = slamm_math::EMathOverflow)]
+    #[expected_failure(abort_code = steamm_math::EMathOverflow)]
     fun test_fail_deposit_maximally_imbalanced_pool() {
         let (pool, bank_a, bank_b) = test_utils::new_for_testing(
             1,
@@ -314,8 +277,6 @@ module slamm::deposit_redeem {
         let _quote = pool.quote_deposit_impl_test(
             50_000_000, // max_a
             50, // max_b,
-            0, // min_a
-            50_000_000, // min_b
         );
 
         destroy(pool);
