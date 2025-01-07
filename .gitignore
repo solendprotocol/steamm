@@ -12,3 +12,4 @@ grcov.log
 package-lock.json
 yarn.lock
 sui/*
+dist/*

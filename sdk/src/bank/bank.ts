@@ -122,43 +122,28 @@ export class Bank<
 
   // Client-side logic
 
-  public checkLendingAction(amount: bigint, isInput: boolean): LendingAction {
-    if (this.bank.lending == null) {
-      return LendingAction.None;
-    } else {
-      if (!isInput) {
-        if (amount > this.bank.fundsAvailable.value) {
-          return LendingAction.Recall;
-        }
-      }
+  public needsRebalance(
+    tx: Transaction = new Transaction()
+  ): TransactionArgument {
+    const callArgs = {
+      bank: tx.object(this.bank.id),
+      lendingMarket: tx.object(this.lendingMarket.id),
+      clock: tx.object(SUI_CLOCK_OBJECT_ID),
+    };
 
-      const fundsAvailableAfter = isInput
-        ? this.bank.fundsAvailable.value + amount
-        : this.bank.fundsAvailable.value - amount;
+    return BankFunctions.needsRebalance(tx, this.typeArgs(), callArgs);
+  }
 
-      const effectiveUtilisation = computeUtilisationBps(
-        fundsAvailableAfter,
-        this.bank.lending.fundsDeployed
-      );
+  public compoundInterest(
+    tx: Transaction = new Transaction()
+  ): TransactionArgument {
+    const callArgs = {
+      bank: tx.object(this.bank.id),
+      lendingMarket: tx.object(this.lendingMarket.id),
+      clock: tx.object(SUI_CLOCK_OBJECT_ID),
+    };
 
-      if (
-        effectiveUtilisation <
-        this.bank.lending.targetUtilisationBps -
-          this.bank.lending.utilisationBufferBps
-      ) {
-        return LendingAction.Recall;
-      }
-
-      if (
-        effectiveUtilisation >
-        this.bank.lending.targetUtilisationBps +
-          this.bank.lending.utilisationBufferBps
-      ) {
-        return LendingAction.Lend;
-      }
-
-      return LendingAction.None;
-    }
+    return BankFunctions.compoundInterestIfAny(tx, this.typeArgs(), callArgs);
   }
 
   // Getters
@@ -170,31 +155,13 @@ export class Bank<
   public viewTotalFunds(
     tx: Transaction = new Transaction()
   ): TransactionArgument {
-    return BankFunctions.totalFunds(
-      tx,
-      this.typeArgs(),
-      tx.object(this.bank.id)
-    );
-  }
+    const callArgs = {
+      bank: tx.object(this.bank.id),
+      lendingMarket: tx.object(this.lendingMarket.id),
+      clock: tx.object(SUI_CLOCK_OBJECT_ID),
+    };
 
-  public viewEffectiveUtilisationBps(
-    tx: Transaction = new Transaction()
-  ): TransactionArgument {
-    return BankFunctions.effectiveUtilisationBps(
-      tx,
-      this.typeArgs(),
-      tx.object(this.bank.id)
-    );
-  }
-
-  public viewFundsDeployed(
-    tx: Transaction = new Transaction()
-  ): TransactionArgument {
-    return BankFunctions.fundsDeployed(
-      tx,
-      this.typeArgs(),
-      tx.object(this.bank.id)
-    );
+    return BankFunctions.totalFunds(tx, this.typeArgs(), callArgs);
   }
 
   public viewFundsAvailable(
@@ -221,16 +188,6 @@ export class Bank<
     tx: Transaction = new Transaction()
   ): TransactionArgument {
     return BankFunctions.utilisationBufferBps(
-      tx,
-      this.typeArgs(),
-      tx.object(this.bank.id)
-    );
-  }
-
-  public viewFundsDeployedUnchecked(
-    tx: Transaction = new Transaction()
-  ): TransactionArgument {
-    return BankFunctions.fundsDeployedUnchecked(
       tx,
       this.typeArgs(),
       tx.object(this.bank.id)

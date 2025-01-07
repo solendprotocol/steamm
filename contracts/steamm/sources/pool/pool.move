@@ -525,7 +525,7 @@ module steamm::pool {
         pool.pool_fee_config = fees::new_config(swap_fee_bps, BPS_DENOMINATOR, 0);
     }
     
-    public fun set_redemption_swap_fees<A, B, Quoter: store, P>(
+    public fun set_redemption_fees<A, B, Quoter: store, P>(
         pool: &mut Pool<A, B, Quoter, P>,
         _pool_cap: &PoolCap<A, B, Quoter, P>,
         redemption_fee_bps: u64,

@@ -11,12 +11,11 @@ export type GenericHookType<T extends StructClass> = ToPhantomTypeArgument<
   PhantomReified<ToTypeStr<T>>
 >;
 
-export interface PoolTypes<A, B, HookType, W, State, P> {
+export interface PoolTypes<A, B, Quoter, W, P> {
   aType: A;
   bType: B;
-  hookType: HookType;
   wit: W;
-  state: State;
+  quoterType: Quoter;
   pType: P;
 }
 

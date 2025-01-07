@@ -43,8 +43,8 @@ export interface PoolRedeemLiquidityArgs {
 }
 
 export interface QuoteDepositArgs {
-  idealA: bigint | TransactionArgument;
-  idealB: bigint | TransactionArgument;
+  maxA: bigint | TransactionArgument;
+  maxB: bigint | TransactionArgument;
 }
 
 export interface PoolPrepareBankForPendingWithdrawArgs {

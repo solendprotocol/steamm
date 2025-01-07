@@ -10,6 +10,7 @@ module steamm::bank {
         coin::{Self, Coin},
     };
     use steamm::{
+        events::emit_event,
         bank_math,
         version::{Self, Version},
         registry::Registry,
@@ -61,6 +62,15 @@ module steamm::bank {
         obligation_cap: ObligationOwnerCap<P>,
     }
 
+    // ====== Events =====
+
+    // Events are the easiest way to observe the effect of a function
+    // call during a dry run.
+    public struct NeedsRebalanceEvent has store, copy, drop {
+        needs_rebalance: bool,
+    }
+    
+    
     // ====== Entry Functions =====
 
     #[allow(lint(share_owned))]
@@ -464,10 +474,14 @@ module steamm::bank {
         let target_utilisation_bps = bank.target_utilisation_bps_unchecked();
         let buffer_bps = bank.utilisation_buffer_bps_unchecked();
 
-        if (effective_utilisation_bps <= target_utilisation_bps + buffer_bps && effective_utilisation_bps >= target_utilisation_bps - buffer_bps) { false } else { true }
+        let needs_rebalance = if (effective_utilisation_bps <= target_utilisation_bps + buffer_bps && effective_utilisation_bps >= target_utilisation_bps - buffer_bps) { false } else { true };
+
+        emit_event(NeedsRebalanceEvent { needs_rebalance });
+
+        needs_rebalance
     }
 
-    fun compound_interest_if_any<P, T>(
+    public fun compound_interest_if_any<P, T>(
         bank: &Bank<P, T>,
         lending_market: &mut LendingMarket<P>,
         clock: &Clock,

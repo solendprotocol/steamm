@@ -1,10 +1,13 @@
 export {
   createBankAndShare,
+  needsRebalance,
+  compoundInterestIfAny,
+  mintBtokens,
+  burnBtokens,
   ctokenAmount,
   effectiveUtilisationBps,
   fundsAvailable,
   fundsDeployed,
-  fundsDeployedUnchecked,
   initLending,
   lending,
   migrateAsGlobalAdmin,
@@ -16,4 +19,4 @@ export {
   totalFunds,
   utilisationBufferBps,
   utilisationBufferBpsUnchecked,
-} from "./_generated/slamm/bank/functions";
+} from "./_generated/steamm/bank/functions";

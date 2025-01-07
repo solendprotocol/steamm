@@ -36,17 +36,16 @@ import { Bank } from "../bank/bank";
 export abstract class Pool<
   A extends PhantomTypeArgument,
   B extends PhantomTypeArgument,
-  Hook extends PhantomTypeArgument,
-  State extends TypeArgument,
+  Quoter extends TypeArgument,
   P extends PhantomTypeArgument
 > {
-  public pool: PoolObj<A, B, Hook, State>;
+  public pool: PoolObj<A, B, Quoter, P>;
   public bankA: Bank<P, A>;
   public bankB: Bank<P, B>;
   public lendingMarket: LendingMarketObj<P>;
 
   constructor(
-    pool: PoolObj<A, B, Hook, State>,
+    pool: PoolObj<A, B, Quoter, P>,
     bankA: Bank<P, A>,
     bankB: Bank<P, B>,
     lendingMarket: LendingMarketObj<P>
@@ -67,15 +66,13 @@ export abstract class Pool<
     A extends PhantomTypeArgument,
     B extends PhantomTypeArgument,
     P extends PhantomTypeArgument,
-    HookType extends PhantomTypeArgument,
-    StateType extends StructClass,
-    StateFields,
-    State extends Reified<StateType, StateFields>
+    QuoterType extends StructClass,
+    QuoterFields,
+    Quoter extends Reified<QuoterType, QuoterFields>
   >(
     aType: A,
     bType: B,
-    hookType: HookType,
-    state: State,
+    quoter: Quoter,
     pType: P,
     poolId: string,
     bankAId: string,
@@ -84,7 +81,7 @@ export abstract class Pool<
     client: SuiClient
   ): Promise<
     [
-      PoolObj<A, B, HookType, ToTypeArgument<State>>,
+      PoolObj<A, B, ToTypeArgument<Quoter>, P>,
       BankObj<P, A>,
       BankObj<P, B>,
       LendingMarketObj<P>
@@ -93,15 +90,15 @@ export abstract class Pool<
     const poolTypeArgs: [
       PhantomReified<A>,
       PhantomReified<B>,
-      PhantomReified<HookType>,
-      State
-    ] = [phantom(aType), phantom(bType), phantom(hookType), state];
+      Quoter,
+      PhantomReified<P>
+    ] = [phantom(aType), phantom(bType), quoter, phantom(pType)];
 
     const pool = await PoolObj.fetch<
       PhantomReified<A>,
       PhantomReified<B>,
-      PhantomReified<HookType>,
-      State
+      Quoter,
+      PhantomReified<P>
     >(client, poolTypeArgs, poolId);
 
     const bankATypeArgs: [PhantomReified<P>, PhantomReified<A>] = [
@@ -146,7 +143,7 @@ export abstract class Pool<
 
     const [lpCoin, depositResult] = PoolFunctions.depositLiquidity(
       tx,
-      this.typeArgsWithP(),
+      this.typeArgs(),
       callArgs
     );
     return [lpCoin, depositResult];
@@ -167,7 +164,7 @@ export abstract class Pool<
 
     const [coinA, coinB, redeemResult] = PoolFunctions.redeemLiquidity(
       tx,
-      this.typeArgsWithP(),
+      this.typeArgs(),
       callArgs
     );
     return [coinA, coinB, redeemResult];
@@ -179,8 +176,8 @@ export abstract class Pool<
   ): TransactionArgument {
     const callArgs = {
       pool: tx.object(this.pool.id),
-      idealA: args.idealA,
-      idealB: args.idealB,
+      maxA: args.maxA,
+      maxB: args.maxB,
     };
 
     const quote = PoolFunctions.quoteDeposit(tx, this.typeArgs(), callArgs);
@@ -198,26 +195,6 @@ export abstract class Pool<
 
     const quote = PoolFunctions.quoteRedeem(tx, this.typeArgs(), callArgs);
     return quote;
-  }
-
-  public prepareBankForPendingWithdraw(
-    args: PoolPrepareBankForPendingWithdrawArgs,
-    tx: Transaction = new Transaction()
-  ) {
-    const callArgs = {
-      pool: tx.object(this.pool.id),
-      bankA: tx.object(this.bankA.bank.id),
-      bankB: tx.object(this.bankB.bank.id),
-      lendingMarket: tx.object(this.lendingMarket.id),
-      intent: args.intent,
-      clock: tx.object(SUI_CLOCK_OBJECT_ID),
-    };
-
-    PoolFunctions.prepareBankForPendingWithdraw(
-      tx,
-      this.typeArgsWithP(),
-      callArgs
-    );
   }
 
   public setPoolSwapFees(
@@ -314,15 +291,9 @@ export abstract class Pool<
     return [coinA, coinB];
   }
 
-  public typeArgsWithP(): [string, string, string, string, string] {
-    const [typeA, typeB, typeHook, typeState] = this.pool.$typeArgs;
-    const [typeP, _] = this.bankA.bank.$typeArgs;
-    return [`${typeA}`, `${typeB}`, `${typeHook}`, `${typeState}`, `${typeP}`];
-  }
-
   public typeArgs(): [string, string, string, string] {
-    const [typeA, typeB, typeHook, typeState] = this.pool.$typeArgs;
-    return [`${typeA}`, `${typeB}`, `${typeHook}`, `${typeState}`];
+    const [typeA, typeB, typeQuoter, typeP] = this.pool.$typeArgs;
+    return [`${typeA}`, `${typeB}`, `${typeQuoter}`, `${typeP}`];
   }
 
   // Getter functions
@@ -330,27 +301,27 @@ export abstract class Pool<
   public viewTotalFunds(
     tx: Transaction = new Transaction()
   ): TransactionArgument {
-    return PoolFunctions.totalFunds(
+    return PoolFunctions.btokenAmounts(
       tx,
       this.typeArgs(),
       tx.object(this.pool.id)
     );
   }
 
-  public viewTotalFundsA(
+  public viewBtokenAmountA(
     tx: Transaction = new Transaction()
   ): TransactionArgument {
-    return PoolFunctions.totalFundsA(
+    return PoolFunctions.btokenAmountA(
       tx,
       this.typeArgs(),
       tx.object(this.pool.id)
     );
   }
 
-  public viewTotalFundsB(
+  public viewBtokenAmountB(
     tx: Transaction = new Transaction()
   ): TransactionArgument {
-    return PoolFunctions.totalFundsB(
+    return PoolFunctions.btokenAmountB(
       tx,
       this.typeArgs(),
       tx.object(this.pool.id)
@@ -397,8 +368,8 @@ export abstract class Pool<
     );
   }
 
-  public viewInner(tx: Transaction = new Transaction()): TransactionArgument {
-    return PoolFunctions.inner(tx, this.typeArgs(), tx.object(this.pool.id));
+  public viewQuoter(tx: Transaction = new Transaction()): TransactionArgument {
+    return PoolFunctions.quoter(tx, this.typeArgs(), tx.object(this.pool.id));
   }
 
   public viewTotalSwapAInAmount(

@@ -136,9 +136,9 @@ export interface SetPoolSwapFeesArgs { pool: TransactionObjectInput; poolCap: Tr
 
 export function setPoolSwapFees( tx: Transaction, typeArgs: [string, string, string, string], args: SetPoolSwapFeesArgs ) { return tx.moveCall({ target: `${PUBLISHED_AT}::pool::set_pool_swap_fees`, typeArguments: typeArgs, arguments: [ obj(tx, args.pool), obj(tx, args.poolCap), pure(tx, args.swapFeeBps, `u64`) ], }) }
 
-export interface SetRedemptionSwapFeesArgs { pool: TransactionObjectInput; poolCap: TransactionObjectInput; redemptionFeeBps: bigint | TransactionArgument }
+export interface SetRedemptionFeesArgs { pool: TransactionObjectInput; poolCap: TransactionObjectInput; redemptionFeeBps: bigint | TransactionArgument }
 
-export function setRedemptionSwapFees( tx: Transaction, typeArgs: [string, string, string, string], args: SetRedemptionSwapFeesArgs ) { return tx.moveCall({ target: `${PUBLISHED_AT}::pool::set_redemption_swap_fees`, typeArguments: typeArgs, arguments: [ obj(tx, args.pool), obj(tx, args.poolCap), pure(tx, args.redemptionFeeBps, `u64`) ], }) }
+export function setRedemptionFees( tx: Transaction, typeArgs: [string, string, string, string], args: SetRedemptionFeesArgs ) { return tx.moveCall({ target: `${PUBLISHED_AT}::pool::set_redemption_fees`, typeArguments: typeArgs, arguments: [ obj(tx, args.pool), obj(tx, args.poolCap), pure(tx, args.redemptionFeeBps, `u64`) ], }) }
 
 export interface SwapInnerArgs { quote: TransactionObjectInput; reserveIn: TransactionObjectInput; coinIn: TransactionObjectInput; lifetimeInAmount: bigint | TransactionArgument; protocolFeeBalance: TransactionObjectInput; reserveOut: TransactionObjectInput; coinOut: TransactionObjectInput; lifetimeOutAmount: bigint | TransactionArgument; lifetimeProtocolFee: bigint | TransactionArgument; lifetimePoolFee: bigint | TransactionArgument }
 

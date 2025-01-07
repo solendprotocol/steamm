@@ -4,4 +4,4 @@ export {
   MigrateAsGlobalAdminArgs,
   RebalanceArgs,
   SetUtilisationBpsArgs,
-} from "./_generated/slamm/bank/functions";
+} from "./_generated/steamm/bank/functions";

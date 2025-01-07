@@ -4,6 +4,8 @@ import {
   PhantomTypeArgument,
   ToTypeArgument,
   PhantomToTypeStr,
+  PhantomReified,
+  phantom,
 } from "../_codegen/_generated/_framework/reified";
 import {
   CpExecuteSwapArgs,
@@ -13,68 +15,62 @@ import {
   CpSwapArgs,
   SwapQuote,
 } from "./constantProductArgs";
-import { PKG_V1 } from "../_codegen/_generated/slamm";
+import { PKG_V1 } from "../_codegen/_generated/steamm";
 import {
-  Hook,
-  State,
-  StateFields,
-  StateReified,
-} from "../_codegen/_generated/slamm/cpmm/structs";
+  CpQuoter,
+  CpQuoterFields,
+  CpQuoterReified,
+} from "../_codegen/_generated/steamm/cpmm/structs";
 import { GenericHookType, ObjectIds, PoolTypes } from "../utils";
 import { Pool } from "../pool/pool";
 import { ConstantProductFunctions, LendingMarketObj, PoolObj } from "..";
 import { Bank } from "../bank/bank";
 import { MigrateArgs, MigrateAsGlobalAdminArgs } from "../pool/poolArgs";
 
-export type HookType<W extends PhantomTypeArgument> = GenericHookType<Hook<W>>;
-export type StateType = ToTypeArgument<StateReified>;
+export type CpQuoterType<W extends PhantomTypeArgument> = ToTypeArgument<
+  CpQuoterReified<W>
+>;
 
 export class ConstantProductPool<
   A extends PhantomTypeArgument,
   B extends PhantomTypeArgument,
   W extends PhantomTypeArgument,
   P extends PhantomTypeArgument
-> extends Pool<A, B, HookType<W>, StateType, P> {
-  public hook: Hook<W>;
+> extends Pool<A, B, CpQuoterType<W>, P> {
+  public quoter: CpQuoterType<W>;
 
   constructor(
-    pool: PoolObj<A, B, HookType<W>, State>,
+    pool: PoolObj<A, B, CpQuoter<W>, P>,
     bankA: Bank<P, A>,
     bankB: Bank<P, B>,
     lendingMarket: LendingMarketObj<P>,
-    hook: Hook<W>
+    quoter: CpQuoter<W>
   ) {
     super(pool, bankA, bankB, lendingMarket);
-    this.hook = hook;
+    this.quoter = quoter;
   }
 
   public async fetch(
-    poolTypes: PoolTypes<A, B, Hook<W>, W, State, P>,
+    poolTypes: PoolTypes<A, B, CpQuoter<W>, W, P>,
     objectIds: ObjectIds,
     client: SuiClient
   ): Promise<ConstantProductPool<A, B, W, P>> {
-    const { aType, bType, hookType, wit, pType } = poolTypes;
+    const { aType, bType, quoterType, wit, pType } = poolTypes;
     const { poolId, bankAId, bankBId, lendingMarketId } = objectIds;
 
-    const hookTypeName: HookType<W> = `${PKG_V1}::cpmm::Hook<${
-      wit as PhantomToTypeStr<W>
-    }>`;
-
-    const state = State.reified();
+    const quoter = CpQuoter.reified(phantom(wit));
 
     const [pool, bankAObj, bankBObj, lendingMarketObj] = await Pool.fetchState<
       A,
       B,
       P,
-      HookType<W>,
-      State,
-      StateFields,
-      StateReified
+      CpQuoter<W>,
+      CpQuoterFields<W>,
+      CpQuoterReified<W>
     >(
       aType,
       bType,
-      hookTypeName,
-      state,
+      quoter,
       pType,
       poolId,
       bankAId,
@@ -91,7 +87,7 @@ export class ConstantProductPool<
       bankA,
       bankB,
       lendingMarketObj,
-      hookType
+      quoterType
     );
   }
 
@@ -160,7 +156,7 @@ export class ConstantProductPool<
       minAmountOut: args.minAmountOut,
     };
 
-    ConstantProductFunctions.executeSwap(tx, this.rawTypeArgsWithP(), callArgs);
+    ConstantProductFunctions.executeSwap(tx, this.rawTypeArgs(), callArgs);
   }
 
   public async computeSwapQuote(
@@ -217,23 +213,15 @@ export class ConstantProductPool<
     return [`${this.pool.$fullTypeName}`];
   }
 
-  public rawTypeArgs(): [string, string, string] {
-    const [typeA, typeB, typeHook, typeState] = this.pool.$typeArgs;
-    const [typeW] = this.hook.$typeArgs;
-    return [`${typeA}`, `${typeB}`, `${typeW}`];
-  }
-
-  public rawTypeArgsWithP(): [string, string, string, string] {
-    const [typeA, typeB, typeHook, typeState] = this.pool.$typeArgs;
-    const [typeW] = this.hook.$typeArgs;
-    const [typeP, _] = this.bankA.bank.$typeArgs;
+  public rawTypeArgs(): [string, string, string, string] {
+    const [typeA, typeB, typeQuoter, typeP] = this.pool.$typeArgs;
+    const [typeW] = this.quoter.$typeArgs;
     return [`${typeA}`, `${typeB}`, `${typeW}`, `${typeP}`];
   }
 
   public rawTypeWithGenericHookArgs(): [string, string, string, string] {
-    const [typeA, typeB, typeHook, typeState] = this.pool.$typeArgs;
-    const [typeW] = this.hook.$typeArgs;
-    return [`${typeA}`, `${typeB}`, `${typeHook}`, `${typeState}`];
+    const [typeA, typeB, typeQuoter, typeP] = this.pool.$typeArgs;
+    return [`${typeA}`, `${typeB}`, `${typeQuoter}`, `${typeP}`];
   }
 
   // Getter functions

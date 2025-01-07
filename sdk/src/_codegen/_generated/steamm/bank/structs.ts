@@ -220,3 +220,71 @@ export class Lending<P extends PhantomTypeArgument> implements StructClass { __S
  return Lending.fromSuiObjectData( typeArg, res.data ); }
 
  }
+
+/* ============================== NeedsRebalanceEvent =============================== */
+
+export function isNeedsRebalanceEvent(type: string): boolean { type = compressSuiType(type); return type === `${PKG_V1}::bank::NeedsRebalanceEvent`; }
+
+export interface NeedsRebalanceEventFields { needsRebalance: ToField<"bool"> }
+
+export type NeedsRebalanceEventReified = Reified< NeedsRebalanceEvent, NeedsRebalanceEventFields >;
+
+export class NeedsRebalanceEvent implements StructClass { __StructClass = true as const;
+
+ static readonly $typeName = `${PKG_V1}::bank::NeedsRebalanceEvent`; static readonly $numTypeParams = 0; static readonly $isPhantom = [] as const;
+
+ readonly $typeName = NeedsRebalanceEvent.$typeName; readonly $fullTypeName: `${typeof PKG_V1}::bank::NeedsRebalanceEvent`; readonly $typeArgs: []; readonly $isPhantom = NeedsRebalanceEvent.$isPhantom;
+
+ readonly needsRebalance: ToField<"bool">
+
+ private constructor(typeArgs: [], fields: NeedsRebalanceEventFields, ) { this.$fullTypeName = composeSuiType( NeedsRebalanceEvent.$typeName, ...typeArgs ) as `${typeof PKG_V1}::bank::NeedsRebalanceEvent`; this.$typeArgs = typeArgs;
+
+ this.needsRebalance = fields.needsRebalance; }
+
+ static reified( ): NeedsRebalanceEventReified { return { typeName: NeedsRebalanceEvent.$typeName, fullTypeName: composeSuiType( NeedsRebalanceEvent.$typeName, ...[] ) as `${typeof PKG_V1}::bank::NeedsRebalanceEvent`, typeArgs: [ ] as [], isPhantom: NeedsRebalanceEvent.$isPhantom, reifiedTypeArgs: [], fromFields: (fields: Record<string, any>) => NeedsRebalanceEvent.fromFields( fields, ), fromFieldsWithTypes: (item: FieldsWithTypes) => NeedsRebalanceEvent.fromFieldsWithTypes( item, ), fromBcs: (data: Uint8Array) => NeedsRebalanceEvent.fromBcs( data, ), bcs: NeedsRebalanceEvent.bcs, fromJSONField: (field: any) => NeedsRebalanceEvent.fromJSONField( field, ), fromJSON: (json: Record<string, any>) => NeedsRebalanceEvent.fromJSON( json, ), fromSuiParsedData: (content: SuiParsedData) => NeedsRebalanceEvent.fromSuiParsedData( content, ), fromSuiObjectData: (content: SuiObjectData) => NeedsRebalanceEvent.fromSuiObjectData( content, ), fetch: async (client: SuiClient, id: string) => NeedsRebalanceEvent.fetch( client, id, ), new: ( fields: NeedsRebalanceEventFields, ) => { return new NeedsRebalanceEvent( [], fields ) }, kind: "StructClassReified", } }
+
+ static get r() { return NeedsRebalanceEvent.reified() }
+
+ static phantom( ): PhantomReified<ToTypeStr<NeedsRebalanceEvent>> { return phantom(NeedsRebalanceEvent.reified( )); } static get p() { return NeedsRebalanceEvent.phantom() }
+
+ static get bcs() { return bcs.struct("NeedsRebalanceEvent", {
+
+ needs_rebalance: bcs.bool()
+
+}) };
+
+ static fromFields( fields: Record<string, any> ): NeedsRebalanceEvent { return NeedsRebalanceEvent.reified( ).new( { needsRebalance: decodeFromFields("bool", fields.needs_rebalance) } ) }
+
+ static fromFieldsWithTypes( item: FieldsWithTypes ): NeedsRebalanceEvent { if (!isNeedsRebalanceEvent(item.type)) { throw new Error("not a NeedsRebalanceEvent type");
+
+ }
+
+ return NeedsRebalanceEvent.reified( ).new( { needsRebalance: decodeFromFieldsWithTypes("bool", item.fields.needs_rebalance) } ) }
+
+ static fromBcs( data: Uint8Array ): NeedsRebalanceEvent { return NeedsRebalanceEvent.fromFields( NeedsRebalanceEvent.bcs.parse(data) ) }
+
+ toJSONField() { return {
+
+ needsRebalance: this.needsRebalance,
+
+} }
+
+ toJSON() { return { $typeName: this.$typeName, $typeArgs: this.$typeArgs, ...this.toJSONField() } }
+
+ static fromJSONField( field: any ): NeedsRebalanceEvent { return NeedsRebalanceEvent.reified( ).new( { needsRebalance: decodeFromJSONField("bool", field.needsRebalance) } ) }
+
+ static fromJSON( json: Record<string, any> ): NeedsRebalanceEvent { if (json.$typeName !== NeedsRebalanceEvent.$typeName) { throw new Error("not a WithTwoGenerics json object") };
+
+ return NeedsRebalanceEvent.fromJSONField( json, ) }
+
+ static fromSuiParsedData( content: SuiParsedData ): NeedsRebalanceEvent { if (content.dataType !== "moveObject") { throw new Error("not an object"); } if (!isNeedsRebalanceEvent(content.type)) { throw new Error(`object at ${(content.fields as any).id} is not a NeedsRebalanceEvent object`); } return NeedsRebalanceEvent.fromFieldsWithTypes( content ); }
+
+ static fromSuiObjectData( data: SuiObjectData ): NeedsRebalanceEvent { if (data.bcs) { if (data.bcs.dataType !== "moveObject" || !isNeedsRebalanceEvent(data.bcs.type)) { throw new Error(`object at is not a NeedsRebalanceEvent object`); }
+
+ return NeedsRebalanceEvent.fromBcs( fromB64(data.bcs.bcsBytes) ); } if (data.content) { return NeedsRebalanceEvent.fromSuiParsedData( data.content ) } throw new Error( "Both `bcs` and `content` fields are missing from the data. Include `showBcs` or `showContent` in the request." ); }
+
+ static async fetch( client: SuiClient, id: string ): Promise<NeedsRebalanceEvent> { const res = await client.getObject({ id, options: { showBcs: true, }, }); if (res.error) { throw new Error(`error fetching NeedsRebalanceEvent object at id ${id}: ${res.error.code}`); } if (res.data?.bcs?.dataType !== "moveObject" || !isNeedsRebalanceEvent(res.data.bcs.type)) { throw new Error(`object at id ${id} is not a NeedsRebalanceEvent object`); }
+
+ return NeedsRebalanceEvent.fromSuiObjectData( res.data ); }
+
+ }

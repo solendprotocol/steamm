@@ -8,4 +8,4 @@ export {
   k,
   migrate,
   migrateAsGlobalAdmin,
-} from "./_generated/slamm/cpmm/functions";
+} from "./_generated/steamm/cpmm/functions";
