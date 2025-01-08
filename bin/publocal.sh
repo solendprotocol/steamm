@@ -104,7 +104,7 @@ publish_package() {
     
     # Change to package directory
     cd "$FOLDER_NAME"
-    PACKAGE_ID=$(sui client publish --silence-warnings --no-lint --json --install-dir "$FOLDER_NAME" | grep -A 3 '"type": "published"' | grep "packageId" | cut -d'"' -f4)
+    PACKAGE_ID=$(sui client publish --silence-warnings --no-lint --json | grep -A 3 '"type": "published"' | grep "packageId" | cut -d'"' -f4)
     cd "$INITIAL_DIR"
 
     if [ -z "$PACKAGE_ID" ]; then
