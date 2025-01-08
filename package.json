@@ -15,7 +15,8 @@
     "eslint": "eslint --fix \"./sdk/src/**/*.ts\"",
     "prettier": "prettier --write \"./sdk/src/**/*\"",
     "lint": "bun eslint && bun prettier",
-    "release": "bun run build && bun ts-node ./prepublish.ts && cd ./dist && npm publish --access public"
+    "release": "bun run build && bun ts-node ./prepublish.ts && cd ./dist && npm publish --access public",
+    "test": "bun test"
   },
   "dependencies": {
     "@mysten/sui": "^1.9.0",
@@ -24,8 +25,10 @@
   "devDependencies": {
     "@types/bn.js": "^5.1.6",
     "@types/chai": "^4.3.19",
-    "@types/jest": "^29.5.13",
+    "@types/jest": "^29.5.14",
+    "babel-jest": "^29.7.0",
     "chai": "^5.1.1",
-    "jest": "^29.7.0"
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5"
   }
 }

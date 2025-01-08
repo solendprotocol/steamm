@@ -26,19 +26,15 @@ build: _check_sui
 test: _check_sui
     sui move test -p steamm --gas-limit 5000000000000
 
-# Deploys all Sui packages
-publish: _check_sui
-    sui client publish steamm
-
 # Starts a localnet faucet process on port 9123 that airdrops 500 SUI
-lfaucet: _check_sui
-    sui-faucet --write-ahead-log $HOME/.sui/sui_config/faucet.wal --port 9123 --amount 500000000000
+faucet: _check_sui
+    ../sui/sui-faucet --write-ahead-log $HOME/.sui/sui_config/faucet.wal --port 9123 --amount 500000000000
 
 # Resets localnet state and starts the network
-lfresh: _check_sui
+localnew: _check_sui
     sui genesis -f
     sui start
 
 # Starts the localnet network
-lresume: _check_sui
+local: _check_sui
     sui start
