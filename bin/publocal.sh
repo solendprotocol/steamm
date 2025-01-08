@@ -109,7 +109,7 @@ publish_package() {
 
     if [ -z "$PACKAGE_ID" ]; then
         echo "Error: Package ID is empty"
-        # ./bin/unpublocal.sh # cleanup
+        ./bin/unpublocal.sh # cleanup
         exit 1
     fi
 
