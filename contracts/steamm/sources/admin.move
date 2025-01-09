@@ -1,3 +1,5 @@
+/// Module containing the global admin capability object. The admin capability
+/// is used to perform privileged operations across the protocol.
 module steamm::global_admin;
 
 public struct GlobalAdmin has key, store {

@@ -1,4 +1,4 @@
-/// Constant-Product AMM Hook implementation
+/// Constant-Product AMM Quoter implementation
 module steamm::cpmm;
 
 use std::option::none;
@@ -19,7 +19,7 @@ const CURRENT_VERSION: u16 = 1;
 const EInvariantViolation: u64 = 1;
 const EZeroInvariant: u64 = 2;
 
-/// Hook type for the constant-product AMM implementation. Serves as both
+/// Quoter type for the constant-product AMM implementation. Serves as both
 /// the hook's witness (authentication) as well as it wraps around the pool
 /// creator's witness.
 ///
@@ -29,7 +29,7 @@ const EZeroInvariant: u64 = 2;
 /// Other hook implementations can decide to leverage this property and
 /// provide pathways for the inner witness contract to add further logic,
 /// therefore making the hook extendable.
-// public struct Hook<phantom W> has drop {}
+// public struct Quoter<phantom W> has drop {}
 
 /// Constant-Product AMM specific state. We do not store the invariant,
 /// instead we compute it at runtime.

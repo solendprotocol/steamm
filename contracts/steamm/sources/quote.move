@@ -1,4 +1,6 @@
-/// Module for informative structs which provide the input/outputs of a given quotation.
+/// Module containing quote types and utilities for AMM operations like swaps,
+/// deposits and redemptions. The quote types are used to represent the expected
+/// outcomes of these operations.
 module steamm::quote;
 
 use suilend::decimal::{Self, Decimal};

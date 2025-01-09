@@ -1,7 +1,5 @@
-/// AMM Pool module. It contains the core logic of the of the AMM,
-/// such as the deposit and redeem logic, which is exposed and should be
-/// called directly. Is also exports an intializer and swap method to be
-/// called by the hook modules.
+/// Module containing package math functions for pool operations
+/// such as deposits, redeems, and swaps
 module steamm::pool_math;
 
 use std::u128::sqrt;
@@ -26,6 +24,14 @@ const EDepositRatioLeadsToZeroA: u64 = 8;
 
 // ===== Package functions =====
 
+/// Calculates the amount of tokens A and B to deposit and LP tokens to mint
+/// @param reserve_a Current reserve of token A in the pool
+/// @param reserve_b Current reserve of token B in the pool
+/// @param lp_supply Total supply of LP tokens
+/// @param max_a Maximum amount of token A user is willing to deposit
+/// @param max_b Maximum amount of token B user is willing to deposit
+/// 
+/// @return (delta_a, delta_b, delta_lp) Tuple of token amounts to deposit and LP tokens to mint
 public(package) fun quote_deposit(
     reserve_a: u64,
     reserve_b: u64,
@@ -52,6 +58,15 @@ public(package) fun quote_deposit(
     (delta_a, delta_b, delta_lp)
 }
 
+/// Calculates the amount of tokens A and B to be redeemed for a given amount of LP tokens
+/// @param reserve_a Current reserve of token A in the pool
+/// @param reserve_b Current reserve of token B in the pool
+/// @param lp_supply Total supply of LP tokens
+/// @param lp_tokens Amount of LP tokens to redeem
+/// @param min_a Minimum amount of token A user is willing to receive
+/// @param min_b Minimum amount of token B user is willing to receive
+/// 
+/// @return (withdraw_a, withdraw_b) Tuple of token amounts to be redeemed
 public(package) fun quote_redeem(
     reserve_a: u64,
     reserve_b: u64,
@@ -72,6 +87,11 @@ public(package) fun quote_redeem(
     (withdraw_a, withdraw_b)
 }
 
+/// Asserts that the ratio between LP supply and reserves remains favorable for the pool
+/// @param initial_reserve_a Initial reserve of token A in the pool
+/// @param initial_lp_supply Initial total supply of LP tokens
+/// @param final_reserve_a Final reserve of token A in the pool
+/// @param final_lp_supply Final total supply of LP tokens
 public(package) fun assert_lp_supply_reserve_ratio(
     initial_reserve_a: u64,
     initial_lp_supply: u64,
@@ -87,6 +107,13 @@ public(package) fun assert_lp_supply_reserve_ratio(
 
 // ===== Private functions =====
 
+/// Calculates the optimal deposit amounts for both tokens while maintaining the pool ratio
+/// @param reserve_a Current reserve of token A in the pool
+/// @param reserve_b Current reserve of token B in the pool
+/// @param max_a Maximum amount of token A user is willing to deposit
+/// @param max_b Maximum amount of token B user is willing to deposit
+/// 
+/// @return (amount_a, amount_b) Tuple of optimal deposit amounts for tokens A and B
 fun tokens_to_deposit(reserve_a: u64, reserve_b: u64, max_a: u64, max_b: u64): (u64, u64) {
     assert!(max_a > 0, EDepositMaxAParamCantBeZero);
 
@@ -103,6 +130,14 @@ fun tokens_to_deposit(reserve_a: u64, reserve_b: u64, max_a: u64, max_b: u64): (
     }
 }
 
+/// Calculates the amount of LP tokens to mint for a given deposit
+/// @param reserve_a Current reserve of token A in the pool
+/// @param reserve_b Current reserve of token B in the pool
+/// @param lp_supply Current total supply of LP tokens
+/// @param amount_a Amount of token A being deposited
+/// @param amount_b Amount of token B being deposited
+/// 
+/// @return Amount of LP tokens to mint
 fun lp_tokens_to_mint(
     reserve_a: u64,
     reserve_b: u64,

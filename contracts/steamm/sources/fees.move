@@ -1,3 +1,6 @@
+/// Module containing fee-related structs and functions for managing protocol fees,
+/// pool fees and redemption fees. Provides utilities for fee configuration and
+/// fee collection.
 module steamm::fees;
 
 use sui::balance::{Self, Balance};

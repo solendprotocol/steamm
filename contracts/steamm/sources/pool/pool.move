@@ -1,7 +1,7 @@
 /// AMM Pool module. It contains the core logic of the of the AMM,
 /// such as the deposit and redeem logic, which is exposed and should be
 /// called directly. Is also exports an intializer and swap method to be
-/// called by the hook modules.
+/// called by the quoter modules.
 module steamm::pool;
 
 use steamm::events::emit_event;
@@ -60,7 +60,7 @@ const EInsufficientFunds: u64 = 6;
 /// pool per type, albeit given the permissionless aspect of the pool
 /// creation, we allow for pool creators to export their own types. The creator's
 /// type is not explicitly expressed in the generic types of this struct,
-/// instead the hooks types in our implementations follow the `Hook<phantom W>`
+/// instead the quoters types in our implementations follow the `Quoter<phantom W>`
 /// schema. This has the advantage that we do not require an extra generic
 /// type on the `LP` as well as on the `Pool`
 public struct LP<phantom A, phantom B, phantom Quoter: store> has copy, drop {}
@@ -73,27 +73,26 @@ public struct PoolCap<phantom A, phantom B, phantom Quoter: store> has key {
 
 /// AMM pool object. This object is the top-level object and sits at the
 /// core of the protocol. The generic types `A` and `B` correspond to the
-/// associated coin types of the AMM. The `Hook` type corresponds to the
-/// witness type of the associated hook module, whereas the `State` type
-/// corresponds the hooks state object, meant to store implementation-specific
-/// data. The pool object contains the core of the AMM logic, which all hooks
-/// rely on.
+/// associated coin types of the AMM. The `Quoter` type corresponds to the
+/// type of the associated quoter module, which is itself the state object of said
+/// quoter, meant to store implementation-specific data. The pool object contains
+/// the core of the AMM logic, which all quoters rely on.
 ///
 /// It stores the pool's liquidity, protocol fees, the lp supply object
-/// as well as the inner state of the associated Hook.
+/// as well as the inner state of the associated Quoter.
 ///
 /// The pool object is mostly responsible to providing the liquidity depositing
-/// and withdrawal logic, which can be directly called without relying on a hook's wrapper,
+/// and withdrawal logic, which can be directly called without relying on a quoter's wrapper,
 /// as well as the computation of the fees for a given swap. From a perspective of the pool
-/// module, the Pool does not rely on the hook as a trustfull oracle for computing fees.
+/// module, the Pool does not rely on the quoter as a trustfull oracle for computing fees.
 /// Instead the Pool will compute fees on the amount_out of the swap and therefore
-/// inform the hook on what the fees will be for the given swap.
+/// inform the quoter on what the fees will be for the given swap.
 ///
 /// Moreover this object also exports an initalizer and a swap method which
-/// are meant to be called by the associated hook module.
+/// are meant to be called by the associated quoter module.
 public struct Pool<phantom A, phantom B, Quoter: store> has key, store {
     id: UID,
-    // Inner state of the hook
+    // Inner state of the quoter
     quoter: Quoter,
     balance_a: Balance<A>,
     balance_b: Balance<B>,
@@ -134,14 +133,15 @@ public struct TradingData has store {
 /// specified protocol fees, and the provided swap fee. The pool's LP supply
 /// object is initialized at zero supply and the pool is added to the `registry`.
 ///
-/// This function is meant to be called by the hook module and therefore it
+/// This function is meant to be called by the quoter module and therefore it
 /// it witness-protected.
+/// 
+/// @param registry The registry to add the pool to
+/// @param swap_fee_bps The pool's swap fee in basis points
+/// @param quoter The quoter module's state object
 ///
-/// # Returns
-///
-/// A tuple containing:
-/// - `Pool<A, B, Quoter, P>`: The created AMM pool object.
-/// - `PoolCap<A, B, Quoter, P>`: The associated pool capability object.
+/// @return (pool, pool_cap) Tuple containing the created AMM pool object and
+/// its associated capability object
 ///
 /// # Panics
 ///
@@ -202,17 +202,20 @@ public(package) fun new<A, B, Quoter: store>(
     (pool, pool_cap)
 }
 
-/// Executes inner swap logic that is generalised accross all hooks. It takes
+/// Executes inner swap logic that is generalised accross all quoters. It takes
 /// care of fee handling, management of fund inputs and outputs as well
 /// as slippage protections.
 ///
-/// This function is meant to be called by the hook module and therefore it
-/// it witness-protected.
+/// This function is meant to be called by the quoter module and therefore being
+/// a package function.
 ///
-/// # Returns
-///
-/// `SwapResult`: An object containing details of the executed swap,
-/// including input and output amounts, fees, and the direction of the swap.
+/// @param pool Pool object to execute the swap on
+/// @param coin_a Coin A object to swap from/to
+/// @param coin_b Coin B object to swap from/to
+/// @param quote Quote object containing swap parameters and fee information
+/// @param min_amount_out Minimum amount of output tokens user is willing to receive
+/// 
+/// @return SwapResult object containing details of the executed swap including amounts and fees
 ///
 /// # Panics
 ///
@@ -289,11 +292,13 @@ public(package) fun swap<A, B, Quoter: store>(
 /// This function ensures that liquidity is added to the pool in a
 /// balanced manner, maintaining the pool's reserves and LP supply ratio.
 ///
-/// # Returns
-///
-/// A tuple containing:
-/// - `Coin<LP<A, B, Quoter>>`: The minted LP tokens for the depositor.
-/// - `DepositResult`: An object containing details of the deposit, including the amounts of coins `A` and `B` deposited and the number of LP tokens minted.
+/// @param pool The pool to deposit liquidity into
+/// @param coin_a The coin A to deposit
+/// @param coin_b The coin B to deposit 
+/// @param max_a Maximum amount of coin A to deposit
+/// @param max_b Maximum amount of coin B to deposit
+/// 
+/// @return (lp_coins, result) Tuple containing the minted LP tokens and deposit details
 ///
 /// # Panics
 ///
@@ -372,14 +377,15 @@ public fun deposit_liquidity<A, B, Quoter: store>(
 /// Liquidity is redeemed from the pool in a balanced manner,
 /// maintaining the pool's reserves and LP supply ratio.
 ///
-/// # Returns
+/// @param pool The pool to redeem liquidity from
+/// @param lp_tokens The LP tokens to burn
+/// @param min_a Minimum amount of coin A to receive
+/// @param min_b Minimum amount of coin B to receive
 ///
-/// A tuple containing:
-/// - `Coin<A>`: The withdrawn amount of coin `A`.
-/// - `Coin<B>`: The withdrawn amount of coin `B`.
-/// - `RedeemResult`: An object containing details of the redeem transaction,
-/// including the amounts of coins `A` and `B` withdrawn and the
-/// number of LP tokens burned.
+/// @return (coin_a, coin_b, result) Tuple containing:
+/// - coin_a: The withdrawn amount of coin A
+/// - coin_b: The withdrawn amount of coin B  
+/// - result: Details of the redemption including amounts and fees
 ///
 /// # Panics
 ///

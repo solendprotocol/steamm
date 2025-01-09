@@ -1,3 +1,4 @@
+/// Math utilities for bank operations like computing recalls and utilisation.
 #[allow(lint(share_owned))]
 module steamm::bank_math;
 
