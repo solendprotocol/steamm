@@ -6,6 +6,7 @@ use std::option::none;
 use std::string;
 use std::type_name::{get, TypeName};
 use steamm::bank_math;
+use steamm::registry::Registry;
 use steamm::events::emit_event;
 use steamm::global_admin::GlobalAdmin;
 use steamm::utils::get_type_reflection;
@@ -77,12 +78,14 @@ public struct Lending<phantom P> has store {
 /// * `ID` - The object ID of the created bank
 #[allow(lint(share_owned))]
 public entry fun create_bank_and_share<P, T, BToken: drop>(
+    registry: &mut Registry,
     meta_t: &CoinMetadata<T>,
     meta_b: &mut CoinMetadata<BToken>,
     btoken_treasury: TreasuryCap<BToken>,
     ctx: &mut TxContext,
 ): ID {
     let bank = create_bank<P, T, BToken>(
+        registry,
         meta_t,
         meta_b,
         btoken_treasury,
@@ -345,6 +348,7 @@ entry fun migrate<P, T, BToken>(bank: &mut Bank<P, T, BToken>, _admin: &GlobalAd
 // ====== Package Functions =====
 
 public(package) fun create_bank<P, T, BToken: drop>(
+    registry: &mut Registry,
     meta_t: &CoinMetadata<T>,
     meta_b: &mut CoinMetadata<BToken>,
     btoken_treasury: TreasuryCap<BToken>,
@@ -362,6 +366,8 @@ public(package) fun create_bank<P, T, BToken: drop>(
         btoken_supply: btoken_treasury.treasury_into_supply(),
         version: version::new(CURRENT_VERSION),
     };
+
+    registry.add_bank<_, T>(&bank);
 
     emit_event(NewBankEvent {
         bank_id: object::id(&bank),

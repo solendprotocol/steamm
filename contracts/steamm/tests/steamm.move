@@ -12,7 +12,7 @@ use steamm::pool_math;
 use steamm::quote;
 use steamm::test_utils::{test_setup_dummy, test_setup_cpmm, e9, reserve_args};
 use sui::coin;
-use sui::test_scenario::{Self, ctx};
+use sui::test_scenario::{Self, Scenario, ctx};
 use sui::test_utils::{destroy, assert_eq};
 use suilend::lending_market_tests::setup as suilend_setup;
 
@@ -24,8 +24,9 @@ const TRADER: address = @0x13;
 #[test_only]
 fun test_setup_dummy_no_banks(
     swap_fee_bps: u64,
+    scenario: &mut Scenario,
 ): Pool<B_TEST_USDC, B_TEST_SUI, DummyQuoter, LP_USDC_SUI> {
-    let (pool, bank_a, bank_b) = test_setup_dummy(swap_fee_bps);
+    let (pool, bank_a, bank_b) = test_setup_dummy(swap_fee_bps, scenario);
 
     destroy(bank_a);
     destroy(bank_b);
@@ -45,9 +46,8 @@ fun test_steamm_deposit_redeem_swap() {
         &mut scenario,
     ).destruct_state();
 
+    let mut pool = test_setup_dummy_no_banks(100, &mut scenario);
     let ctx = ctx(&mut scenario);
-
-    let mut pool = test_setup_dummy_no_banks(100);
 
     pool.no_redemption_fees_for_testing();
 
@@ -171,9 +171,8 @@ fun test_full_amm_cycle() {
         &mut scenario,
     ).destruct_state();
 
+    let mut pool = test_setup_dummy_no_banks(100, &mut scenario);
     let ctx = ctx(&mut scenario);
-
-    let mut pool = test_setup_dummy_no_banks(100);
 
     pool.no_redemption_fees_for_testing();
 
@@ -340,9 +339,8 @@ fun test_fail_swap_slippage() {
         &mut scenario,
     ).destruct_state();
 
+    let mut pool = test_setup_dummy_no_banks(100, &mut scenario);
     let ctx = ctx(&mut scenario);
-
-    let mut pool = test_setup_dummy_no_banks(100);
 
     let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(e9(1_000), ctx);
     let mut coin_b = coin::mint_for_testing<B_TEST_SUI>(e9(500_000), ctx);
@@ -416,9 +414,8 @@ fun test_fail_swap_insufficient_funds() {
         &mut scenario,
     ).destruct_state();
 
+    let mut pool = test_setup_dummy_no_banks(100, &mut scenario);
     let ctx = ctx(&mut scenario);
-
-    let mut pool = test_setup_dummy_no_banks(100);
 
     let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(e9(1_000), ctx);
     let mut coin_b = coin::mint_for_testing<B_TEST_SUI>(e9(500_000), ctx);
@@ -486,9 +483,8 @@ fun test_fail_redeem_slippage_a() {
         &mut scenario,
     ).destruct_state();
 
+    let mut pool = test_setup_dummy_no_banks(100, &mut scenario);
     let ctx = ctx(&mut scenario);
-
-    let mut pool = test_setup_dummy_no_banks(100);
 
     let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(e9(1_000), ctx);
     let mut coin_b = coin::mint_for_testing<B_TEST_SUI>(e9(500_000), ctx);
@@ -579,9 +575,8 @@ fun test_fail_redeem_slippage_b() {
         &mut scenario,
     ).destruct_state();
 
+    let mut pool = test_setup_dummy_no_banks(100, &mut scenario);
     let ctx = ctx(&mut scenario);
-
-    let mut pool = test_setup_dummy_no_banks(100);
 
     let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(e9(1_000), ctx);
     let mut coin_b = coin::mint_for_testing<B_TEST_SUI>(e9(500_000), ctx);
@@ -672,7 +667,7 @@ fun test_fail_fee_above_100() {
         &mut scenario,
     ).destruct_state();
 
-    let pool = test_setup_dummy_no_banks(10_000 + 1);
+    let pool = test_setup_dummy_no_banks(10_000 + 1, &mut scenario);
 
     destroy(pool);
     destroy(lend_cap);
@@ -695,11 +690,11 @@ fun test_steamm_fees() {
         &mut scenario,
     ).destruct_state();
 
+    let mut pool = test_setup_dummy_no_banks(100, &mut scenario);
+
+    let mut pool_2 = test_setup_dummy_no_banks(100, &mut scenario);
+    
     let ctx = ctx(&mut scenario);
-
-    let mut pool = test_setup_dummy_no_banks(100);
-    let mut pool_2 = test_setup_dummy_no_banks(100);
-
     let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(e9(200_000_000), ctx);
     let mut coin_b = coin::mint_for_testing<B_TEST_SUI>(e9(200_000_000), ctx);
 
@@ -832,9 +827,9 @@ fun test_output_exceeds_liquidity() {
 
     // Init Pool
     test_scenario::next_tx(&mut scenario, POOL_CREATOR);
-    let ctx = ctx(&mut scenario);
 
-    let mut pool = test_setup_dummy_no_banks(100);
+    let mut pool = test_setup_dummy_no_banks(100, &mut scenario);
+    let ctx = ctx(&mut scenario);
 
     // Deposit funds in AMM Pool
     let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(500_000, ctx);
@@ -896,9 +891,8 @@ fun test_redeem_fees() {
         &mut scenario,
     ).destruct_state();
 
+    let mut pool = test_setup_dummy_no_banks(100, &mut scenario);
     let ctx = ctx(&mut scenario);
-
-    let mut pool = test_setup_dummy_no_banks(100);
 
     let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(e9(100_000), ctx);
     let mut coin_b = coin::mint_for_testing<B_TEST_SUI>(e9(100_000), ctx);
@@ -952,9 +946,8 @@ fun test_min_redeem_fees_ceil() {
         &mut scenario,
     ).destruct_state();
 
+    let mut pool = test_setup_dummy_no_banks(100, &mut scenario);
     let ctx = ctx(&mut scenario);
-
-    let mut pool = test_setup_dummy_no_banks(100);
 
     let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(e9(100_000), ctx);
     let mut coin_b = coin::mint_for_testing<B_TEST_SUI>(e9(100_000), ctx);
@@ -1010,9 +1003,8 @@ fun test_min_redeem_fees() {
         &mut scenario,
     ).destruct_state();
 
+    let mut pool = test_setup_dummy_no_banks(100, &mut scenario);
     let ctx = ctx(&mut scenario);
-
-    let mut pool = test_setup_dummy_no_banks(100);
 
     pool.no_redemption_fees_for_testing_with_min_fee();
 
@@ -1070,9 +1062,8 @@ fun test_one_sided_deposit() {
         &mut scenario,
     ).destruct_state();
 
+    let (mut pool, bank_a, bank_b) = test_setup_cpmm(100, 20, &mut scenario);
     let ctx = ctx(&mut scenario);
-
-    let (mut pool, bank_a, bank_b) = test_setup_cpmm(100, 20);
 
     let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(500_000, ctx);
     let mut coin_b = coin::mint_for_testing<B_TEST_SUI>(0, ctx);
@@ -1119,9 +1110,8 @@ fun test_one_sided_deposit_twice() {
         &mut scenario,
     ).destruct_state();
 
+    let (mut pool, bank_a, bank_b) = test_setup_cpmm(100, 20, &mut scenario);
     let ctx = ctx(&mut scenario);
-
-    let (mut pool, bank_a, bank_b) = test_setup_cpmm(100, 20);
 
     let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(500_000, ctx);
     let mut coin_b = coin::mint_for_testing<B_TEST_SUI>(0, ctx);
@@ -1182,9 +1172,8 @@ fun test_one_sided_deposit_redeem() {
         &mut scenario,
     ).destruct_state();
 
+    let (mut pool, bank_a, bank_b) = test_setup_cpmm(100, 20, &mut scenario);
     let ctx = ctx(&mut scenario);
-
-    let (mut pool, bank_a, bank_b) = test_setup_cpmm(100, 20);
 
     let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(500_000, ctx);
     let mut coin_b = coin::mint_for_testing<B_TEST_SUI>(500_000, ctx);

@@ -3,6 +3,7 @@ module steamm::cpmm;
 
 use std::option::none;
 use steamm::global_admin::GlobalAdmin;
+use steamm::registry::Registry;
 use steamm::math::{safe_mul_div, checked_mul_div};
 use steamm::pool::{Self, Pool, PoolCap, SwapResult, assert_liquidity};
 use steamm::quote::SwapQuote;
@@ -52,23 +53,25 @@ public struct CpQuoter has store {
 /// This function will panic if `swap_fee_bps` is greater than or equal to
 /// `SWAP_FEE_DENOMINATOR`
 public fun new<A, B, LpType: drop>(
+    registry: &mut Registry,
+    swap_fee_bps: u64,
+    offset: u64,
     meta_a: &CoinMetadata<A>,
     meta_b: &CoinMetadata<B>,
     meta_lp: &mut CoinMetadata<LpType>,
     lp_treasury: TreasuryCap<LpType>,
-    swap_fee_bps: u64,
-    offset: u64,
     ctx: &mut TxContext,
 ): (Pool<A, B, CpQuoter, LpType>, PoolCap<A, B, CpQuoter, LpType>) {
     let quoter = CpQuoter { version: version::new(CURRENT_VERSION), offset };
 
     let (pool, pool_cap) = pool::new<A, B, CpQuoter, LpType>(
+        registry,
+        swap_fee_bps,
+        quoter,
         meta_a,
         meta_b,
         meta_lp,
         lp_treasury,
-        swap_fee_bps,
-        quoter,
         ctx,
     );
 

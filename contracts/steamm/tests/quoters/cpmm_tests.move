@@ -36,7 +36,7 @@ public fun setup(
         scenario,
     ).destruct_state();
 
-    let pool = setup_pool(fee, offset);
+    let pool = setup_pool(fee, offset, scenario);
     destroy(bag);
     destroy(prices);
 
@@ -47,8 +47,9 @@ public fun setup(
 public fun setup_pool(
     fee: u64,
     offset: u64,
+    scenario: &mut Scenario,
 ): (Pool<B_TEST_USDC, B_TEST_SUI, CpQuoter, LP_USDC_SUI>) {
-    let (pool, bank_a, bank_b) = test_setup_cpmm(fee, offset);
+    let (pool, bank_a, bank_b) = test_setup_cpmm(fee, offset, scenario);
     destroy(bank_a);
     destroy(bank_b);
 
@@ -511,9 +512,8 @@ fun test_cpmm_fees() {
         &mut scenario,
     );
 
+    let mut pool_2 = setup_pool(100, 0, &mut scenario);
     let ctx = ctx(&mut scenario);
-
-    let mut pool_2 = setup_pool(100, 0);
 
     let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(e9(200_000_000), ctx);
     let mut coin_b = coin::mint_for_testing<B_TEST_SUI>(e9(200_000_000), ctx);
