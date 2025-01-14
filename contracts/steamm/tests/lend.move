@@ -39,7 +39,7 @@ fun test_simple_deposit_with_lending_a() {
 
     // Create amm bank
     let global_admin = global_admin::init_for_testing(ctx(&mut scenario));
-    let (mut pool, mut bank_a, mut bank_b) = test_setup_cpmm(100, 0);
+    let (mut pool, mut bank_a, mut bank_b) = test_setup_cpmm(100, 0, &mut scenario);
 
     bank_a.mock_min_token_block_size(10);
     bank_b.mock_min_token_block_size(10);
@@ -138,7 +138,7 @@ fun test_swap_with_lending_without_touching_lending_market() {
     // Create amm bank
     let global_admin = global_admin::init_for_testing(ctx(&mut scenario));
 
-    let (mut pool, mut bank_a, mut bank_b) = test_setup_cpmm(100, 0);
+    let (mut pool, mut bank_a, mut bank_b) = test_setup_cpmm(100, 0, &mut scenario);
     bank_a.mock_min_token_block_size(10);
     bank_b.mock_min_token_block_size(10);
 
@@ -254,7 +254,7 @@ fun test_simple_deposit_with_lending_ab() {
     // Create amm bank
     let global_admin = global_admin::init_for_testing(ctx(&mut scenario));
 
-    let (mut pool, mut bank_a, mut bank_b) = test_setup_cpmm(100, 0);
+    let (mut pool, mut bank_a, mut bank_b) = test_setup_cpmm(100, 0, &mut scenario);
     bank_a.mock_min_token_block_size(10);
     bank_b.mock_min_token_block_size(10);
 
@@ -361,7 +361,7 @@ fun test_swap_with_lending_within_utilization_range() {
     // Create amm bank
     let global_admin = global_admin::init_for_testing(ctx(&mut scenario));
 
-    let (mut pool, mut bank_a, mut bank_b) = test_setup_cpmm(100, 0);
+    let (mut pool, mut bank_a, mut bank_b) = test_setup_cpmm(100, 0, &mut scenario);
     bank_a.mock_min_token_block_size(10);
     bank_b.mock_min_token_block_size(10);
 
@@ -550,7 +550,7 @@ fun test_swap_with_lending_beyond_utilization_range() {
     // Create amm bank
     let global_admin = global_admin::init_for_testing(ctx(&mut scenario));
 
-    let (mut pool, mut bank_a, mut bank_b) = test_setup_cpmm(100, 0);
+    let (mut pool, mut bank_a, mut bank_b) = test_setup_cpmm(100, 0, &mut scenario);
     bank_a.mock_min_token_block_size(10);
     bank_b.mock_min_token_block_size(10);
 
@@ -736,7 +736,7 @@ fun test_deposit_with_lending_all_scenarios() {
     // Create amm bank
     let global_admin = global_admin::init_for_testing(ctx(&mut scenario));
 
-    let (mut pool, mut bank_a, mut bank_b) = test_setup_dummy_no_fees();
+    let (mut pool, mut bank_a, mut bank_b) = test_setup_dummy_no_fees(&mut scenario);
     bank_a.mock_min_token_block_size(10);
     bank_b.mock_min_token_block_size(10);
 
@@ -928,7 +928,7 @@ fun test_deposit_with_lending_proptest() {
     // Create amm bank
     let global_admin = global_admin::init_for_testing(ctx(&mut scenario));
 
-    let (mut pool, mut bank_a, mut bank_b) = test_setup_dummy_no_fees();
+    let (mut pool, mut bank_a, mut bank_b) = test_setup_dummy_no_fees(&mut scenario);
     bank_a.mock_min_token_block_size(10);
     bank_b.mock_min_token_block_size(10);
 
@@ -1074,7 +1074,7 @@ fun test_lend_redeem_with_lending_within_utilization() {
     // Create amm bank
     let global_admin = global_admin::init_for_testing(ctx(&mut scenario));
 
-    let (mut pool, mut bank_a, mut bank_b) = test_setup_dummy_no_fees();
+    let (mut pool, mut bank_a, mut bank_b) = test_setup_dummy_no_fees(&mut scenario);
     bank_a.mock_min_token_block_size(10);
     bank_b.mock_min_token_block_size(10);
 
@@ -1215,7 +1215,7 @@ fun test_lend_amm_swap_small_swap_scenario_no_rebalance() {
     // Create amm bank
     let global_admin = global_admin::init_for_testing(ctx(&mut scenario));
 
-    let (mut pool, mut bank_a, mut bank_b) = test_setup_dummy_no_fees();
+    let (mut pool, mut bank_a, mut bank_b) = test_setup_dummy_no_fees(&mut scenario);
     bank_a.mock_min_token_block_size(10);
     bank_b.mock_min_token_block_size(10);
 
@@ -1379,7 +1379,7 @@ fun test_lend_amm_swap_medium_swap_scenario() {
     // Create amm bank
     let global_admin = global_admin::init_for_testing(ctx(&mut scenario));
 
-    let (mut pool, mut bank_a, mut bank_b) = test_setup_dummy_no_fees();
+    let (mut pool, mut bank_a, mut bank_b) = test_setup_dummy_no_fees(&mut scenario);
     bank_a.mock_min_token_block_size(10);
     bank_b.mock_min_token_block_size(10);
 
@@ -1542,7 +1542,7 @@ fun test_lend_amm_swap_large_swap_scenario() {
     // Create amm bank
     let global_admin = global_admin::init_for_testing(ctx(&mut scenario));
 
-    let (mut pool, mut bank_a, mut bank_b) = test_setup_dummy_no_fees();
+    let (mut pool, mut bank_a, mut bank_b) = test_setup_dummy_no_fees(&mut scenario);
     bank_a.mock_min_token_block_size(10);
     bank_b.mock_min_token_block_size(10);
 
@@ -1705,7 +1705,7 @@ public fun test_no_op_below_min_deploy_amount() {
     ).destruct_state();
 
     let global_admin = global_admin::init_for_testing(ctx(&mut scenario));
-    let (pool, bank_usdc, mut bank_sui) = test_setup_dummy_no_fees();
+    let (pool, bank_usdc, mut bank_sui) = test_setup_dummy_no_fees(&mut scenario);
     bank_sui.mock_min_token_block_size(10);
 
     bank_sui.deposit_for_testing(1);
@@ -1764,7 +1764,7 @@ public fun test_interest_distribution_one_lp() {
     clock.set_for_testing(1733093342000);
 
     let global_admin = global_admin::init_for_testing(ctx(&mut scenario));
-    let (mut pool, mut bank_a, mut bank_b) = test_setup_dummy_no_fees();
+    let (mut pool, mut bank_a, mut bank_b) = test_setup_dummy_no_fees(&mut scenario);
 
     let ctx = ctx(&mut scenario);
 
@@ -1983,7 +1983,7 @@ public fun test_interest_distribution_multiple_lps() {
     clock.set_for_testing(1733093342000);
 
     let global_admin = global_admin::init_for_testing(ctx(&mut scenario));
-    let (mut pool, mut bank_a, mut bank_b) = test_setup_dummy_no_fees();
+    let (mut pool, mut bank_a, mut bank_b) = test_setup_dummy_no_fees(&mut scenario);
     let ctx = ctx(&mut scenario);
 
     bank_b.init_lending(

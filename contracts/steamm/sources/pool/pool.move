@@ -8,6 +8,7 @@ use std::ascii;
 use std::string;
 use std::type_name::{get, TypeName};
 use steamm::events::emit_event;
+use steamm::registry::Registry;
 use steamm::fees::{Self, Fees, FeeConfig};
 use steamm::global_admin::GlobalAdmin;
 use steamm::math::safe_mul_div_up;
@@ -483,12 +484,13 @@ entry fun migrate<A, B, Quoter: store, LpType: drop>(
 /// - `swap_fee_bps` is greater than or equal to `BPS_DENOMINATOR`
 /// - `lp_treasury` has non-zero total supply
 public(package) fun new<A, B, Quoter: store, LpType: drop>(
+    registry: &mut Registry,
+    swap_fee_bps: u64,
+    quoter: Quoter,
     meta_a: &CoinMetadata<A>,
     meta_b: &CoinMetadata<B>,
     meta_lp: &mut CoinMetadata<LpType>,
     lp_treasury: TreasuryCap<LpType>,
-    swap_fee_bps: u64,
-    quoter: Quoter,
     ctx: &mut TxContext,
 ): (Pool<A, B, Quoter, LpType>, PoolCap<A, B, Quoter, LpType>) {
     assert!(lp_treasury.total_supply() == 0, ELpSupplyMustBeZero);
@@ -525,6 +527,8 @@ public(package) fun new<A, B, Quoter: store, LpType: drop>(
         },
         version: version::new(CURRENT_VERSION),
     };
+
+    registry.add_amm(&pool);
 
     // Create pool cap
     let pool_cap = PoolCap {
