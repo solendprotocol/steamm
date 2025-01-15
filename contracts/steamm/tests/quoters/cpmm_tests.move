@@ -49,9 +49,19 @@ public fun setup_pool(
     offset: u64,
     scenario: &mut Scenario,
 ): (Pool<B_TEST_USDC, B_TEST_SUI, CpQuoter, LP_USDC_SUI>) {
-    let (pool, bank_a, bank_b) = test_setup_cpmm(fee, offset, scenario);
+    let (pool, bank_a, bank_b, lending_market, lend_cap, prices, bag, clock) = test_setup_cpmm(
+        fee,
+        offset,
+        scenario,
+    );
+
     destroy(bank_a);
     destroy(bank_b);
+    destroy(lending_market);
+    destroy(lend_cap);
+    destroy(prices);
+    destroy(bag);
+    destroy(clock);
 
     pool
 }
@@ -82,7 +92,7 @@ fun test_full_cpmm_cycle() {
     let (reserve_a, reserve_b) = pool.balance_amounts();
     let reserve_ratio_0 = (reserve_a as u256) * (e9(1) as u256) / (reserve_b as u256);
 
-    assert_eq(pool.cpmm_k(0), 500_000 * 500_000);
+    assert_eq(pool.cpmm_k(), 500_000 * 500_000);
     assert_eq(pool.lp_supply_val(), 500_000);
     assert_eq(reserve_a, 500_000);
     assert_eq(reserve_b, 500_000);
@@ -243,7 +253,7 @@ fun test_cpmm_deposit_redeem_swap() {
     let (reserve_a, reserve_b) = pool.balance_amounts();
     let reserve_ratio_0 = (reserve_a as u256) * (e9(1) as u256) / (reserve_b as u256);
 
-    assert_eq(pool.cpmm_k(0), 500000000000000000000000000);
+    assert_eq(pool.cpmm_k(), 500000000000000000000000000);
     assert_eq(pool.lp_supply_val(), 22360679774997);
     assert_eq(reserve_a, e9(1_000));
     assert_eq(reserve_b, e9(500_000));

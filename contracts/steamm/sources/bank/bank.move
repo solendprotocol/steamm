@@ -858,3 +858,6 @@ public fun needs_rebalance_after_outflow<P, T, BToken>(
         effective_utilisation_bps <= target_utilisation_bps + buffer_bps && effective_utilisation_bps >= target_utilisation_bps - buffer_bps
     ) { false } else { true }
 }
+
+#[test_only]
+public fun needs_rebalance_(needs_rebalance: NeedsRebalance): bool { needs_rebalance.needs_rebalance } 

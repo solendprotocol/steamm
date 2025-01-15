@@ -21,7 +21,17 @@ fun setup_pool(
     swap_fee_bps: u64,
     scenario: &mut Scenario,
 ): (Pool<B_TEST_USDC, B_TEST_SUI, CpQuoter, LP_USDC_SUI>) {
-    let (mut pool, bank_a, bank_b) = test_utils::test_setup_cpmm(swap_fee_bps, 0, scenario);
+    // let (mut pool, bank_a, bank_b) = test_utils::test_setup_cpmm(swap_fee_bps, 0, scenario);
+    let (
+        mut pool,
+        bank_a,
+        bank_b,
+        lending_market,
+        lend_cap,
+        prices,
+        bag,
+        clock,
+    ) = test_utils::test_setup_cpmm(swap_fee_bps, 0, scenario);
 
     pool.mut_reserve_a(reserve_a, true);
     pool.mut_reserve_b(reserve_b, true);
@@ -30,6 +40,11 @@ fun setup_pool(
     destroy(lp);
     destroy(bank_a);
     destroy(bank_b);
+    destroy(lending_market);
+    destroy(lend_cap);
+    destroy(prices);
+    destroy(bag);
+    destroy(clock);
 
     pool
 }

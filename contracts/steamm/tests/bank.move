@@ -12,10 +12,24 @@ use suilend::test_usdc::TEST_USDC;
 
 #[test_only]
 fun setup_bank(scenario: &mut Scenario): Bank<LENDING_MARKET, TEST_USDC, B_TEST_USDC> {
-    let (pool, bank_a, bank_b) = test_utils::test_setup_dummy(0, scenario);
+    let (
+        pool,
+        bank_a,
+        bank_b,
+        lending_market,
+        lend_cap,
+        prices,
+        bag,
+        clock,
+    ) = test_utils::test_setup_dummy(0, scenario);
 
     destroy(pool);
     destroy(bank_b);
+    destroy(lending_market);
+    destroy(lend_cap);
+    destroy(prices);
+    destroy(bag);
+    destroy(clock);
 
     bank_a
 }
