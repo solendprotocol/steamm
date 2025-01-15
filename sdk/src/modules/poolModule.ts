@@ -234,7 +234,7 @@ export class PoolModule implements IModule {
       tx
     );
 
-    return await this.getQuoteResult<DepositQuote>(tx, quote);
+    return await this.getQuoteResult<DepositQuote>(tx, quote, "DepositQuote");
   }
 
   public async quoteRedeem(args: PoolQuoteRedeemArgs): Promise<RedeemQuote> {
@@ -250,18 +250,19 @@ export class PoolModule implements IModule {
       tx
     );
 
-    return await this.getQuoteResult<RedeemQuote>(tx, quote);
+    return await this.getQuoteResult<RedeemQuote>(tx, quote, "RedeemQuote");
   }
 
   private async getQuoteResult<T>(
     tx: Transaction,
-    quote: TransactionArgument
+    quote: TransactionArgument,
+    quoteType: string
   ): Promise<T> {
     const pkgAddy = this._sdk._sdkOptions.steamm_config.package_id;
 
     tx.moveCall({
       target: `0x2::event::emit`,
-      typeArguments: [`${pkgAddy}::quote::DepositQuote`],
+      typeArguments: [`${pkgAddy}::quote::${quoteType}`],
       arguments: [quote],
     });
 
