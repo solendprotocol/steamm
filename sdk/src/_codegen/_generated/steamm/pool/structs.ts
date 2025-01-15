@@ -1,12 +1,11 @@
-import * as reified from "../../_framework/reified";
+import {TypeName} from "../../_dependencies/source/0x1/type-name/structs";
 import {Balance, Supply} from "../../_dependencies/source/0x2/balance/structs";
 import {ID, UID} from "../../_dependencies/source/0x2/object/structs";
-import {PhantomReified, PhantomToTypeStr, PhantomTypeArgument, Reified, StructClass, ToField, ToPhantomTypeArgument, ToTypeArgument, ToTypeStr, TypeArgument, assertFieldsWithTypesArgsMatch, assertReifiedTypeArgsMatch, decodeFromFields, decodeFromFieldsWithTypes, decodeFromJSONField, extractType, fieldToJSON, phantom, toBcs, ToTypeStr as ToPhantom} from "../../_framework/reified";
+import {PhantomReified, PhantomToTypeStr, PhantomTypeArgument, Reified, StructClass, ToField, ToPhantomTypeArgument, ToTypeArgument, ToTypeStr, TypeArgument, assertFieldsWithTypesArgsMatch, assertReifiedTypeArgsMatch, decodeFromFields, decodeFromFieldsWithTypes, decodeFromJSONField, extractType, fieldToJSON, phantom, toBcs} from "../../_framework/reified";
 import {FieldsWithTypes, composeSuiType, compressSuiType, parseTypeName} from "../../_framework/util";
-import {BToken} from "../bank/structs";
 import {FeeConfig, Fees} from "../fees/structs";
 import {PKG_V1} from "../index";
-import {SwapFee, SwapQuote} from "../quote/structs";
+import {SwapFee} from "../quote/structs";
 import {Version} from "../version/structs";
 import {BcsType, bcs} from "@mysten/sui/bcs";
 import {SuiClient, SuiObjectData, SuiParsedData} from "@mysten/sui/client";
@@ -80,151 +79,11 @@ export class DepositResult implements StructClass { __StructClass = true as cons
 
  }
 
-/* ============================== Intent =============================== */
-
-export function isIntent(type: string): boolean { type = compressSuiType(type); return type.startsWith(`${PKG_V1}::pool::Intent` + '<'); }
-
-export interface IntentFields<A extends PhantomTypeArgument, B extends PhantomTypeArgument, Quoter extends PhantomTypeArgument, P extends PhantomTypeArgument> { quote: ToField<SwapQuote> }
-
-export type IntentReified<A extends PhantomTypeArgument, B extends PhantomTypeArgument, Quoter extends PhantomTypeArgument, P extends PhantomTypeArgument> = Reified< Intent<A, B, Quoter, P>, IntentFields<A, B, Quoter, P> >;
-
-export class Intent<A extends PhantomTypeArgument, B extends PhantomTypeArgument, Quoter extends PhantomTypeArgument, P extends PhantomTypeArgument> implements StructClass { __StructClass = true as const;
-
- static readonly $typeName = `${PKG_V1}::pool::Intent`; static readonly $numTypeParams = 4; static readonly $isPhantom = [true,true,true,true,] as const;
-
- readonly $typeName = Intent.$typeName; readonly $fullTypeName: `${typeof PKG_V1}::pool::Intent<${PhantomToTypeStr<A>}, ${PhantomToTypeStr<B>}, ${PhantomToTypeStr<Quoter>}, ${PhantomToTypeStr<P>}>`; readonly $typeArgs: [PhantomToTypeStr<A>, PhantomToTypeStr<B>, PhantomToTypeStr<Quoter>, PhantomToTypeStr<P>]; readonly $isPhantom = Intent.$isPhantom;
-
- readonly quote: ToField<SwapQuote>
-
- private constructor(typeArgs: [PhantomToTypeStr<A>, PhantomToTypeStr<B>, PhantomToTypeStr<Quoter>, PhantomToTypeStr<P>], fields: IntentFields<A, B, Quoter, P>, ) { this.$fullTypeName = composeSuiType( Intent.$typeName, ...typeArgs ) as `${typeof PKG_V1}::pool::Intent<${PhantomToTypeStr<A>}, ${PhantomToTypeStr<B>}, ${PhantomToTypeStr<Quoter>}, ${PhantomToTypeStr<P>}>`; this.$typeArgs = typeArgs;
-
- this.quote = fields.quote; }
-
- static reified<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( A: A, B: B, Quoter: Quoter, P: P ): IntentReified<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { return { typeName: Intent.$typeName, fullTypeName: composeSuiType( Intent.$typeName, ...[extractType(A), extractType(B), extractType(Quoter), extractType(P)] ) as `${typeof PKG_V1}::pool::Intent<${PhantomToTypeStr<ToPhantomTypeArgument<A>>}, ${PhantomToTypeStr<ToPhantomTypeArgument<B>>}, ${PhantomToTypeStr<ToPhantomTypeArgument<Quoter>>}, ${PhantomToTypeStr<ToPhantomTypeArgument<P>>}>`, typeArgs: [ extractType(A), extractType(B), extractType(Quoter), extractType(P) ] as [PhantomToTypeStr<ToPhantomTypeArgument<A>>, PhantomToTypeStr<ToPhantomTypeArgument<B>>, PhantomToTypeStr<ToPhantomTypeArgument<Quoter>>, PhantomToTypeStr<ToPhantomTypeArgument<P>>], isPhantom: Intent.$isPhantom, reifiedTypeArgs: [A, B, Quoter, P], fromFields: (fields: Record<string, any>) => Intent.fromFields( [A, B, Quoter, P], fields, ), fromFieldsWithTypes: (item: FieldsWithTypes) => Intent.fromFieldsWithTypes( [A, B, Quoter, P], item, ), fromBcs: (data: Uint8Array) => Intent.fromBcs( [A, B, Quoter, P], data, ), bcs: Intent.bcs, fromJSONField: (field: any) => Intent.fromJSONField( [A, B, Quoter, P], field, ), fromJSON: (json: Record<string, any>) => Intent.fromJSON( [A, B, Quoter, P], json, ), fromSuiParsedData: (content: SuiParsedData) => Intent.fromSuiParsedData( [A, B, Quoter, P], content, ), fromSuiObjectData: (content: SuiObjectData) => Intent.fromSuiObjectData( [A, B, Quoter, P], content, ), fetch: async (client: SuiClient, id: string) => Intent.fetch( client, [A, B, Quoter, P], id, ), new: ( fields: IntentFields<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>>, ) => { return new Intent( [extractType(A), extractType(B), extractType(Quoter), extractType(P)], fields ) }, kind: "StructClassReified", } }
-
- static get r() { return Intent.reified }
-
- static phantom<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( A: A, B: B, Quoter: Quoter, P: P ): PhantomReified<ToTypeStr<Intent<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>>>> { return phantom(Intent.reified( A, B, Quoter, P )); } static get p() { return Intent.phantom }
-
- static get bcs() { return bcs.struct("Intent", {
-
- quote: SwapQuote.bcs
-
-}) };
-
- static fromFields<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], fields: Record<string, any> ): Intent<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { return Intent.reified( typeArgs[0], typeArgs[1], typeArgs[2], typeArgs[3], ).new( { quote: decodeFromFields(SwapQuote.reified(), fields.quote) } ) }
-
- static fromFieldsWithTypes<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], item: FieldsWithTypes ): Intent<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { if (!isIntent(item.type)) { throw new Error("not a Intent type");
-
- } assertFieldsWithTypesArgsMatch(item, typeArgs);
-
- return Intent.reified( typeArgs[0], typeArgs[1], typeArgs[2], typeArgs[3], ).new( { quote: decodeFromFieldsWithTypes(SwapQuote.reified(), item.fields.quote) } ) }
-
- static fromBcs<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], data: Uint8Array ): Intent<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { return Intent.fromFields( typeArgs, Intent.bcs.parse(data) ) }
-
- toJSONField() { return {
-
- quote: this.quote.toJSONField(),
-
-} }
-
- toJSON() { return { $typeName: this.$typeName, $typeArgs: this.$typeArgs, ...this.toJSONField() } }
-
- static fromJSONField<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], field: any ): Intent<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { return Intent.reified( typeArgs[0], typeArgs[1], typeArgs[2], typeArgs[3], ).new( { quote: decodeFromJSONField(SwapQuote.reified(), field.quote) } ) }
-
- static fromJSON<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], json: Record<string, any> ): Intent<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { if (json.$typeName !== Intent.$typeName) { throw new Error("not a WithTwoGenerics json object") }; assertReifiedTypeArgsMatch( composeSuiType(Intent.$typeName, ...typeArgs.map(extractType)), json.$typeArgs, typeArgs, )
-
- return Intent.fromJSONField( typeArgs, json, ) }
-
- static fromSuiParsedData<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], content: SuiParsedData ): Intent<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { if (content.dataType !== "moveObject") { throw new Error("not an object"); } if (!isIntent(content.type)) { throw new Error(`object at ${(content.fields as any).id} is not a Intent object`); } return Intent.fromFieldsWithTypes( typeArgs, content ); }
-
- static fromSuiObjectData<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], data: SuiObjectData ): Intent<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { if (data.bcs) { if (data.bcs.dataType !== "moveObject" || !isIntent(data.bcs.type)) { throw new Error(`object at is not a Intent object`); }
-
- const gotTypeArgs = parseTypeName(data.bcs.type).typeArgs; if (gotTypeArgs.length !== 4) { throw new Error(`type argument mismatch: expected 4 type arguments but got ${gotTypeArgs.length}`); }; for (let i = 0; i < 4; i++) { const gotTypeArg = compressSuiType(gotTypeArgs[i]); const expectedTypeArg = compressSuiType(extractType(typeArgs[i])); if (gotTypeArg !== expectedTypeArg) { throw new Error(`type argument mismatch at position ${i}: expected '${expectedTypeArg}' but got '${gotTypeArg}'`); } };
-
- return Intent.fromBcs( typeArgs, fromB64(data.bcs.bcsBytes) ); } if (data.content) { return Intent.fromSuiParsedData( typeArgs, data.content ) } throw new Error( "Both `bcs` and `content` fields are missing from the data. Include `showBcs` or `showContent` in the request." ); }
-
- static async fetch<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( client: SuiClient, typeArgs: [A, B, Quoter, P], id: string ): Promise<Intent<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>>> { const res = await client.getObject({ id, options: { showBcs: true, }, }); if (res.error) { throw new Error(`error fetching Intent object at id ${id}: ${res.error.code}`); } if (res.data?.bcs?.dataType !== "moveObject" || !isIntent(res.data.bcs.type)) { throw new Error(`object at id ${id} is not a Intent object`); }
-
- return Intent.fromSuiObjectData( typeArgs, res.data ); }
-
- }
-
-/* ============================== LP =============================== */
-
-export function isLP(type: string): boolean { type = compressSuiType(type); return type.startsWith(`${PKG_V1}::pool::LP` + '<'); }
-
-export interface LPFields<A extends PhantomTypeArgument, B extends PhantomTypeArgument, Quoter extends PhantomTypeArgument, P extends PhantomTypeArgument> { dummyField: ToField<"bool"> }
-
-export type LPReified<A extends PhantomTypeArgument, B extends PhantomTypeArgument, Quoter extends PhantomTypeArgument, P extends PhantomTypeArgument> = Reified< LP<A, B, Quoter, P>, LPFields<A, B, Quoter, P> >;
-
-export class LP<A extends PhantomTypeArgument, B extends PhantomTypeArgument, Quoter extends PhantomTypeArgument, P extends PhantomTypeArgument> implements StructClass { __StructClass = true as const;
-
- static readonly $typeName = `${PKG_V1}::pool::LP`; static readonly $numTypeParams = 4; static readonly $isPhantom = [true,true,true,true,] as const;
-
- readonly $typeName = LP.$typeName; readonly $fullTypeName: `${typeof PKG_V1}::pool::LP<${PhantomToTypeStr<A>}, ${PhantomToTypeStr<B>}, ${PhantomToTypeStr<Quoter>}, ${PhantomToTypeStr<P>}>`; readonly $typeArgs: [PhantomToTypeStr<A>, PhantomToTypeStr<B>, PhantomToTypeStr<Quoter>, PhantomToTypeStr<P>]; readonly $isPhantom = LP.$isPhantom;
-
- readonly dummyField: ToField<"bool">
-
- private constructor(typeArgs: [PhantomToTypeStr<A>, PhantomToTypeStr<B>, PhantomToTypeStr<Quoter>, PhantomToTypeStr<P>], fields: LPFields<A, B, Quoter, P>, ) { this.$fullTypeName = composeSuiType( LP.$typeName, ...typeArgs ) as `${typeof PKG_V1}::pool::LP<${PhantomToTypeStr<A>}, ${PhantomToTypeStr<B>}, ${PhantomToTypeStr<Quoter>}, ${PhantomToTypeStr<P>}>`; this.$typeArgs = typeArgs;
-
- this.dummyField = fields.dummyField; }
-
- static reified<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( A: A, B: B, Quoter: Quoter, P: P ): LPReified<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { return { typeName: LP.$typeName, fullTypeName: composeSuiType( LP.$typeName, ...[extractType(A), extractType(B), extractType(Quoter), extractType(P)] ) as `${typeof PKG_V1}::pool::LP<${PhantomToTypeStr<ToPhantomTypeArgument<A>>}, ${PhantomToTypeStr<ToPhantomTypeArgument<B>>}, ${PhantomToTypeStr<ToPhantomTypeArgument<Quoter>>}, ${PhantomToTypeStr<ToPhantomTypeArgument<P>>}>`, typeArgs: [ extractType(A), extractType(B), extractType(Quoter), extractType(P) ] as [PhantomToTypeStr<ToPhantomTypeArgument<A>>, PhantomToTypeStr<ToPhantomTypeArgument<B>>, PhantomToTypeStr<ToPhantomTypeArgument<Quoter>>, PhantomToTypeStr<ToPhantomTypeArgument<P>>], isPhantom: LP.$isPhantom, reifiedTypeArgs: [A, B, Quoter, P], fromFields: (fields: Record<string, any>) => LP.fromFields( [A, B, Quoter, P], fields, ), fromFieldsWithTypes: (item: FieldsWithTypes) => LP.fromFieldsWithTypes( [A, B, Quoter, P], item, ), fromBcs: (data: Uint8Array) => LP.fromBcs( [A, B, Quoter, P], data, ), bcs: LP.bcs, fromJSONField: (field: any) => LP.fromJSONField( [A, B, Quoter, P], field, ), fromJSON: (json: Record<string, any>) => LP.fromJSON( [A, B, Quoter, P], json, ), fromSuiParsedData: (content: SuiParsedData) => LP.fromSuiParsedData( [A, B, Quoter, P], content, ), fromSuiObjectData: (content: SuiObjectData) => LP.fromSuiObjectData( [A, B, Quoter, P], content, ), fetch: async (client: SuiClient, id: string) => LP.fetch( client, [A, B, Quoter, P], id, ), new: ( fields: LPFields<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>>, ) => { return new LP( [extractType(A), extractType(B), extractType(Quoter), extractType(P)], fields ) }, kind: "StructClassReified", } }
-
- static get r() { return LP.reified }
-
- static phantom<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( A: A, B: B, Quoter: Quoter, P: P ): PhantomReified<ToTypeStr<LP<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>>>> { return phantom(LP.reified( A, B, Quoter, P )); } static get p() { return LP.phantom }
-
- static get bcs() { return bcs.struct("LP", {
-
- dummy_field: bcs.bool()
-
-}) };
-
- static fromFields<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], fields: Record<string, any> ): LP<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { return LP.reified( typeArgs[0], typeArgs[1], typeArgs[2], typeArgs[3], ).new( { dummyField: decodeFromFields("bool", fields.dummy_field) } ) }
-
- static fromFieldsWithTypes<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], item: FieldsWithTypes ): LP<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { if (!isLP(item.type)) { throw new Error("not a LP type");
-
- } assertFieldsWithTypesArgsMatch(item, typeArgs);
-
- return LP.reified( typeArgs[0], typeArgs[1], typeArgs[2], typeArgs[3], ).new( { dummyField: decodeFromFieldsWithTypes("bool", item.fields.dummy_field) } ) }
-
- static fromBcs<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], data: Uint8Array ): LP<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { return LP.fromFields( typeArgs, LP.bcs.parse(data) ) }
-
- toJSONField() { return {
-
- dummyField: this.dummyField,
-
-} }
-
- toJSON() { return { $typeName: this.$typeName, $typeArgs: this.$typeArgs, ...this.toJSONField() } }
-
- static fromJSONField<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], field: any ): LP<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { return LP.reified( typeArgs[0], typeArgs[1], typeArgs[2], typeArgs[3], ).new( { dummyField: decodeFromJSONField("bool", field.dummyField) } ) }
-
- static fromJSON<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], json: Record<string, any> ): LP<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { if (json.$typeName !== LP.$typeName) { throw new Error("not a WithTwoGenerics json object") }; assertReifiedTypeArgsMatch( composeSuiType(LP.$typeName, ...typeArgs.map(extractType)), json.$typeArgs, typeArgs, )
-
- return LP.fromJSONField( typeArgs, json, ) }
-
- static fromSuiParsedData<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], content: SuiParsedData ): LP<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { if (content.dataType !== "moveObject") { throw new Error("not an object"); } if (!isLP(content.type)) { throw new Error(`object at ${(content.fields as any).id} is not a LP object`); } return LP.fromFieldsWithTypes( typeArgs, content ); }
-
- static fromSuiObjectData<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], data: SuiObjectData ): LP<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { if (data.bcs) { if (data.bcs.dataType !== "moveObject" || !isLP(data.bcs.type)) { throw new Error(`object at is not a LP object`); }
-
- const gotTypeArgs = parseTypeName(data.bcs.type).typeArgs; if (gotTypeArgs.length !== 4) { throw new Error(`type argument mismatch: expected 4 type arguments but got ${gotTypeArgs.length}`); }; for (let i = 0; i < 4; i++) { const gotTypeArg = compressSuiType(gotTypeArgs[i]); const expectedTypeArg = compressSuiType(extractType(typeArgs[i])); if (gotTypeArg !== expectedTypeArg) { throw new Error(`type argument mismatch at position ${i}: expected '${expectedTypeArg}' but got '${gotTypeArg}'`); } };
-
- return LP.fromBcs( typeArgs, fromB64(data.bcs.bcsBytes) ); } if (data.content) { return LP.fromSuiParsedData( typeArgs, data.content ) } throw new Error( "Both `bcs` and `content` fields are missing from the data. Include `showBcs` or `showContent` in the request." ); }
-
- static async fetch<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( client: SuiClient, typeArgs: [A, B, Quoter, P], id: string ): Promise<LP<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>>> { const res = await client.getObject({ id, options: { showBcs: true, }, }); if (res.error) { throw new Error(`error fetching LP object at id ${id}: ${res.error.code}`); } if (res.data?.bcs?.dataType !== "moveObject" || !isLP(res.data.bcs.type)) { throw new Error(`object at id ${id} is not a LP object`); }
-
- return LP.fromSuiObjectData( typeArgs, res.data ); }
-
- }
-
 /* ============================== NewPoolResult =============================== */
 
 export function isNewPoolResult(type: string): boolean { type = compressSuiType(type); return type === `${PKG_V1}::pool::NewPoolResult`; }
 
-export interface NewPoolResultFields { creator: ToField<"address">; poolId: ToField<ID> }
+export interface NewPoolResultFields { creator: ToField<"address">; poolId: ToField<ID>; poolCapId: ToField<ID>; coinTypeA: ToField<TypeName>; coinTypeB: ToField<TypeName>; quoterType: ToField<TypeName>; lpTokenType: ToField<TypeName> }
 
 export type NewPoolResultReified = Reified< NewPoolResult, NewPoolResultFields >;
 
@@ -234,11 +93,11 @@ export class NewPoolResult implements StructClass { __StructClass = true as cons
 
  readonly $typeName = NewPoolResult.$typeName; readonly $fullTypeName: `${typeof PKG_V1}::pool::NewPoolResult`; readonly $typeArgs: []; readonly $isPhantom = NewPoolResult.$isPhantom;
 
- readonly creator: ToField<"address">; readonly poolId: ToField<ID>
+ readonly creator: ToField<"address">; readonly poolId: ToField<ID>; readonly poolCapId: ToField<ID>; readonly coinTypeA: ToField<TypeName>; readonly coinTypeB: ToField<TypeName>; readonly quoterType: ToField<TypeName>; readonly lpTokenType: ToField<TypeName>
 
  private constructor(typeArgs: [], fields: NewPoolResultFields, ) { this.$fullTypeName = composeSuiType( NewPoolResult.$typeName, ...typeArgs ) as `${typeof PKG_V1}::pool::NewPoolResult`; this.$typeArgs = typeArgs;
 
- this.creator = fields.creator;; this.poolId = fields.poolId; }
+ this.creator = fields.creator;; this.poolId = fields.poolId;; this.poolCapId = fields.poolCapId;; this.coinTypeA = fields.coinTypeA;; this.coinTypeB = fields.coinTypeB;; this.quoterType = fields.quoterType;; this.lpTokenType = fields.lpTokenType; }
 
  static reified( ): NewPoolResultReified { return { typeName: NewPoolResult.$typeName, fullTypeName: composeSuiType( NewPoolResult.$typeName, ...[] ) as `${typeof PKG_V1}::pool::NewPoolResult`, typeArgs: [ ] as [], isPhantom: NewPoolResult.$isPhantom, reifiedTypeArgs: [], fromFields: (fields: Record<string, any>) => NewPoolResult.fromFields( fields, ), fromFieldsWithTypes: (item: FieldsWithTypes) => NewPoolResult.fromFieldsWithTypes( item, ), fromBcs: (data: Uint8Array) => NewPoolResult.fromBcs( data, ), bcs: NewPoolResult.bcs, fromJSONField: (field: any) => NewPoolResult.fromJSONField( field, ), fromJSON: (json: Record<string, any>) => NewPoolResult.fromJSON( json, ), fromSuiParsedData: (content: SuiParsedData) => NewPoolResult.fromSuiParsedData( content, ), fromSuiObjectData: (content: SuiObjectData) => NewPoolResult.fromSuiObjectData( content, ), fetch: async (client: SuiClient, id: string) => NewPoolResult.fetch( client, id, ), new: ( fields: NewPoolResultFields, ) => { return new NewPoolResult( [], fields ) }, kind: "StructClassReified", } }
 
@@ -248,29 +107,29 @@ export class NewPoolResult implements StructClass { __StructClass = true as cons
 
  static get bcs() { return bcs.struct("NewPoolResult", {
 
- creator: bcs.bytes(32).transform({ input: (val: string) => fromHEX(val), output: (val: Uint8Array) => toHEX(val), }), pool_id: ID.bcs
+ creator: bcs.bytes(32).transform({ input: (val: string) => fromHEX(val), output: (val: Uint8Array) => toHEX(val), }), pool_id: ID.bcs, pool_cap_id: ID.bcs, coin_type_a: TypeName.bcs, coin_type_b: TypeName.bcs, quoter_type: TypeName.bcs, lp_token_type: TypeName.bcs
 
 }) };
 
- static fromFields( fields: Record<string, any> ): NewPoolResult { return NewPoolResult.reified( ).new( { creator: decodeFromFields("address", fields.creator), poolId: decodeFromFields(ID.reified(), fields.pool_id) } ) }
+ static fromFields( fields: Record<string, any> ): NewPoolResult { return NewPoolResult.reified( ).new( { creator: decodeFromFields("address", fields.creator), poolId: decodeFromFields(ID.reified(), fields.pool_id), poolCapId: decodeFromFields(ID.reified(), fields.pool_cap_id), coinTypeA: decodeFromFields(TypeName.reified(), fields.coin_type_a), coinTypeB: decodeFromFields(TypeName.reified(), fields.coin_type_b), quoterType: decodeFromFields(TypeName.reified(), fields.quoter_type), lpTokenType: decodeFromFields(TypeName.reified(), fields.lp_token_type) } ) }
 
  static fromFieldsWithTypes( item: FieldsWithTypes ): NewPoolResult { if (!isNewPoolResult(item.type)) { throw new Error("not a NewPoolResult type");
 
  }
 
- return NewPoolResult.reified( ).new( { creator: decodeFromFieldsWithTypes("address", item.fields.creator), poolId: decodeFromFieldsWithTypes(ID.reified(), item.fields.pool_id) } ) }
+ return NewPoolResult.reified( ).new( { creator: decodeFromFieldsWithTypes("address", item.fields.creator), poolId: decodeFromFieldsWithTypes(ID.reified(), item.fields.pool_id), poolCapId: decodeFromFieldsWithTypes(ID.reified(), item.fields.pool_cap_id), coinTypeA: decodeFromFieldsWithTypes(TypeName.reified(), item.fields.coin_type_a), coinTypeB: decodeFromFieldsWithTypes(TypeName.reified(), item.fields.coin_type_b), quoterType: decodeFromFieldsWithTypes(TypeName.reified(), item.fields.quoter_type), lpTokenType: decodeFromFieldsWithTypes(TypeName.reified(), item.fields.lp_token_type) } ) }
 
  static fromBcs( data: Uint8Array ): NewPoolResult { return NewPoolResult.fromFields( NewPoolResult.bcs.parse(data) ) }
 
  toJSONField() { return {
 
- creator: this.creator,poolId: this.poolId,
+ creator: this.creator,poolId: this.poolId,poolCapId: this.poolCapId,coinTypeA: this.coinTypeA.toJSONField(),coinTypeB: this.coinTypeB.toJSONField(),quoterType: this.quoterType.toJSONField(),lpTokenType: this.lpTokenType.toJSONField(),
 
 } }
 
  toJSON() { return { $typeName: this.$typeName, $typeArgs: this.$typeArgs, ...this.toJSONField() } }
 
- static fromJSONField( field: any ): NewPoolResult { return NewPoolResult.reified( ).new( { creator: decodeFromJSONField("address", field.creator), poolId: decodeFromJSONField(ID.reified(), field.poolId) } ) }
+ static fromJSONField( field: any ): NewPoolResult { return NewPoolResult.reified( ).new( { creator: decodeFromJSONField("address", field.creator), poolId: decodeFromJSONField(ID.reified(), field.poolId), poolCapId: decodeFromJSONField(ID.reified(), field.poolCapId), coinTypeA: decodeFromJSONField(TypeName.reified(), field.coinTypeA), coinTypeB: decodeFromJSONField(TypeName.reified(), field.coinTypeB), quoterType: decodeFromJSONField(TypeName.reified(), field.quoterType), lpTokenType: decodeFromJSONField(TypeName.reified(), field.lpTokenType) } ) }
 
  static fromJSON( json: Record<string, any> ): NewPoolResult { if (json.$typeName !== NewPoolResult.$typeName) { throw new Error("not a WithTwoGenerics json object") };
 
@@ -292,67 +151,67 @@ export class NewPoolResult implements StructClass { __StructClass = true as cons
 
 export function isPool(type: string): boolean { type = compressSuiType(type); return type.startsWith(`${PKG_V1}::pool::Pool` + '<'); }
 
-export interface PoolFields<A extends PhantomTypeArgument, B extends PhantomTypeArgument, Quoter extends TypeArgument, P extends PhantomTypeArgument> { id: ToField<UID>; quoter: ToField<Quoter>; btokensA: ToField<Balance<ToPhantom<BToken<P, A>>>>; btokensB: ToField<Balance<ToPhantom<BToken<P, B>>>>; lpSupply: ToField<Supply<ToPhantom<LP<A, B, ToPhantom<Quoter>, P>>>>; protocolFees: ToField<Fees<ToPhantom<BToken<P, A>>, ToPhantom<BToken<P, B>>>>; poolFeeConfig: ToField<FeeConfig>; redemptionFees: ToField<Fees<ToPhantom<BToken<P, A>>, ToPhantom<BToken<P, B>>>>; tradingData: ToField<TradingData>; lockGuard: ToField<"bool">; version: ToField<Version> }
+export interface PoolFields<A extends PhantomTypeArgument, B extends PhantomTypeArgument, Quoter extends TypeArgument, LpType extends PhantomTypeArgument> { id: ToField<UID>; quoter: ToField<Quoter>; balanceA: ToField<Balance<A>>; balanceB: ToField<Balance<B>>; lpSupply: ToField<Supply<LpType>>; protocolFees: ToField<Fees<A, B>>; poolFeeConfig: ToField<FeeConfig>; redemptionFees: ToField<Fees<A, B>>; tradingData: ToField<TradingData>; version: ToField<Version> }
 
-export type PoolReified<A extends PhantomTypeArgument, B extends PhantomTypeArgument, Quoter extends TypeArgument, P extends PhantomTypeArgument> = Reified< Pool<A, B, Quoter, P>, PoolFields<A, B, Quoter, P> >;
+export type PoolReified<A extends PhantomTypeArgument, B extends PhantomTypeArgument, Quoter extends TypeArgument, LpType extends PhantomTypeArgument> = Reified< Pool<A, B, Quoter, LpType>, PoolFields<A, B, Quoter, LpType> >;
 
-export class Pool<A extends PhantomTypeArgument, B extends PhantomTypeArgument, Quoter extends TypeArgument, P extends PhantomTypeArgument> implements StructClass { __StructClass = true as const;
+export class Pool<A extends PhantomTypeArgument, B extends PhantomTypeArgument, Quoter extends TypeArgument, LpType extends PhantomTypeArgument> implements StructClass { __StructClass = true as const;
 
  static readonly $typeName = `${PKG_V1}::pool::Pool`; static readonly $numTypeParams = 4; static readonly $isPhantom = [true,true,false,true,] as const;
 
- readonly $typeName = Pool.$typeName; readonly $fullTypeName: `${typeof PKG_V1}::pool::Pool<${PhantomToTypeStr<A>}, ${PhantomToTypeStr<B>}, ${ToTypeStr<Quoter>}, ${PhantomToTypeStr<P>}>`; readonly $typeArgs: [PhantomToTypeStr<A>, PhantomToTypeStr<B>, ToTypeStr<Quoter>, PhantomToTypeStr<P>]; readonly $isPhantom = Pool.$isPhantom;
+ readonly $typeName = Pool.$typeName; readonly $fullTypeName: `${typeof PKG_V1}::pool::Pool<${PhantomToTypeStr<A>}, ${PhantomToTypeStr<B>}, ${ToTypeStr<Quoter>}, ${PhantomToTypeStr<LpType>}>`; readonly $typeArgs: [PhantomToTypeStr<A>, PhantomToTypeStr<B>, ToTypeStr<Quoter>, PhantomToTypeStr<LpType>]; readonly $isPhantom = Pool.$isPhantom;
 
- readonly id: ToField<UID>; readonly quoter: ToField<Quoter>; readonly btokensA: ToField<Balance<ToPhantom<BToken<P, A>>>>; readonly btokensB: ToField<Balance<ToPhantom<BToken<P, B>>>>; readonly lpSupply: ToField<Supply<ToPhantom<LP<A, B, ToPhantom<Quoter>, P>>>>; readonly protocolFees: ToField<Fees<ToPhantom<BToken<P, A>>, ToPhantom<BToken<P, B>>>>; readonly poolFeeConfig: ToField<FeeConfig>; readonly redemptionFees: ToField<Fees<ToPhantom<BToken<P, A>>, ToPhantom<BToken<P, B>>>>; readonly tradingData: ToField<TradingData>; readonly lockGuard: ToField<"bool">; readonly version: ToField<Version>
+ readonly id: ToField<UID>; readonly quoter: ToField<Quoter>; readonly balanceA: ToField<Balance<A>>; readonly balanceB: ToField<Balance<B>>; readonly lpSupply: ToField<Supply<LpType>>; readonly protocolFees: ToField<Fees<A, B>>; readonly poolFeeConfig: ToField<FeeConfig>; readonly redemptionFees: ToField<Fees<A, B>>; readonly tradingData: ToField<TradingData>; readonly version: ToField<Version>
 
- private constructor(typeArgs: [PhantomToTypeStr<A>, PhantomToTypeStr<B>, ToTypeStr<Quoter>, PhantomToTypeStr<P>], fields: PoolFields<A, B, Quoter, P>, ) { this.$fullTypeName = composeSuiType( Pool.$typeName, ...typeArgs ) as `${typeof PKG_V1}::pool::Pool<${PhantomToTypeStr<A>}, ${PhantomToTypeStr<B>}, ${ToTypeStr<Quoter>}, ${PhantomToTypeStr<P>}>`; this.$typeArgs = typeArgs;
+ private constructor(typeArgs: [PhantomToTypeStr<A>, PhantomToTypeStr<B>, ToTypeStr<Quoter>, PhantomToTypeStr<LpType>], fields: PoolFields<A, B, Quoter, LpType>, ) { this.$fullTypeName = composeSuiType( Pool.$typeName, ...typeArgs ) as `${typeof PKG_V1}::pool::Pool<${PhantomToTypeStr<A>}, ${PhantomToTypeStr<B>}, ${ToTypeStr<Quoter>}, ${PhantomToTypeStr<LpType>}>`; this.$typeArgs = typeArgs;
 
- this.id = fields.id;; this.quoter = fields.quoter;; this.btokensA = fields.btokensA;; this.btokensB = fields.btokensB;; this.lpSupply = fields.lpSupply;; this.protocolFees = fields.protocolFees;; this.poolFeeConfig = fields.poolFeeConfig;; this.redemptionFees = fields.redemptionFees;; this.tradingData = fields.tradingData;; this.lockGuard = fields.lockGuard;; this.version = fields.version; }
+ this.id = fields.id;; this.quoter = fields.quoter;; this.balanceA = fields.balanceA;; this.balanceB = fields.balanceB;; this.lpSupply = fields.lpSupply;; this.protocolFees = fields.protocolFees;; this.poolFeeConfig = fields.poolFeeConfig;; this.redemptionFees = fields.redemptionFees;; this.tradingData = fields.tradingData;; this.version = fields.version; }
 
- static reified<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends Reified<TypeArgument, any>, P extends PhantomReified<PhantomTypeArgument>>( A: A, B: B, Quoter: Quoter, P: P ): PoolReified<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { return { typeName: Pool.$typeName, fullTypeName: composeSuiType( Pool.$typeName, ...[extractType(A), extractType(B), extractType(Quoter), extractType(P)] ) as `${typeof PKG_V1}::pool::Pool<${PhantomToTypeStr<ToPhantomTypeArgument<A>>}, ${PhantomToTypeStr<ToPhantomTypeArgument<B>>}, ${ToTypeStr<ToTypeArgument<Quoter>>}, ${PhantomToTypeStr<ToPhantomTypeArgument<P>>}>`, typeArgs: [ extractType(A), extractType(B), extractType(Quoter), extractType(P) ] as [PhantomToTypeStr<ToPhantomTypeArgument<A>>, PhantomToTypeStr<ToPhantomTypeArgument<B>>, ToTypeStr<ToTypeArgument<Quoter>>, PhantomToTypeStr<ToPhantomTypeArgument<P>>], isPhantom: Pool.$isPhantom, reifiedTypeArgs: [A, B, Quoter, P], fromFields: (fields: Record<string, any>) => Pool.fromFields( [A, B, Quoter, P], fields, ), fromFieldsWithTypes: (item: FieldsWithTypes) => Pool.fromFieldsWithTypes( [A, B, Quoter, P], item, ), fromBcs: (data: Uint8Array) => Pool.fromBcs( [A, B, Quoter, P], data, ), bcs: Pool.bcs(toBcs(Quoter)), fromJSONField: (field: any) => Pool.fromJSONField( [A, B, Quoter, P], field, ), fromJSON: (json: Record<string, any>) => Pool.fromJSON( [A, B, Quoter, P], json, ), fromSuiParsedData: (content: SuiParsedData) => Pool.fromSuiParsedData( [A, B, Quoter, P], content, ), fromSuiObjectData: (content: SuiObjectData) => Pool.fromSuiObjectData( [A, B, Quoter, P], content, ), fetch: async (client: SuiClient, id: string) => Pool.fetch( client, [A, B, Quoter, P], id, ), new: ( fields: PoolFields<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<P>>, ) => { return new Pool( [extractType(A), extractType(B), extractType(Quoter), extractType(P)], fields ) }, kind: "StructClassReified", } }
+ static reified<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends Reified<TypeArgument, any>, LpType extends PhantomReified<PhantomTypeArgument>>( A: A, B: B, Quoter: Quoter, LpType: LpType ): PoolReified<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>> { return { typeName: Pool.$typeName, fullTypeName: composeSuiType( Pool.$typeName, ...[extractType(A), extractType(B), extractType(Quoter), extractType(LpType)] ) as `${typeof PKG_V1}::pool::Pool<${PhantomToTypeStr<ToPhantomTypeArgument<A>>}, ${PhantomToTypeStr<ToPhantomTypeArgument<B>>}, ${ToTypeStr<ToTypeArgument<Quoter>>}, ${PhantomToTypeStr<ToPhantomTypeArgument<LpType>>}>`, typeArgs: [ extractType(A), extractType(B), extractType(Quoter), extractType(LpType) ] as [PhantomToTypeStr<ToPhantomTypeArgument<A>>, PhantomToTypeStr<ToPhantomTypeArgument<B>>, ToTypeStr<ToTypeArgument<Quoter>>, PhantomToTypeStr<ToPhantomTypeArgument<LpType>>], isPhantom: Pool.$isPhantom, reifiedTypeArgs: [A, B, Quoter, LpType], fromFields: (fields: Record<string, any>) => Pool.fromFields( [A, B, Quoter, LpType], fields, ), fromFieldsWithTypes: (item: FieldsWithTypes) => Pool.fromFieldsWithTypes( [A, B, Quoter, LpType], item, ), fromBcs: (data: Uint8Array) => Pool.fromBcs( [A, B, Quoter, LpType], data, ), bcs: Pool.bcs(toBcs(Quoter)), fromJSONField: (field: any) => Pool.fromJSONField( [A, B, Quoter, LpType], field, ), fromJSON: (json: Record<string, any>) => Pool.fromJSON( [A, B, Quoter, LpType], json, ), fromSuiParsedData: (content: SuiParsedData) => Pool.fromSuiParsedData( [A, B, Quoter, LpType], content, ), fromSuiObjectData: (content: SuiObjectData) => Pool.fromSuiObjectData( [A, B, Quoter, LpType], content, ), fetch: async (client: SuiClient, id: string) => Pool.fetch( client, [A, B, Quoter, LpType], id, ), new: ( fields: PoolFields<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>>, ) => { return new Pool( [extractType(A), extractType(B), extractType(Quoter), extractType(LpType)], fields ) }, kind: "StructClassReified", } }
 
  static get r() { return Pool.reified }
 
- static phantom<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends Reified<TypeArgument, any>, P extends PhantomReified<PhantomTypeArgument>>( A: A, B: B, Quoter: Quoter, P: P ): PhantomReified<ToTypeStr<Pool<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<P>>>> { return phantom(Pool.reified( A, B, Quoter, P )); } static get p() { return Pool.phantom }
+ static phantom<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends Reified<TypeArgument, any>, LpType extends PhantomReified<PhantomTypeArgument>>( A: A, B: B, Quoter: Quoter, LpType: LpType ): PhantomReified<ToTypeStr<Pool<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>>>> { return phantom(Pool.reified( A, B, Quoter, LpType )); } static get p() { return Pool.phantom }
 
  static get bcs() { return <Quoter extends BcsType<any>>(Quoter: Quoter) => bcs.struct(`Pool<${Quoter.name}>`, {
 
- id: UID.bcs, quoter: Quoter, btokens_a: Balance.bcs, btokens_b: Balance.bcs, lp_supply: Supply.bcs, protocol_fees: Fees.bcs, pool_fee_config: FeeConfig.bcs, redemption_fees: Fees.bcs, trading_data: TradingData.bcs, lock_guard: bcs.bool(), version: Version.bcs
+ id: UID.bcs, quoter: Quoter, balance_a: Balance.bcs, balance_b: Balance.bcs, lp_supply: Supply.bcs, protocol_fees: Fees.bcs, pool_fee_config: FeeConfig.bcs, redemption_fees: Fees.bcs, trading_data: TradingData.bcs, version: Version.bcs
 
 }) };
 
- static fromFields<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends Reified<TypeArgument, any>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], fields: Record<string, any> ): Pool<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { return Pool.reified( typeArgs[0], typeArgs[1], typeArgs[2], typeArgs[3], ).new( { id: decodeFromFields(UID.reified(), fields.id), quoter: decodeFromFields(typeArgs[2], fields.quoter), btokensA: decodeFromFields(Balance.reified(reified.phantom(BToken.reified(typeArgs[3], typeArgs[0]))), fields.btokens_a), btokensB: decodeFromFields(Balance.reified(reified.phantom(BToken.reified(typeArgs[3], typeArgs[1]))), fields.btokens_b), lpSupply: decodeFromFields(Supply.reified(reified.phantom(LP.reified(typeArgs[0], typeArgs[1], reified.phantom(typeArgs[2]), typeArgs[3]))), fields.lp_supply), protocolFees: decodeFromFields(Fees.reified(reified.phantom(BToken.reified(typeArgs[3], typeArgs[0])), reified.phantom(BToken.reified(typeArgs[3], typeArgs[1]))), fields.protocol_fees), poolFeeConfig: decodeFromFields(FeeConfig.reified(), fields.pool_fee_config), redemptionFees: decodeFromFields(Fees.reified(reified.phantom(BToken.reified(typeArgs[3], typeArgs[0])), reified.phantom(BToken.reified(typeArgs[3], typeArgs[1]))), fields.redemption_fees), tradingData: decodeFromFields(TradingData.reified(), fields.trading_data), lockGuard: decodeFromFields("bool", fields.lock_guard), version: decodeFromFields(Version.reified(), fields.version) } ) }
+ static fromFields<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends Reified<TypeArgument, any>, LpType extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, LpType], fields: Record<string, any> ): Pool<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>> { return Pool.reified( typeArgs[0], typeArgs[1], typeArgs[2], typeArgs[3], ).new( { id: decodeFromFields(UID.reified(), fields.id), quoter: decodeFromFields(typeArgs[2], fields.quoter), balanceA: decodeFromFields(Balance.reified(typeArgs[0]), fields.balance_a), balanceB: decodeFromFields(Balance.reified(typeArgs[1]), fields.balance_b), lpSupply: decodeFromFields(Supply.reified(typeArgs[3]), fields.lp_supply), protocolFees: decodeFromFields(Fees.reified(typeArgs[0], typeArgs[1]), fields.protocol_fees), poolFeeConfig: decodeFromFields(FeeConfig.reified(), fields.pool_fee_config), redemptionFees: decodeFromFields(Fees.reified(typeArgs[0], typeArgs[1]), fields.redemption_fees), tradingData: decodeFromFields(TradingData.reified(), fields.trading_data), version: decodeFromFields(Version.reified(), fields.version) } ) }
 
- static fromFieldsWithTypes<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends Reified<TypeArgument, any>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], item: FieldsWithTypes ): Pool<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { if (!isPool(item.type)) { throw new Error("not a Pool type");
+ static fromFieldsWithTypes<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends Reified<TypeArgument, any>, LpType extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, LpType], item: FieldsWithTypes ): Pool<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>> { if (!isPool(item.type)) { throw new Error("not a Pool type");
 
  } assertFieldsWithTypesArgsMatch(item, typeArgs);
 
- return Pool.reified( typeArgs[0], typeArgs[1], typeArgs[2], typeArgs[3], ).new( { id: decodeFromFieldsWithTypes(UID.reified(), item.fields.id), quoter: decodeFromFieldsWithTypes(typeArgs[2], item.fields.quoter), btokensA: decodeFromFieldsWithTypes(Balance.reified(reified.phantom(BToken.reified(typeArgs[3], typeArgs[0]))), item.fields.btokens_a), btokensB: decodeFromFieldsWithTypes(Balance.reified(reified.phantom(BToken.reified(typeArgs[3], typeArgs[1]))), item.fields.btokens_b), lpSupply: decodeFromFieldsWithTypes(Supply.reified(reified.phantom(LP.reified(typeArgs[0], typeArgs[1], reified.phantom(typeArgs[2]), typeArgs[3]))), item.fields.lp_supply), protocolFees: decodeFromFieldsWithTypes(Fees.reified(reified.phantom(BToken.reified(typeArgs[3], typeArgs[0])), reified.phantom(BToken.reified(typeArgs[3], typeArgs[1]))), item.fields.protocol_fees), poolFeeConfig: decodeFromFieldsWithTypes(FeeConfig.reified(), item.fields.pool_fee_config), redemptionFees: decodeFromFieldsWithTypes(Fees.reified(reified.phantom(BToken.reified(typeArgs[3], typeArgs[0])), reified.phantom(BToken.reified(typeArgs[3], typeArgs[1]))), item.fields.redemption_fees), tradingData: decodeFromFieldsWithTypes(TradingData.reified(), item.fields.trading_data), lockGuard: decodeFromFieldsWithTypes("bool", item.fields.lock_guard), version: decodeFromFieldsWithTypes(Version.reified(), item.fields.version) } ) }
+ return Pool.reified( typeArgs[0], typeArgs[1], typeArgs[2], typeArgs[3], ).new( { id: decodeFromFieldsWithTypes(UID.reified(), item.fields.id), quoter: decodeFromFieldsWithTypes(typeArgs[2], item.fields.quoter), balanceA: decodeFromFieldsWithTypes(Balance.reified(typeArgs[0]), item.fields.balance_a), balanceB: decodeFromFieldsWithTypes(Balance.reified(typeArgs[1]), item.fields.balance_b), lpSupply: decodeFromFieldsWithTypes(Supply.reified(typeArgs[3]), item.fields.lp_supply), protocolFees: decodeFromFieldsWithTypes(Fees.reified(typeArgs[0], typeArgs[1]), item.fields.protocol_fees), poolFeeConfig: decodeFromFieldsWithTypes(FeeConfig.reified(), item.fields.pool_fee_config), redemptionFees: decodeFromFieldsWithTypes(Fees.reified(typeArgs[0], typeArgs[1]), item.fields.redemption_fees), tradingData: decodeFromFieldsWithTypes(TradingData.reified(), item.fields.trading_data), version: decodeFromFieldsWithTypes(Version.reified(), item.fields.version) } ) }
 
- static fromBcs<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends Reified<TypeArgument, any>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], data: Uint8Array ): Pool<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { return Pool.fromFields( typeArgs, Pool.bcs( toBcs(typeArgs[2]) ).parse(data) ) }
+ static fromBcs<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends Reified<TypeArgument, any>, LpType extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, LpType], data: Uint8Array ): Pool<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>> { return Pool.fromFields( typeArgs, Pool.bcs( toBcs(typeArgs[2]) ).parse(data) ) }
 
  toJSONField() { return {
 
- id: this.id,quoter: fieldToJSON<Quoter>(this.$typeArgs[2], this.quoter),btokensA: this.btokensA.toJSONField(),btokensB: this.btokensB.toJSONField(),lpSupply: this.lpSupply.toJSONField(),protocolFees: this.protocolFees.toJSONField(),poolFeeConfig: this.poolFeeConfig.toJSONField(),redemptionFees: this.redemptionFees.toJSONField(),tradingData: this.tradingData.toJSONField(),lockGuard: this.lockGuard,version: this.version.toJSONField(),
+ id: this.id,quoter: fieldToJSON<Quoter>(this.$typeArgs[2], this.quoter),balanceA: this.balanceA.toJSONField(),balanceB: this.balanceB.toJSONField(),lpSupply: this.lpSupply.toJSONField(),protocolFees: this.protocolFees.toJSONField(),poolFeeConfig: this.poolFeeConfig.toJSONField(),redemptionFees: this.redemptionFees.toJSONField(),tradingData: this.tradingData.toJSONField(),version: this.version.toJSONField(),
 
 } }
 
  toJSON() { return { $typeName: this.$typeName, $typeArgs: this.$typeArgs, ...this.toJSONField() } }
 
- static fromJSONField<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends Reified<TypeArgument, any>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], field: any ): Pool<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { return Pool.reified( typeArgs[0], typeArgs[1], typeArgs[2], typeArgs[3], ).new( { id: decodeFromJSONField(UID.reified(), field.id), quoter: decodeFromJSONField(typeArgs[2], field.quoter), btokensA: decodeFromJSONField(Balance.reified(reified.phantom(BToken.reified(typeArgs[3], typeArgs[0]))), field.btokensA), btokensB: decodeFromJSONField(Balance.reified(reified.phantom(BToken.reified(typeArgs[3], typeArgs[1]))), field.btokensB), lpSupply: decodeFromJSONField(Supply.reified(reified.phantom(LP.reified(typeArgs[0], typeArgs[1], reified.phantom(typeArgs[2]), typeArgs[3]))), field.lpSupply), protocolFees: decodeFromJSONField(Fees.reified(reified.phantom(BToken.reified(typeArgs[3], typeArgs[0])), reified.phantom(BToken.reified(typeArgs[3], typeArgs[1]))), field.protocolFees), poolFeeConfig: decodeFromJSONField(FeeConfig.reified(), field.poolFeeConfig), redemptionFees: decodeFromJSONField(Fees.reified(reified.phantom(BToken.reified(typeArgs[3], typeArgs[0])), reified.phantom(BToken.reified(typeArgs[3], typeArgs[1]))), field.redemptionFees), tradingData: decodeFromJSONField(TradingData.reified(), field.tradingData), lockGuard: decodeFromJSONField("bool", field.lockGuard), version: decodeFromJSONField(Version.reified(), field.version) } ) }
+ static fromJSONField<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends Reified<TypeArgument, any>, LpType extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, LpType], field: any ): Pool<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>> { return Pool.reified( typeArgs[0], typeArgs[1], typeArgs[2], typeArgs[3], ).new( { id: decodeFromJSONField(UID.reified(), field.id), quoter: decodeFromJSONField(typeArgs[2], field.quoter), balanceA: decodeFromJSONField(Balance.reified(typeArgs[0]), field.balanceA), balanceB: decodeFromJSONField(Balance.reified(typeArgs[1]), field.balanceB), lpSupply: decodeFromJSONField(Supply.reified(typeArgs[3]), field.lpSupply), protocolFees: decodeFromJSONField(Fees.reified(typeArgs[0], typeArgs[1]), field.protocolFees), poolFeeConfig: decodeFromJSONField(FeeConfig.reified(), field.poolFeeConfig), redemptionFees: decodeFromJSONField(Fees.reified(typeArgs[0], typeArgs[1]), field.redemptionFees), tradingData: decodeFromJSONField(TradingData.reified(), field.tradingData), version: decodeFromJSONField(Version.reified(), field.version) } ) }
 
- static fromJSON<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends Reified<TypeArgument, any>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], json: Record<string, any> ): Pool<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { if (json.$typeName !== Pool.$typeName) { throw new Error("not a WithTwoGenerics json object") }; assertReifiedTypeArgsMatch( composeSuiType(Pool.$typeName, ...typeArgs.map(extractType)), json.$typeArgs, typeArgs, )
+ static fromJSON<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends Reified<TypeArgument, any>, LpType extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, LpType], json: Record<string, any> ): Pool<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>> { if (json.$typeName !== Pool.$typeName) { throw new Error("not a WithTwoGenerics json object") }; assertReifiedTypeArgsMatch( composeSuiType(Pool.$typeName, ...typeArgs.map(extractType)), json.$typeArgs, typeArgs, )
 
  return Pool.fromJSONField( typeArgs, json, ) }
 
- static fromSuiParsedData<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends Reified<TypeArgument, any>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], content: SuiParsedData ): Pool<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { if (content.dataType !== "moveObject") { throw new Error("not an object"); } if (!isPool(content.type)) { throw new Error(`object at ${(content.fields as any).id} is not a Pool object`); } return Pool.fromFieldsWithTypes( typeArgs, content ); }
+ static fromSuiParsedData<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends Reified<TypeArgument, any>, LpType extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, LpType], content: SuiParsedData ): Pool<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>> { if (content.dataType !== "moveObject") { throw new Error("not an object"); } if (!isPool(content.type)) { throw new Error(`object at ${(content.fields as any).id} is not a Pool object`); } return Pool.fromFieldsWithTypes( typeArgs, content ); }
 
- static fromSuiObjectData<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends Reified<TypeArgument, any>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], data: SuiObjectData ): Pool<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { if (data.bcs) { if (data.bcs.dataType !== "moveObject" || !isPool(data.bcs.type)) { throw new Error(`object at is not a Pool object`); }
+ static fromSuiObjectData<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends Reified<TypeArgument, any>, LpType extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, LpType], data: SuiObjectData ): Pool<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>> { if (data.bcs) { if (data.bcs.dataType !== "moveObject" || !isPool(data.bcs.type)) { throw new Error(`object at is not a Pool object`); }
 
  const gotTypeArgs = parseTypeName(data.bcs.type).typeArgs; if (gotTypeArgs.length !== 4) { throw new Error(`type argument mismatch: expected 4 type arguments but got ${gotTypeArgs.length}`); }; for (let i = 0; i < 4; i++) { const gotTypeArg = compressSuiType(gotTypeArgs[i]); const expectedTypeArg = compressSuiType(extractType(typeArgs[i])); if (gotTypeArg !== expectedTypeArg) { throw new Error(`type argument mismatch at position ${i}: expected '${expectedTypeArg}' but got '${gotTypeArg}'`); } };
 
  return Pool.fromBcs( typeArgs, fromB64(data.bcs.bcsBytes) ); } if (data.content) { return Pool.fromSuiParsedData( typeArgs, data.content ) } throw new Error( "Both `bcs` and `content` fields are missing from the data. Include `showBcs` or `showContent` in the request." ); }
 
- static async fetch<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends Reified<TypeArgument, any>, P extends PhantomReified<PhantomTypeArgument>>( client: SuiClient, typeArgs: [A, B, Quoter, P], id: string ): Promise<Pool<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<P>>> { const res = await client.getObject({ id, options: { showBcs: true, }, }); if (res.error) { throw new Error(`error fetching Pool object at id ${id}: ${res.error.code}`); } if (res.data?.bcs?.dataType !== "moveObject" || !isPool(res.data.bcs.type)) { throw new Error(`object at id ${id} is not a Pool object`); }
+ static async fetch<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends Reified<TypeArgument, any>, LpType extends PhantomReified<PhantomTypeArgument>>( client: SuiClient, typeArgs: [A, B, Quoter, LpType], id: string ): Promise<Pool<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>>> { const res = await client.getObject({ id, options: { showBcs: true, }, }); if (res.error) { throw new Error(`error fetching Pool object at id ${id}: ${res.error.code}`); } if (res.data?.bcs?.dataType !== "moveObject" || !isPool(res.data.bcs.type)) { throw new Error(`object at id ${id} is not a Pool object`); }
 
  return Pool.fromSuiObjectData( typeArgs, res.data ); }
 
@@ -362,27 +221,27 @@ export class Pool<A extends PhantomTypeArgument, B extends PhantomTypeArgument, 
 
 export function isPoolCap(type: string): boolean { type = compressSuiType(type); return type.startsWith(`${PKG_V1}::pool::PoolCap` + '<'); }
 
-export interface PoolCapFields<A extends PhantomTypeArgument, B extends PhantomTypeArgument, Quoter extends PhantomTypeArgument, P extends PhantomTypeArgument> { id: ToField<UID>; poolId: ToField<ID> }
+export interface PoolCapFields<A extends PhantomTypeArgument, B extends PhantomTypeArgument, Quoter extends PhantomTypeArgument, LpType extends PhantomTypeArgument> { id: ToField<UID>; poolId: ToField<ID> }
 
-export type PoolCapReified<A extends PhantomTypeArgument, B extends PhantomTypeArgument, Quoter extends PhantomTypeArgument, P extends PhantomTypeArgument> = Reified< PoolCap<A, B, Quoter, P>, PoolCapFields<A, B, Quoter, P> >;
+export type PoolCapReified<A extends PhantomTypeArgument, B extends PhantomTypeArgument, Quoter extends PhantomTypeArgument, LpType extends PhantomTypeArgument> = Reified< PoolCap<A, B, Quoter, LpType>, PoolCapFields<A, B, Quoter, LpType> >;
 
-export class PoolCap<A extends PhantomTypeArgument, B extends PhantomTypeArgument, Quoter extends PhantomTypeArgument, P extends PhantomTypeArgument> implements StructClass { __StructClass = true as const;
+export class PoolCap<A extends PhantomTypeArgument, B extends PhantomTypeArgument, Quoter extends PhantomTypeArgument, LpType extends PhantomTypeArgument> implements StructClass { __StructClass = true as const;
 
  static readonly $typeName = `${PKG_V1}::pool::PoolCap`; static readonly $numTypeParams = 4; static readonly $isPhantom = [true,true,true,true,] as const;
 
- readonly $typeName = PoolCap.$typeName; readonly $fullTypeName: `${typeof PKG_V1}::pool::PoolCap<${PhantomToTypeStr<A>}, ${PhantomToTypeStr<B>}, ${PhantomToTypeStr<Quoter>}, ${PhantomToTypeStr<P>}>`; readonly $typeArgs: [PhantomToTypeStr<A>, PhantomToTypeStr<B>, PhantomToTypeStr<Quoter>, PhantomToTypeStr<P>]; readonly $isPhantom = PoolCap.$isPhantom;
+ readonly $typeName = PoolCap.$typeName; readonly $fullTypeName: `${typeof PKG_V1}::pool::PoolCap<${PhantomToTypeStr<A>}, ${PhantomToTypeStr<B>}, ${PhantomToTypeStr<Quoter>}, ${PhantomToTypeStr<LpType>}>`; readonly $typeArgs: [PhantomToTypeStr<A>, PhantomToTypeStr<B>, PhantomToTypeStr<Quoter>, PhantomToTypeStr<LpType>]; readonly $isPhantom = PoolCap.$isPhantom;
 
  readonly id: ToField<UID>; readonly poolId: ToField<ID>
 
- private constructor(typeArgs: [PhantomToTypeStr<A>, PhantomToTypeStr<B>, PhantomToTypeStr<Quoter>, PhantomToTypeStr<P>], fields: PoolCapFields<A, B, Quoter, P>, ) { this.$fullTypeName = composeSuiType( PoolCap.$typeName, ...typeArgs ) as `${typeof PKG_V1}::pool::PoolCap<${PhantomToTypeStr<A>}, ${PhantomToTypeStr<B>}, ${PhantomToTypeStr<Quoter>}, ${PhantomToTypeStr<P>}>`; this.$typeArgs = typeArgs;
+ private constructor(typeArgs: [PhantomToTypeStr<A>, PhantomToTypeStr<B>, PhantomToTypeStr<Quoter>, PhantomToTypeStr<LpType>], fields: PoolCapFields<A, B, Quoter, LpType>, ) { this.$fullTypeName = composeSuiType( PoolCap.$typeName, ...typeArgs ) as `${typeof PKG_V1}::pool::PoolCap<${PhantomToTypeStr<A>}, ${PhantomToTypeStr<B>}, ${PhantomToTypeStr<Quoter>}, ${PhantomToTypeStr<LpType>}>`; this.$typeArgs = typeArgs;
 
  this.id = fields.id;; this.poolId = fields.poolId; }
 
- static reified<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( A: A, B: B, Quoter: Quoter, P: P ): PoolCapReified<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { return { typeName: PoolCap.$typeName, fullTypeName: composeSuiType( PoolCap.$typeName, ...[extractType(A), extractType(B), extractType(Quoter), extractType(P)] ) as `${typeof PKG_V1}::pool::PoolCap<${PhantomToTypeStr<ToPhantomTypeArgument<A>>}, ${PhantomToTypeStr<ToPhantomTypeArgument<B>>}, ${PhantomToTypeStr<ToPhantomTypeArgument<Quoter>>}, ${PhantomToTypeStr<ToPhantomTypeArgument<P>>}>`, typeArgs: [ extractType(A), extractType(B), extractType(Quoter), extractType(P) ] as [PhantomToTypeStr<ToPhantomTypeArgument<A>>, PhantomToTypeStr<ToPhantomTypeArgument<B>>, PhantomToTypeStr<ToPhantomTypeArgument<Quoter>>, PhantomToTypeStr<ToPhantomTypeArgument<P>>], isPhantom: PoolCap.$isPhantom, reifiedTypeArgs: [A, B, Quoter, P], fromFields: (fields: Record<string, any>) => PoolCap.fromFields( [A, B, Quoter, P], fields, ), fromFieldsWithTypes: (item: FieldsWithTypes) => PoolCap.fromFieldsWithTypes( [A, B, Quoter, P], item, ), fromBcs: (data: Uint8Array) => PoolCap.fromBcs( [A, B, Quoter, P], data, ), bcs: PoolCap.bcs, fromJSONField: (field: any) => PoolCap.fromJSONField( [A, B, Quoter, P], field, ), fromJSON: (json: Record<string, any>) => PoolCap.fromJSON( [A, B, Quoter, P], json, ), fromSuiParsedData: (content: SuiParsedData) => PoolCap.fromSuiParsedData( [A, B, Quoter, P], content, ), fromSuiObjectData: (content: SuiObjectData) => PoolCap.fromSuiObjectData( [A, B, Quoter, P], content, ), fetch: async (client: SuiClient, id: string) => PoolCap.fetch( client, [A, B, Quoter, P], id, ), new: ( fields: PoolCapFields<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>>, ) => { return new PoolCap( [extractType(A), extractType(B), extractType(Quoter), extractType(P)], fields ) }, kind: "StructClassReified", } }
+ static reified<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, LpType extends PhantomReified<PhantomTypeArgument>>( A: A, B: B, Quoter: Quoter, LpType: LpType ): PoolCapReified<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>> { return { typeName: PoolCap.$typeName, fullTypeName: composeSuiType( PoolCap.$typeName, ...[extractType(A), extractType(B), extractType(Quoter), extractType(LpType)] ) as `${typeof PKG_V1}::pool::PoolCap<${PhantomToTypeStr<ToPhantomTypeArgument<A>>}, ${PhantomToTypeStr<ToPhantomTypeArgument<B>>}, ${PhantomToTypeStr<ToPhantomTypeArgument<Quoter>>}, ${PhantomToTypeStr<ToPhantomTypeArgument<LpType>>}>`, typeArgs: [ extractType(A), extractType(B), extractType(Quoter), extractType(LpType) ] as [PhantomToTypeStr<ToPhantomTypeArgument<A>>, PhantomToTypeStr<ToPhantomTypeArgument<B>>, PhantomToTypeStr<ToPhantomTypeArgument<Quoter>>, PhantomToTypeStr<ToPhantomTypeArgument<LpType>>], isPhantom: PoolCap.$isPhantom, reifiedTypeArgs: [A, B, Quoter, LpType], fromFields: (fields: Record<string, any>) => PoolCap.fromFields( [A, B, Quoter, LpType], fields, ), fromFieldsWithTypes: (item: FieldsWithTypes) => PoolCap.fromFieldsWithTypes( [A, B, Quoter, LpType], item, ), fromBcs: (data: Uint8Array) => PoolCap.fromBcs( [A, B, Quoter, LpType], data, ), bcs: PoolCap.bcs, fromJSONField: (field: any) => PoolCap.fromJSONField( [A, B, Quoter, LpType], field, ), fromJSON: (json: Record<string, any>) => PoolCap.fromJSON( [A, B, Quoter, LpType], json, ), fromSuiParsedData: (content: SuiParsedData) => PoolCap.fromSuiParsedData( [A, B, Quoter, LpType], content, ), fromSuiObjectData: (content: SuiObjectData) => PoolCap.fromSuiObjectData( [A, B, Quoter, LpType], content, ), fetch: async (client: SuiClient, id: string) => PoolCap.fetch( client, [A, B, Quoter, LpType], id, ), new: ( fields: PoolCapFields<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>>, ) => { return new PoolCap( [extractType(A), extractType(B), extractType(Quoter), extractType(LpType)], fields ) }, kind: "StructClassReified", } }
 
  static get r() { return PoolCap.reified }
 
- static phantom<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( A: A, B: B, Quoter: Quoter, P: P ): PhantomReified<ToTypeStr<PoolCap<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>>>> { return phantom(PoolCap.reified( A, B, Quoter, P )); } static get p() { return PoolCap.phantom }
+ static phantom<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, LpType extends PhantomReified<PhantomTypeArgument>>( A: A, B: B, Quoter: Quoter, LpType: LpType ): PhantomReified<ToTypeStr<PoolCap<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>>>> { return phantom(PoolCap.reified( A, B, Quoter, LpType )); } static get p() { return PoolCap.phantom }
 
  static get bcs() { return bcs.struct("PoolCap", {
 
@@ -390,15 +249,15 @@ export class PoolCap<A extends PhantomTypeArgument, B extends PhantomTypeArgumen
 
 }) };
 
- static fromFields<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], fields: Record<string, any> ): PoolCap<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { return PoolCap.reified( typeArgs[0], typeArgs[1], typeArgs[2], typeArgs[3], ).new( { id: decodeFromFields(UID.reified(), fields.id), poolId: decodeFromFields(ID.reified(), fields.pool_id) } ) }
+ static fromFields<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, LpType extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, LpType], fields: Record<string, any> ): PoolCap<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>> { return PoolCap.reified( typeArgs[0], typeArgs[1], typeArgs[2], typeArgs[3], ).new( { id: decodeFromFields(UID.reified(), fields.id), poolId: decodeFromFields(ID.reified(), fields.pool_id) } ) }
 
- static fromFieldsWithTypes<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], item: FieldsWithTypes ): PoolCap<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { if (!isPoolCap(item.type)) { throw new Error("not a PoolCap type");
+ static fromFieldsWithTypes<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, LpType extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, LpType], item: FieldsWithTypes ): PoolCap<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>> { if (!isPoolCap(item.type)) { throw new Error("not a PoolCap type");
 
  } assertFieldsWithTypesArgsMatch(item, typeArgs);
 
  return PoolCap.reified( typeArgs[0], typeArgs[1], typeArgs[2], typeArgs[3], ).new( { id: decodeFromFieldsWithTypes(UID.reified(), item.fields.id), poolId: decodeFromFieldsWithTypes(ID.reified(), item.fields.pool_id) } ) }
 
- static fromBcs<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], data: Uint8Array ): PoolCap<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { return PoolCap.fromFields( typeArgs, PoolCap.bcs.parse(data) ) }
+ static fromBcs<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, LpType extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, LpType], data: Uint8Array ): PoolCap<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>> { return PoolCap.fromFields( typeArgs, PoolCap.bcs.parse(data) ) }
 
  toJSONField() { return {
 
@@ -408,21 +267,21 @@ export class PoolCap<A extends PhantomTypeArgument, B extends PhantomTypeArgumen
 
  toJSON() { return { $typeName: this.$typeName, $typeArgs: this.$typeArgs, ...this.toJSONField() } }
 
- static fromJSONField<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], field: any ): PoolCap<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { return PoolCap.reified( typeArgs[0], typeArgs[1], typeArgs[2], typeArgs[3], ).new( { id: decodeFromJSONField(UID.reified(), field.id), poolId: decodeFromJSONField(ID.reified(), field.poolId) } ) }
+ static fromJSONField<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, LpType extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, LpType], field: any ): PoolCap<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>> { return PoolCap.reified( typeArgs[0], typeArgs[1], typeArgs[2], typeArgs[3], ).new( { id: decodeFromJSONField(UID.reified(), field.id), poolId: decodeFromJSONField(ID.reified(), field.poolId) } ) }
 
- static fromJSON<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], json: Record<string, any> ): PoolCap<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { if (json.$typeName !== PoolCap.$typeName) { throw new Error("not a WithTwoGenerics json object") }; assertReifiedTypeArgsMatch( composeSuiType(PoolCap.$typeName, ...typeArgs.map(extractType)), json.$typeArgs, typeArgs, )
+ static fromJSON<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, LpType extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, LpType], json: Record<string, any> ): PoolCap<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>> { if (json.$typeName !== PoolCap.$typeName) { throw new Error("not a WithTwoGenerics json object") }; assertReifiedTypeArgsMatch( composeSuiType(PoolCap.$typeName, ...typeArgs.map(extractType)), json.$typeArgs, typeArgs, )
 
  return PoolCap.fromJSONField( typeArgs, json, ) }
 
- static fromSuiParsedData<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], content: SuiParsedData ): PoolCap<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { if (content.dataType !== "moveObject") { throw new Error("not an object"); } if (!isPoolCap(content.type)) { throw new Error(`object at ${(content.fields as any).id} is not a PoolCap object`); } return PoolCap.fromFieldsWithTypes( typeArgs, content ); }
+ static fromSuiParsedData<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, LpType extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, LpType], content: SuiParsedData ): PoolCap<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>> { if (content.dataType !== "moveObject") { throw new Error("not an object"); } if (!isPoolCap(content.type)) { throw new Error(`object at ${(content.fields as any).id} is not a PoolCap object`); } return PoolCap.fromFieldsWithTypes( typeArgs, content ); }
 
- static fromSuiObjectData<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, P], data: SuiObjectData ): PoolCap<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>> { if (data.bcs) { if (data.bcs.dataType !== "moveObject" || !isPoolCap(data.bcs.type)) { throw new Error(`object at is not a PoolCap object`); }
+ static fromSuiObjectData<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, LpType extends PhantomReified<PhantomTypeArgument>>( typeArgs: [A, B, Quoter, LpType], data: SuiObjectData ): PoolCap<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>> { if (data.bcs) { if (data.bcs.dataType !== "moveObject" || !isPoolCap(data.bcs.type)) { throw new Error(`object at is not a PoolCap object`); }
 
  const gotTypeArgs = parseTypeName(data.bcs.type).typeArgs; if (gotTypeArgs.length !== 4) { throw new Error(`type argument mismatch: expected 4 type arguments but got ${gotTypeArgs.length}`); }; for (let i = 0; i < 4; i++) { const gotTypeArg = compressSuiType(gotTypeArgs[i]); const expectedTypeArg = compressSuiType(extractType(typeArgs[i])); if (gotTypeArg !== expectedTypeArg) { throw new Error(`type argument mismatch at position ${i}: expected '${expectedTypeArg}' but got '${gotTypeArg}'`); } };
 
  return PoolCap.fromBcs( typeArgs, fromB64(data.bcs.bcsBytes) ); } if (data.content) { return PoolCap.fromSuiParsedData( typeArgs, data.content ) } throw new Error( "Both `bcs` and `content` fields are missing from the data. Include `showBcs` or `showContent` in the request." ); }
 
- static async fetch<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, P extends PhantomReified<PhantomTypeArgument>>( client: SuiClient, typeArgs: [A, B, Quoter, P], id: string ): Promise<PoolCap<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<P>>> { const res = await client.getObject({ id, options: { showBcs: true, }, }); if (res.error) { throw new Error(`error fetching PoolCap object at id ${id}: ${res.error.code}`); } if (res.data?.bcs?.dataType !== "moveObject" || !isPoolCap(res.data.bcs.type)) { throw new Error(`object at id ${id} is not a PoolCap object`); }
+ static async fetch<A extends PhantomReified<PhantomTypeArgument>, B extends PhantomReified<PhantomTypeArgument>, Quoter extends PhantomReified<PhantomTypeArgument>, LpType extends PhantomReified<PhantomTypeArgument>>( client: SuiClient, typeArgs: [A, B, Quoter, LpType], id: string ): Promise<PoolCap<ToPhantomTypeArgument<A>, ToPhantomTypeArgument<B>, ToPhantomTypeArgument<Quoter>, ToPhantomTypeArgument<LpType>>> { const res = await client.getObject({ id, options: { showBcs: true, }, }); if (res.error) { throw new Error(`error fetching PoolCap object at id ${id}: ${res.error.code}`); } if (res.data?.bcs?.dataType !== "moveObject" || !isPoolCap(res.data.bcs.type)) { throw new Error(`object at id ${id} is not a PoolCap object`); }
 
  return PoolCap.fromSuiObjectData( typeArgs, res.data ); }
 

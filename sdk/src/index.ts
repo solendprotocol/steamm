@@ -1,3 +1,4 @@
+export * from "./interfaces/IModule";
 export * as BankFunctions from "./_codegen/bankFunctions";
 export * as PoolFunctions from "./_codegen/poolFunctions";
 export * as ConstantProductFunctions from "./_codegen/constantProductFunctions";

@@ -2,27 +2,38 @@ import {
   TransactionArgument,
   TransactionObjectInput,
 } from "@mysten/sui/transactions";
+import {
+  CpQuoteSwapArgs,
+  CpSwapArgs,
+} from "../quoters/constantQuoter/constantProductArgs";
 
 export interface PoolNewArgs {
-  witness: TransactionObjectInput;
+  coinMetadataA: TransactionObjectInput;
+  coinMetadataB: TransactionObjectInput;
+  coinMetadataLp: TransactionObjectInput;
+  LpTreasury: TransactionObjectInput;
   registry: TransactionObjectInput;
   swapFeeBps: bigint | TransactionArgument;
-  inner: TransactionObjectInput;
 }
 
-export interface PoolIntentSwapArgs {
-  amountIn: bigint | TransactionArgument;
+export type PoolSwapArgs = CpSwapArgs; // Add more types here for new quoters
+export type PoolQuoteSwapArgs = CpQuoteSwapArgs; // Add more types here for new quoters
+
+export interface PoolSwapBaseArgs {
+  coinA: TransactionObjectInput;
+  coinB: TransactionObjectInput;
   a2b: boolean | TransactionArgument;
+  amountIn: bigint | TransactionArgument;
+  minAmountOut: bigint | TransactionArgument;
 }
 
 export interface PoolExecuteSwapArgs {
   intent: TransactionObjectInput;
-  coinA: TransactionObjectInput;
-  coinB: TransactionObjectInput;
+
   minAmountOut: bigint | TransactionArgument;
 }
 
-export interface PoolQuoteSwap {
+export interface PoolQuoteSwapBaseArgs {
   amountIn: bigint | TransactionArgument;
   a2b: boolean | TransactionArgument;
 }
@@ -32,12 +43,10 @@ export interface PoolDepositLiquidityArgs {
   coinB: TransactionObjectInput;
   maxA: bigint | TransactionArgument;
   maxB: bigint | TransactionArgument;
-  minA: bigint | TransactionArgument;
-  minB: bigint | TransactionArgument;
 }
 
 export interface PoolRedeemLiquidityArgs {
-  lpTokens: TransactionObjectInput;
+  lpCoinObj: TransactionObjectInput;
   minA: bigint | TransactionArgument;
   minB: bigint | TransactionArgument;
 }
@@ -45,10 +54,6 @@ export interface PoolRedeemLiquidityArgs {
 export interface QuoteDepositArgs {
   maxA: bigint | TransactionArgument;
   maxB: bigint | TransactionArgument;
-}
-
-export interface PoolPrepareBankForPendingWithdrawArgs {
-  intent: TransactionObjectInput;
 }
 
 export interface PoolQuoteRedeemArgs {
@@ -74,9 +79,9 @@ export interface CollectProtocolFeesArgs {
 }
 
 export interface MigrateArgs {
-  poolCap: TransactionObjectInput;
+  adminCap: TransactionObjectInput;
 }
 
-export interface MigrateAsGlobalAdminArgs {
+export interface MigratePoolArgs {
   globalAdmin: TransactionObjectInput;
 }

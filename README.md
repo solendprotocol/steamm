@@ -1,7 +1,5 @@
-# Suilend AMM
+# STEAMM
 
-Build:
-`sui move build`
+Build:`just sui build`
 
-Test:
-`sui move test --gas-limit 5000000000000`
+Test: `just sui test`
