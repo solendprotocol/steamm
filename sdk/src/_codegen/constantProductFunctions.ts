@@ -1,11 +1,8 @@
 export {
-  newWithOffset,
   new_,
-  intentSwap,
-  executeSwap,
+  swap,
   quoteSwap,
   offset,
   k,
   migrate,
-  migrateAsGlobalAdmin,
 } from "./_generated/steamm/cpmm/functions";

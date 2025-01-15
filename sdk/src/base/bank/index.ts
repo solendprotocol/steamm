@@ -1,59 +1,62 @@
-import { SuiClient } from "@mysten/sui/client";
-import { Transaction, TransactionArgument } from "@mysten/sui/transactions";
+import {
+  Transaction,
+  TransactionArgument,
+  TransactionResult,
+} from "@mysten/sui/transactions";
 import { SUI_CLOCK_OBJECT_ID } from "@mysten/sui/utils";
 import {
+  BurnBTokensArgs,
   CTokenAmountArgs,
   InitLendingArgs,
-  MigrateAsGlobalAdminArgs,
+  MigrateBankArgs,
+  MintBTokensArgs,
   SetUtilisationBpsArgs,
 } from "./bankArgs";
-import {
-  BankObj,
-  BankFunctions,
-  LendingMarketObj,
-  phantom,
-  PhantomReified,
-  PhantomTypeArgument,
-} from "..";
-import BN from "bn.js";
-import { computeUtilisationBps, LendingAction } from "./bankMath";
+import { BankFunctions } from "../..";
+import { BankInfo } from "../../types";
 
-export class Bank<
-  P extends PhantomTypeArgument,
-  T extends PhantomTypeArgument
-> {
-  public bank: BankObj<P, T>;
-  public lendingMarket: LendingMarketObj<P>;
+export * from "./bankArgs";
+export * from "./bankMath";
 
-  constructor(bank: BankObj<P, T>, lendingMarket: LendingMarketObj<P>) {
-    this.bank = bank;
-    this.lendingMarket = lendingMarket;
+export class Bank {
+  public packageId: string;
+  public bankInfo: BankInfo;
+
+  constructor(packageId: string, bankInfo: BankInfo) {
+    this.bankInfo = bankInfo;
+    this.packageId = packageId;
   }
 
-  static async fetchState<
-    P extends PhantomTypeArgument,
-    T extends PhantomTypeArgument
-  >(
-    coinType: T,
-    lendingMarketType: P,
-    bankId: string,
-    lendingMarketId: string,
-    client: SuiClient
-  ): Promise<[BankObj<P, T>, LendingMarketObj<P>]> {
-    const bankTypeArgs: [PhantomReified<P>, PhantomReified<T>] = [
-      phantom(lendingMarketType),
-      phantom(coinType),
-    ];
+  public mintBTokens(
+    args: MintBTokensArgs,
+    tx: Transaction = new Transaction()
+  ): TransactionResult {
+    const callArgs = {
+      bank: tx.object(this.bankInfo.bankId),
+      lendingMarket: tx.object(this.bankInfo.lendingMarketId),
+      coins: args.coins,
+      coinAmount: args.coinAmount,
+      clock: tx.object(SUI_CLOCK_OBJECT_ID),
+    };
 
-    const bank = await BankObj.fetch(client, bankTypeArgs, bankId);
+    const coinA = BankFunctions.mintBtokens(tx, this.typeArgs(), callArgs);
+    return coinA;
+  }
 
-    const lendingMarket = await LendingMarketObj.fetch(
-      client,
-      phantom(lendingMarketType),
-      lendingMarketId
-    );
+  public burnBTokens(
+    args: BurnBTokensArgs,
+    tx: Transaction = new Transaction()
+  ): TransactionResult {
+    const callArgs = {
+      bank: tx.object(this.bankInfo.bankId),
+      lendingMarket: tx.object(this.bankInfo.lendingMarketId),
+      btokens: args.btokens,
+      btokenAmount: args.btokenAmount,
+      clock: tx.object(SUI_CLOCK_OBJECT_ID),
+    };
 
-    return [bank, lendingMarket];
+    const coinA = BankFunctions.burnBtokens(tx, this.typeArgs(), callArgs);
+    return coinA;
   }
 
   public initLending(
@@ -61,9 +64,9 @@ export class Bank<
     tx: Transaction = new Transaction()
   ) {
     const callArgs = {
-      bank: tx.object(this.bank.id),
+      bank: tx.object(this.bankInfo.bankId),
       globalAdmin: args.globalAdmin,
-      lendingMarket: tx.object(this.lendingMarket.id),
+      lendingMarket: tx.object(this.bankInfo.lendingMarketId),
       targetUtilisationBps: args.targetUtilisationBps,
       utilisationBufferBps: args.utilisationBufferBps,
     };
@@ -73,8 +76,8 @@ export class Bank<
 
   public rebalance(tx: Transaction = new Transaction()) {
     const callArgs = {
-      bank: tx.object(this.bank.id),
-      lendingMarket: tx.object(this.lendingMarket.id),
+      bank: tx.object(this.bankInfo.bankId),
+      lendingMarket: tx.object(this.bankInfo.lendingMarketId),
       clock: tx.object(SUI_CLOCK_OBJECT_ID),
     };
 
@@ -86,8 +89,8 @@ export class Bank<
     tx: Transaction = new Transaction()
   ): TransactionArgument {
     const callArgs = {
-      bank: tx.object(this.bank.id),
-      lendingMarket: tx.object(this.lendingMarket.id),
+      bank: tx.object(this.bankInfo.bankId),
+      lendingMarket: tx.object(this.bankInfo.lendingMarketId),
       amount: args.amount,
     };
 
@@ -99,7 +102,7 @@ export class Bank<
     tx: Transaction = new Transaction()
   ) {
     const callArgs = {
-      bank: tx.object(this.bank.id),
+      bank: tx.object(this.bankInfo.bankId),
       globalAdmin: args.globalAdmin,
       targetUtilisationBps: args.targetUtilisationBps,
       utilisationBufferBps: args.utilisationBufferBps,
@@ -108,16 +111,13 @@ export class Bank<
     BankFunctions.setUtilisationBps(tx, this.typeArgs(), callArgs);
   }
 
-  public migrateAsGlobalAdmin(
-    args: MigrateAsGlobalAdminArgs,
-    tx: Transaction = new Transaction()
-  ) {
+  public migrate(args: MigrateBankArgs, tx: Transaction = new Transaction()) {
     const callArgs = {
-      bank: tx.object(this.bank.id),
+      bank: tx.object(this.bankInfo.bankId),
       admin: args.admin,
     };
 
-    BankFunctions.migrateAsGlobalAdmin(tx, this.typeArgs(), callArgs);
+    BankFunctions.migrate(tx, this.typeArgs(), callArgs);
   }
 
   // Client-side logic
@@ -126,38 +126,30 @@ export class Bank<
     tx: Transaction = new Transaction()
   ): TransactionArgument {
     const callArgs = {
-      bank: tx.object(this.bank.id),
-      lendingMarket: tx.object(this.lendingMarket.id),
+      bank: tx.object(this.bankInfo.bankId),
+      lendingMarket: tx.object(this.bankInfo.lendingMarketId),
       clock: tx.object(SUI_CLOCK_OBJECT_ID),
     };
 
     return BankFunctions.needsRebalance(tx, this.typeArgs(), callArgs);
   }
 
-  public compoundInterest(
-    tx: Transaction = new Transaction()
-  ): TransactionArgument {
-    const callArgs = {
-      bank: tx.object(this.bank.id),
-      lendingMarket: tx.object(this.lendingMarket.id),
-      clock: tx.object(SUI_CLOCK_OBJECT_ID),
-    };
-
-    return BankFunctions.compoundInterestIfAny(tx, this.typeArgs(), callArgs);
-  }
-
   // Getters
 
   public viewLending(tx: Transaction = new Transaction()): TransactionArgument {
-    return BankFunctions.lending(tx, this.typeArgs(), tx.object(this.bank.id));
+    return BankFunctions.lending(
+      tx,
+      this.typeArgs(),
+      tx.object(this.bankInfo.bankId)
+    );
   }
 
   public viewTotalFunds(
     tx: Transaction = new Transaction()
   ): TransactionArgument {
     const callArgs = {
-      bank: tx.object(this.bank.id),
-      lendingMarket: tx.object(this.lendingMarket.id),
+      bank: tx.object(this.bankInfo.bankId),
+      lendingMarket: tx.object(this.bankInfo.lendingMarketId),
       clock: tx.object(SUI_CLOCK_OBJECT_ID),
     };
 
@@ -170,7 +162,7 @@ export class Bank<
     return BankFunctions.fundsAvailable(
       tx,
       this.typeArgs(),
-      tx.object(this.bank.id)
+      tx.object(this.bankInfo.bankId)
     );
   }
 
@@ -180,7 +172,7 @@ export class Bank<
     return BankFunctions.targetUtilisationBps(
       tx,
       this.typeArgs(),
-      tx.object(this.bank.id)
+      tx.object(this.bankInfo.bankId)
     );
   }
 
@@ -190,7 +182,7 @@ export class Bank<
     return BankFunctions.utilisationBufferBps(
       tx,
       this.typeArgs(),
-      tx.object(this.bank.id)
+      tx.object(this.bankInfo.bankId)
     );
   }
 
@@ -200,7 +192,7 @@ export class Bank<
     return BankFunctions.targetUtilisationBpsUnchecked(
       tx,
       this.typeArgs(),
-      tx.object(this.bank.id)
+      tx.object(this.bankInfo.bankId)
     );
   }
 
@@ -210,7 +202,7 @@ export class Bank<
     return BankFunctions.utilisationBufferBpsUnchecked(
       tx,
       this.typeArgs(),
-      tx.object(this.bank.id)
+      tx.object(this.bankInfo.bankId)
     );
   }
 
@@ -220,22 +212,25 @@ export class Bank<
     return BankFunctions.reserveArrayIndex(
       tx,
       this.typeArgs(),
-      tx.object(this.bank.id)
+      tx.object(this.bankInfo.bankId)
     );
   }
-  public typeArgs(): [string, string] {
-    const [lendingMarketType, cointType] = this.bank.$typeArgs;
-    return [`${lendingMarketType}`, `${cointType}`];
-  }
-
-  public static createBank(
-    pType: string,
-    tType: string,
-    registryID: string,
-    tx: Transaction = new Transaction()
-  ) {
-    const registry = tx.object(registryID);
-
-    BankFunctions.createBankAndShare(tx, [pType, tType], registry);
+  public typeArgs(): [string, string, string] {
+    return [
+      this.bankInfo.lendingMarketType,
+      this.bankInfo.coinType,
+      this.bankInfo.btokenType,
+    ];
   }
 }
+
+// public createBank(
+//   pType: string,
+//   tType: string,
+//   registryID: string,
+//   tx: Transaction = new Transaction()
+// ) {
+//   const registry = tx.object(registryID);
+
+//   BankFunctions.createBankAndShare(tx, [pType, tType], registry);
+// }

@@ -22,15 +22,15 @@ export function feeA( tx: Transaction, typeArgs: [string, string], fees: Transac
 
 export function feeB( tx: Transaction, typeArgs: [string, string], fees: TransactionObjectInput ) { return tx.moveCall({ target: `${PUBLISHED_AT}::fees::fee_b`, typeArguments: typeArgs, arguments: [ obj(tx, fees) ], }) }
 
-export function feeDenominator( tx: Transaction, fees: TransactionObjectInput ) { return tx.moveCall({ target: `${PUBLISHED_AT}::fees::fee_denominator`, arguments: [ obj(tx, fees) ], }) }
+export function feeDenominator( tx: Transaction, feeConfig: TransactionObjectInput ) { return tx.moveCall({ target: `${PUBLISHED_AT}::fees::fee_denominator`, arguments: [ obj(tx, feeConfig) ], }) }
 
-export function feeNumerator( tx: Transaction, fees: TransactionObjectInput ) { return tx.moveCall({ target: `${PUBLISHED_AT}::fees::fee_numerator`, arguments: [ obj(tx, fees) ], }) }
+export function feeNumerator( tx: Transaction, feeConfig: TransactionObjectInput ) { return tx.moveCall({ target: `${PUBLISHED_AT}::fees::fee_numerator`, arguments: [ obj(tx, feeConfig) ], }) }
 
 export function feeRatio( tx: Transaction, typeArgs: [string, string], fees: TransactionObjectInput ) { return tx.moveCall({ target: `${PUBLISHED_AT}::fees::fee_ratio`, typeArguments: typeArgs, arguments: [ obj(tx, fees) ], }) }
 
-export function feeRatio_( tx: Transaction, fees: TransactionObjectInput ) { return tx.moveCall({ target: `${PUBLISHED_AT}::fees::fee_ratio_`, arguments: [ obj(tx, fees) ], }) }
+export function feeRatio_( tx: Transaction, feeConfig: TransactionObjectInput ) { return tx.moveCall({ target: `${PUBLISHED_AT}::fees::fee_ratio_`, arguments: [ obj(tx, feeConfig) ], }) }
 
-export function minFee( tx: Transaction, fees: TransactionObjectInput ) { return tx.moveCall({ target: `${PUBLISHED_AT}::fees::min_fee`, arguments: [ obj(tx, fees) ], }) }
+export function minFee( tx: Transaction, feeConfig: TransactionObjectInput ) { return tx.moveCall({ target: `${PUBLISHED_AT}::fees::min_fee`, arguments: [ obj(tx, feeConfig) ], }) }
 
 export interface SetConfigArgs { fees: TransactionObjectInput; feeNumerator: bigint | TransactionArgument; feeDenominator: bigint | TransactionArgument; minFee: bigint | TransactionArgument }
 

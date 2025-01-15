@@ -3,20 +3,16 @@ import {
   TransactionObjectInput,
 } from "@mysten/sui/transactions";
 import {
-  PoolExecuteSwapArgs,
-  PoolIntentSwapArgs,
   PoolNewArgs,
-  PoolQuoteSwap,
-} from "../pool/poolArgs";
+  PoolQuoteSwapBaseArgs,
+  PoolSwapBaseArgs,
+} from "../../pool/poolArgs";
 
 export type CpNewArgs = PoolNewArgs & {
   offset: bigint | TransactionArgument;
 };
-
-export type CpIntentSwapArgs = PoolIntentSwapArgs & {};
-export type CpExecuteSwapArgs = PoolExecuteSwapArgs & {};
-export type CpPoolQuoteSwap = PoolQuoteSwap & {};
-export type CpSwapArgs = CpIntentSwapArgs & Omit<CpExecuteSwapArgs, "intent">;
+export type CpSwapArgs = PoolSwapBaseArgs & {};
+export type CpQuoteSwapArgs = PoolQuoteSwapBaseArgs & {};
 
 export interface SwapQuote {
   amountIn: bigint;
