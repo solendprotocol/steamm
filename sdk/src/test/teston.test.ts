@@ -8,8 +8,9 @@ export function test() {
 
     afterAll(async () => {});
 
-    it("it", async () => {
+    it("should create a keypair", async () => {
       const keypair = new Ed25519Keypair();
+      expect(keypair).toBeInstanceOf(Ed25519Keypair);
       // const signer = new RawSigner(keypair, provider);
     });
   });
