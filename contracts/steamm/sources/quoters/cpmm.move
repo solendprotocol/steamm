@@ -115,7 +115,7 @@ public fun swap<A, B, LpType: drop>(
     pool.quoter_mut().version.assert_version_and_upgrade(CURRENT_VERSION);
 
     let quote = quote_swap(pool, amount_in, a2b);
-    let k0 = k(pool, offset(pool));
+    let k0 = k(pool);
 
     let response = pool.swap(
         coin_a,
@@ -203,7 +203,13 @@ public fun offset<A, B, LpType: drop>(pool: &Pool<A, B, CpQuoter, LpType>): u64 
     pool.quoter().offset
 }
 
-public fun k<A, B, Quoter: store, LpType: drop>(
+public fun k<A, B, LpType: drop>(
+    pool: &Pool<A, B, CpQuoter, LpType>,
+): u128 {
+    k_external(pool, offset(pool))
+}
+
+public fun k_external<A, B, Quoter: store, LpType: drop>(
     pool: &Pool<A, B, Quoter, LpType>,
     offset: u64,
 ): u128 {
@@ -227,7 +233,7 @@ public(package) fun check_invariance<A, B, Quoter: store, LpType: drop>(
     k0: u128,
     offset: u64,
 ) {
-    let k1 = k(pool, offset);
+    let k1 = k_external(pool, offset);
     assert!(k1 > 0, EZeroInvariant);
     assert!(k1 >= k0, EInvariantViolation);
 }
