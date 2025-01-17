@@ -1,3 +1,4 @@
+import { TransactionArgument } from "@mysten/sui/dist/cjs/transactions";
 import {
   PhantomReified,
   StructClass,
@@ -5,7 +6,6 @@ import {
   ToTypeStr,
 } from ".";
 import { SerializedBcs } from "@mysten/bcs";
-import { TransactionArgument } from "@mysten/sui/dist/cjs/transactions";
 import { normalizeSuiObjectId } from "@mysten/sui/dist/cjs/utils";
 
 export type GenericHookType<T extends StructClass> = ToPhantomTypeArgument<
