@@ -2,7 +2,7 @@
 rm -rf temp
 
 # Get content from packages.ts and replace current content
-cat > sdk/src/test/packages.ts << 'EOL'
+cat > sdk/tests/packages.ts << 'EOL'
 // These addresses are filled automatically by the test pipeline
 export const LIQUID_STAKING_PKG_ID = "";
 export const WORMHOLE_PKG_ID = "";

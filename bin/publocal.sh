@@ -1,4 +1,6 @@
 #!/bin/bash
+# Cleanup
+./bin/unpublocal.sh
 
 # Check if current environment is localnet
 INITIAL_ENV=$(sui client envs --json | grep -oE '"[^"]*"' | tail -n1 | tr -d '"')
@@ -22,6 +24,8 @@ cp -r contracts/steamm/build/steamm/sources/dependencies/suilend/* temp/suilend/
 cp -r contracts/steamm/build/steamm/sources/dependencies/Wormhole/* temp/wormhole/sources/
 cp -r contracts/steamm/sources/* temp/steamm/sources/
 
+cp -r templates/setup temp/steamm/sources/
+
 # Copy Move.toml files from templates
 cp templates/liquid_staking.toml temp/liquid_staking/Move.toml
 cp templates/pyth.toml temp/pyth/Move.toml
@@ -29,7 +33,6 @@ cp templates/sprungsui.toml temp/sprungsui/Move.toml
 cp templates/suilend.toml temp/suilend/Move.toml
 cp templates/wormhole.toml temp/wormhole/Move.toml
 cp templates/steamm.toml temp/steamm/Move.toml
-
 
 ##### 2. Publish contracts & populate TOMLs ####
 
@@ -67,7 +70,7 @@ populate_toml() {
 populate_ts() {
     local PACKAGE_ID="$1"
     local PACKAGE_NAME="$2"
-    local TS_FILE="sdk/src/test/packages.ts"
+    local TS_FILE="sdk/tests/packages.ts"
 
     # Check if TS file exists
     if [ ! -f "$TS_FILE" ]; then
@@ -104,8 +107,10 @@ publish_package() {
     
     # Change to package directory
     cd "$FOLDER_NAME"
-    PACKAGE_ID=$(sui client publish --silence-warnings --no-lint --json | grep -A 3 '"type": "published"' | grep "packageId" | cut -d'"' -f4)
+    RESPONSE=$(sui client publish --silence-warnings --no-lint --json)
     cd "$INITIAL_DIR"
+
+    PACKAGE_ID=$(echo "$RESPONSE" | grep -A 3 '"type": "published"' | grep "packageId" | cut -d'"' -f4)
 
     if [ -z "$PACKAGE_ID" ]; then
         echo "Error: Package ID is empty"
@@ -113,19 +118,75 @@ publish_package() {
         exit 1
     fi
 
-    echo "Package ID: $PACKAGE_ID"
+    # echo "Package ID: $PACKAGE_ID"
     populate_toml "$PACKAGE_ID" "$FOLDER_NAME/Move.toml"
     populate_ts "$PACKAGE_ID" "$TS_CONST_NAME"
 
-    return 0
+    echo "$RESPONSE"
 }
 
-publish_package "temp/liquid_staking" "LIQUID_STAKING_PKG_ID"
-publish_package "temp/wormhole" "WORMHOLE_PKG_ID"
-publish_package "temp/sprungsui" "SPRUNGSUI_PKG_ID"
-publish_package "temp/pyth" "PYTH_PKG_ID"
-publish_package "temp/suilend" "SUILEND_PKG_ID"
-publish_package "temp/steamm" "STEAMM_PKG_ID"
+find_object_id() {
+    local json_content="$1"
+    local regex_pattern="$2"
+
+    # Extract objectChanges array from the JSON file
+    OBJECTS=$(echo "$json_content" | jq -r ".objectChanges[] | select(.objectType?)")
+
+    # Use the provided regex pattern to filter objects
+    RESULT=$(echo "$OBJECTS" | jq -r --arg regex "$regex_pattern" 'select(.objectType | test($regex)) | .objectId')
+
+    if [ -n "$RESULT" ]; then
+        echo "$RESULT"
+    else
+        echo "$regex_pattern not found" >&2
+        return 1
+    fi
+}
+
+
+LIQUID_STAKING_RESPONSE=$(publish_package "temp/liquid_staking" "LIQUID_STAKING_PKG_ID")
+WORMHOLE_RESPONSE=$(publish_package "temp/wormhole" "WORMHOLE_PKG_ID")
+SPRUNGSUI_RESPONSE=$(publish_package "temp/sprungsui" "SPRUNGSUI_PKG_ID") 
+PYTH_RESPONSE=$(publish_package "temp/pyth" "PYTH_PKG_ID")
+SUILEND_RESPONSE=$(publish_package "temp/suilend" "SUILEND_PKG_ID")
+STEAMM_RESPONSE=$(publish_package "temp/steamm" "STEAMM_PKG_ID")
+
+
+# echo "STEAMM_RESPONSE: $STEAMM_RESPONSE"
+
+
+# Get relevant object IDs
+lending_market_registry=$(find_object_id "$SUILEND_RESPONSE" ".*::lending_market_registry::Registry")
+registry=$(find_object_id "$STEAMM_RESPONSE" ".*::registry::Registry")
+
+lp_metadata=$(find_object_id "$STEAMM_RESPONSE" "0x2::coin::CoinMetadata<.*::lp_usdc_sui::LP_USDC_SUI>")
+lp_treasury_cap=$(find_object_id "$STEAMM_RESPONSE" "0x2::coin::TreasuryCap<.*::lp_usdc_sui::LP_USDC_SUI>")
+
+usdc_metadata=$(find_object_id "$STEAMM_RESPONSE" "0x2::coin::CoinMetadata<.*::usdc::USDC>")
+sui_metadata=$(find_object_id "$STEAMM_RESPONSE" "0x2::coin::CoinMetadata<.*::sui::SUI>")
+b_usdc_metadata=$(find_object_id "$STEAMM_RESPONSE" "0x2::coin::CoinMetadata<.*::b_usdc::B_USDC>")
+b_sui_metadata=$(find_object_id "$STEAMM_RESPONSE" "0x2::coin::CoinMetadata<.*::b_sui::B_SUI>")
+b_usdc_treasury_cap=$(find_object_id "$STEAMM_RESPONSE" "0x2::coin::TreasuryCap<.*::b_usdc::B_USDC>")
+b_sui_treasury_cap=$(find_object_id "$STEAMM_RESPONSE" "0x2::coin::TreasuryCap<.*::b_sui::B_SUI>")
+
+# sui_treasury_cap=$(find_object_id "$STEAMM_RESPONSE" "0x2::coin::TreasuryCap<.*::sui::SUI>")
+# usdc_treasury_cap=$(find_object_id "$STEAMM_RESPONSE" "0x2::coin::TreasuryCap<.*::usdc::USDC>")
+
+echo "lending_market_registry: $lending_market_registry"
+echo "registry: $registry"
+echo "lp_metadata: $lp_metadata"
+echo "lp_treasury_cap: $lp_treasury_cap"
+echo "usdc_metadata: $usdc_metadata"
+echo "sui_metadata: $sui_metadata"
+echo "b_usdc_metadata: $b_usdc_metadata"
+echo "b_sui_metadata: $b_sui_metadata"
+echo "b_usdc_treasury_cap: $b_usdc_treasury_cap"
+echo "b_sui_treasury_cap: $b_sui_treasury_cap"
+
+PACKAGE_ID=$(echo "$STEAMM_RESPONSE" | grep -A 3 '"type": "published"' | grep "packageId" | cut -d'"' -f4)
+echo "PACKAGE_ID: $PACKAGE_ID"
+
+echo "$STEAMM_RESPONSE" > "result.json"
 
 
 # Reset back to initial environment
@@ -133,3 +194,5 @@ if [ "$INITIAL_ENV" != "localnet" ]; then
     echo "Switching back to previous environment"
     sui client switch --env "$INITIAL_ENV"
 fi
+
+sui client call --package "$PACKAGE_ID" --module setup --function setup --args "$lending_market_registry" "$registry" "$lp_metadata" "$lp_treasury_cap" "$usdc_metadata" "$sui_metadata" "$b_usdc_metadata" "$b_sui_metadata" "$b_usdc_treasury_cap" "$b_sui_treasury_cap"

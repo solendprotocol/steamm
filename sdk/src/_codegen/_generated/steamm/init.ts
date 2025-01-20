@@ -19,7 +19,7 @@ loader.register(bank.BurnBTokenEvent);
 loader.register(bank.DeployEvent);
 loader.register(bank.Lending);
 loader.register(bank.MintBTokenEvent);
-loader.register(bank.NeedsRebalanceEvent);
+loader.register(bank.NeedsRebalance);
 loader.register(bank.NewBankEvent);
 loader.register(bank.RecallEvent);
 loader.register(quote.DepositQuote);

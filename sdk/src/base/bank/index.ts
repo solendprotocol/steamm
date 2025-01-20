@@ -10,7 +10,7 @@ import {
   InitLendingArgs,
   MigrateBankArgs,
   MintBTokensArgs,
-  SetUtilisationBpsArgs,
+  SetBankUtilisationBpsArgs,
 } from "./bankArgs";
 import { BankFunctions } from "../..";
 import { BankInfo } from "../../types";
@@ -39,7 +39,12 @@ export class Bank {
       clock: tx.object(SUI_CLOCK_OBJECT_ID),
     };
 
-    const coinA = BankFunctions.mintBtokens(tx, this.typeArgs(), callArgs);
+    const coinA = BankFunctions.mintBtokens(
+      tx,
+      this.typeArgs(),
+      callArgs,
+      this.packageId
+    );
     return coinA;
   }
 
@@ -55,7 +60,12 @@ export class Bank {
       clock: tx.object(SUI_CLOCK_OBJECT_ID),
     };
 
-    const coinA = BankFunctions.burnBtokens(tx, this.typeArgs(), callArgs);
+    const coinA = BankFunctions.burnBtokens(
+      tx,
+      this.typeArgs(),
+      callArgs,
+      this.packageId
+    );
     return coinA;
   }
 
@@ -71,7 +81,7 @@ export class Bank {
       utilisationBufferBps: args.utilisationBufferBps,
     };
 
-    BankFunctions.initLending(tx, this.typeArgs(), callArgs);
+    BankFunctions.initLending(tx, this.typeArgs(), callArgs, this.packageId);
   }
 
   public rebalance(tx: Transaction = new Transaction()) {
@@ -81,7 +91,7 @@ export class Bank {
       clock: tx.object(SUI_CLOCK_OBJECT_ID),
     };
 
-    BankFunctions.rebalance(tx, this.typeArgs(), callArgs);
+    BankFunctions.rebalance(tx, this.typeArgs(), callArgs, this.packageId);
   }
 
   public cTokenAmount(
@@ -94,11 +104,16 @@ export class Bank {
       amount: args.amount,
     };
 
-    return BankFunctions.ctokenAmount(tx, this.typeArgs(), callArgs);
+    return BankFunctions.ctokenAmount(
+      tx,
+      this.typeArgs(),
+      callArgs,
+      this.packageId
+    );
   }
 
   public setUtilisationBps(
-    args: SetUtilisationBpsArgs,
+    args: SetBankUtilisationBpsArgs,
     tx: Transaction = new Transaction()
   ) {
     const callArgs = {
@@ -108,7 +123,12 @@ export class Bank {
       utilisationBufferBps: args.utilisationBufferBps,
     };
 
-    BankFunctions.setUtilisationBps(tx, this.typeArgs(), callArgs);
+    BankFunctions.setUtilisationBps(
+      tx,
+      this.typeArgs(),
+      callArgs,
+      this.packageId
+    );
   }
 
   public migrate(args: MigrateBankArgs, tx: Transaction = new Transaction()) {
@@ -140,7 +160,8 @@ export class Bank {
     return BankFunctions.lending(
       tx,
       this.typeArgs(),
-      tx.object(this.bankInfo.bankId)
+      tx.object(this.bankInfo.bankId),
+      this.packageId
     );
   }
 
@@ -153,7 +174,12 @@ export class Bank {
       clock: tx.object(SUI_CLOCK_OBJECT_ID),
     };
 
-    return BankFunctions.totalFunds(tx, this.typeArgs(), callArgs);
+    return BankFunctions.totalFunds(
+      tx,
+      this.typeArgs(),
+      callArgs,
+      this.packageId
+    );
   }
 
   public viewFundsAvailable(
@@ -162,7 +188,8 @@ export class Bank {
     return BankFunctions.fundsAvailable(
       tx,
       this.typeArgs(),
-      tx.object(this.bankInfo.bankId)
+      tx.object(this.bankInfo.bankId),
+      this.packageId
     );
   }
 
@@ -172,7 +199,8 @@ export class Bank {
     return BankFunctions.targetUtilisationBps(
       tx,
       this.typeArgs(),
-      tx.object(this.bankInfo.bankId)
+      tx.object(this.bankInfo.bankId),
+      this.packageId
     );
   }
 
@@ -182,7 +210,8 @@ export class Bank {
     return BankFunctions.utilisationBufferBps(
       tx,
       this.typeArgs(),
-      tx.object(this.bankInfo.bankId)
+      tx.object(this.bankInfo.bankId),
+      this.packageId
     );
   }
 
@@ -192,7 +221,8 @@ export class Bank {
     return BankFunctions.targetUtilisationBpsUnchecked(
       tx,
       this.typeArgs(),
-      tx.object(this.bankInfo.bankId)
+      tx.object(this.bankInfo.bankId),
+      this.packageId
     );
   }
 
@@ -202,7 +232,8 @@ export class Bank {
     return BankFunctions.utilisationBufferBpsUnchecked(
       tx,
       this.typeArgs(),
-      tx.object(this.bankInfo.bankId)
+      tx.object(this.bankInfo.bankId),
+      this.packageId
     );
   }
 
@@ -212,7 +243,8 @@ export class Bank {
     return BankFunctions.reserveArrayIndex(
       tx,
       this.typeArgs(),
-      tx.object(this.bankInfo.bankId)
+      tx.object(this.bankInfo.bankId),
+      this.packageId
     );
   }
   public typeArgs(): [string, string, string] {
@@ -224,6 +256,7 @@ export class Bank {
   }
 }
 
+// TODO
 // public createBank(
 //   pType: string,
 //   tType: string,

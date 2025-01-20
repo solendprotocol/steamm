@@ -5,10 +5,16 @@ import {
   BankList,
   DataPage,
   PoolInfo,
+  EventData,
+  NewPoolEvent,
+  extractPoolInfo,
+  NewBankEvent,
+  extractBankList,
 } from "./types";
 import { RpcModule } from "./modules/rpcModule";
 import { patchFixSuiObjectId, SuiAddressType } from "./utils";
 import { PoolModule } from "./modules/poolModule";
+import { Signer } from "@mysten/sui/dist/cjs/cryptography/keypair";
 
 export type SdkOptions = {
   fullRpcUrl: string;
@@ -26,10 +32,12 @@ export class SteammSDK {
    */
   _sdkOptions: SdkOptions;
 
+  signer: Signer | undefined;
+
   /**
    * After connecting the wallet, set the current wallet address to senderAddress.
    */
-  protected _senderAddress = "";
+  senderAddress = "";
 
   constructor(options: SdkOptions) {
     this._sdkOptions = options;
@@ -42,20 +50,25 @@ export class SteammSDK {
     patchFixSuiObjectId(this._sdkOptions);
   }
 
-  /**
-   * Getter for the sender address property.
-   * @returns {SuiAddressType} The sender address.
-   */
-  get senderAddress(): SuiAddressType {
-    return this._senderAddress;
-  }
+  // /**
+  //  * Getter for the sender address property.
+  //  * @returns {SuiAddressType} The sender address.
+  //  */
+  // get senderAddress(): SuiAddressType {
+  //   return this.senderAddress;
+  // }
 
-  /**
-   * Setter for the sender address property.
-   * @param {string} value - The new sender address value.
-   */
-  set senderAddress(value: string) {
-    this._senderAddress = value;
+  // /**
+  //  * Setter for the sender address property.
+  //  * @param {string} value - The new sender address value.
+  //  */
+  // set senderAddress(value: string) {
+  //   this.senderAddress = value;
+  // }
+
+  setSigner(signer: Signer) {
+    this.signer = signer;
+    this.senderAddress = signer.getPublicKey().toSuiAddress();
   }
 
   /**
@@ -82,19 +95,20 @@ export class SteammSDK {
     return this._pool;
   }
 
-  async getBankList(): Promise<BankList> {
+  async getBanks(): Promise<BankList> {
     const pkgAddy = this.sdkOptions.steamm_config.package_id;
 
+    let eventData: EventData<NewBankEvent>[] = [];
     let bankList: BankList = {};
-    let nextCursor: string | null | undefined = null;
 
-    const res: DataPage<BankList> = await this.fullClient.queryEventsByPage({
-      MoveEventType: `${pkgAddy}::events::Event<${pkgAddy}::bank::NewBankEvent>`,
-    });
+    const res: DataPage<EventData<NewBankEvent>[]> =
+      await this.fullClient.queryEventsByPage({
+        MoveEventType: `${pkgAddy}::events::Event<${pkgAddy}::bank::NewBankEvent>`,
+      });
 
-    bankList = res.data.reduce((acc, curr) => {
-      return { ...acc, ...curr };
-    }, {});
+    eventData = res.data.reduce((acc, curr) => acc.concat(curr), []);
+
+    bankList = extractBankList(eventData);
 
     return bankList;
   }
@@ -102,14 +116,16 @@ export class SteammSDK {
   async getPools(): Promise<PoolInfo[]> {
     const pkgAddy = this.sdkOptions.steamm_config.package_id;
 
+    let eventData: EventData<NewPoolEvent>[] = [];
     let pools: PoolInfo[] = [];
-    let nextCursor: string | null | undefined = null;
 
-    const res: DataPage<PoolInfo[]> = await this.fullClient.queryEventsByPage({
-      MoveEventType: `${pkgAddy}::events::Event<${pkgAddy}::pool::NewPoolResult>`,
-    });
+    const res: DataPage<EventData<NewPoolEvent>[]> =
+      await this.fullClient.queryEventsByPage({
+        MoveEventType: `${pkgAddy}::events::Event<${pkgAddy}::pool::NewPoolResult>`,
+      });
 
-    pools = res.data.reduce((acc, curr) => acc.concat(curr), []);
+    eventData = res.data.reduce((acc, curr) => acc.concat(curr), []);
+    pools = extractPoolInfo(eventData);
 
     return pools;
   }

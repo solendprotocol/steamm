@@ -29,6 +29,11 @@ bind:
     sui-client-gen --manifest src/_codegen/_generated --out src/_codegen/_generated
 
 # Publishes packages to localnet and runs ts tests
+setup:
+    bash -c 'cd ../ && ./bin/publocal.sh'
+unset:
+    bash -c 'cd ../ && ./bin/unpublocal.sh'
+
 test:
     bash -c 'cd ../ && ./bin/publocal.sh'
     bun test

@@ -7,7 +7,6 @@ import { CpNewArgs, CpQuoteSwapArgs, CpSwapArgs } from "./constantProductArgs";
 import { MigrateArgs } from "../../pool/poolArgs";
 import { Quoter } from "../quoter";
 import { PoolInfo } from "../../../types";
-import { NewArgs } from "../../../_codegen/_generated/steamm/pool/functions";
 import { ConstantProductFunctions } from "../../..";
 
 export * from "./constantProductArgs";
@@ -37,7 +36,8 @@ export class ConstantProductQuoter implements Quoter {
     const swapResult = ConstantProductFunctions.swap(
       tx,
       this.quoterTypes(),
-      callArgs
+      callArgs,
+      this.packageId
     );
 
     return swapResult;
@@ -56,7 +56,8 @@ export class ConstantProductQuoter implements Quoter {
     const quote = ConstantProductFunctions.quoteSwap(
       tx,
       this.quoterTypes(),
-      callArgs
+      callArgs,
+      this.packageId
     );
     return quote;
   }

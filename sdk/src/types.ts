@@ -10,6 +10,91 @@ export type DataPage<T> = {
   hasNextPage: boolean;
 };
 
+export type NewPoolEvent = {
+  coin_type_a: { name: string };
+  coin_type_b: { name: string };
+  creator: string;
+  lp_token_type: { name: string };
+  pool_cap_id: string;
+  pool_id: string;
+  quoter_type: { name: string };
+};
+
+export type NewBankEvent = {
+  bank_id: string;
+  btoken_type: { name: string };
+  coin_type: { name: string };
+  lending_market_id: string;
+  lending_market_type: { name: string };
+};
+
+export type EventData<T> = {
+  id: {
+    txDigest: string;
+    eventSeq: string;
+  };
+  packageId: string;
+  transactionModule: string;
+  sender: string;
+  type: string;
+  parsedJson: {
+    event: T;
+  };
+  bcsEncoding: string;
+  bcs: string;
+  timestampMs: string;
+};
+
+export function extractBankList(events: EventData<NewBankEvent>[]): BankList {
+  const bankList: BankList = {};
+
+  events.forEach((event) => {
+    const {
+      coin_type,
+      btoken_type,
+      bank_id,
+      lending_market_id,
+      lending_market_type,
+    } = event.parsedJson.event;
+
+    const bankInfo: BankInfo = {
+      coinType: `0x${coin_type.name}`,
+      btokenType: `0x${btoken_type.name}`,
+      lendingMarketType: `0x${lending_market_type.name}`,
+      bankId: bank_id,
+      lendingMarketId: lending_market_id,
+    };
+
+    // Set the key as coin_type.name
+    bankList[`0x${coin_type.name}`] = bankInfo;
+  });
+
+  return bankList;
+}
+
+export function extractPoolInfo(events: EventData<NewPoolEvent>[]): PoolInfo[] {
+  return events.map((event) => {
+    const {
+      creator,
+      pool_id,
+      pool_cap_id,
+      coin_type_a,
+      coin_type_b,
+      lp_token_type,
+      quoter_type,
+    } = event.parsedJson.event;
+    return {
+      creator,
+      poolId: pool_id,
+      poolCapId: pool_cap_id,
+      coinTypeA: `0x${coin_type_a.name}`,
+      coinTypeB: `0x${coin_type_b.name}`,
+      lpTokenType: `0x${lp_token_type.name}`,
+      quoterType: `0x${quoter_type.name}`,
+    };
+  });
+}
+
 export type SteammConfigs = {
   registryId: SuiObjectIdType;
   globalConfigId: SuiObjectIdType;
@@ -40,7 +125,6 @@ export type BankInfo = {
   btokenType: string;
   lendingMarketType: string;
   bankId: SuiObjectIdType;
-  bankType: string;
   lendingMarketId: SuiObjectIdType;
 };
 

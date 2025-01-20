@@ -1,16 +1,4 @@
-import { TransactionArgument } from "@mysten/sui/dist/cjs/transactions";
-import {
-  PhantomReified,
-  StructClass,
-  ToPhantomTypeArgument,
-  ToTypeStr,
-} from ".";
-import { SerializedBcs } from "@mysten/bcs";
-import { normalizeSuiObjectId } from "@mysten/sui/dist/cjs/utils";
-
-export type GenericHookType<T extends StructClass> = ToPhantomTypeArgument<
-  PhantomReified<ToTypeStr<T>>
->;
+import { normalizeSuiObjectId } from "@mysten/sui/utils";
 
 export interface PoolTypes<A, B, Quoter, W, P> {
   aType: A;
@@ -67,15 +55,6 @@ export type SuiStructTag = {
    */
   type_arguments: SuiAddressType[];
 };
-
-declare module "@mysten/sui/dist/cjs/transactions" {
-  interface Transaction {
-    shareObject(
-      object: TransactionArgument | SerializedBcs<any>,
-      typeArgs: string[]
-    ): void;
-  }
-}
 
 export function fixSuiObjectId(value: string): string {
   if (value.toLowerCase().startsWith("0x")) {

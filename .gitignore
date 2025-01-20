@@ -1,5 +1,7 @@
 local/*
 .vscode/*
+temp/*
+sdk/.env
 
 contracts/*/build/*
 

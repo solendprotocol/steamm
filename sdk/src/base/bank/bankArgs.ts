@@ -22,7 +22,7 @@ export interface CTokenAmountArgs {
   amount: bigint | TransactionArgument;
 }
 
-export interface SetUtilisationBpsArgs {
+export interface SetBankUtilisationBpsArgs {
   globalAdmin: TransactionObjectInput;
   targetUtilisationBps: number | TransactionArgument;
   utilisationBufferBps: number | TransactionArgument;

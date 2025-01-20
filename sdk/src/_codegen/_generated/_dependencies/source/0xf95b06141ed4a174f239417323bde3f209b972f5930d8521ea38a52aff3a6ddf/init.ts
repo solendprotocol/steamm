@@ -44,6 +44,8 @@ loader.register(lendingMarket.RedeemEvent);
 loader.register(lendingMarket.BorrowEvent);
 loader.register(lendingMarket.ClaimRewardEvent);
 loader.register(lendingMarket.DepositEvent);
+loader.register(lendingMarket.FeeReceivers);
+loader.register(lendingMarket.FeeReceiversKey);
 loader.register(lendingMarket.ForgiveEvent);
 loader.register(lendingMarket.LENDING_MARKET);
 loader.register(lendingMarket.LendingMarket);
