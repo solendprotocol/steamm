@@ -152,9 +152,6 @@ SUILEND_RESPONSE=$(publish_package "temp/suilend" "SUILEND_PKG_ID")
 STEAMM_RESPONSE=$(publish_package "temp/steamm" "STEAMM_PKG_ID")
 
 
-# echo "STEAMM_RESPONSE: $STEAMM_RESPONSE"
-
-
 # Get relevant object IDs
 lending_market_registry=$(find_object_id "$SUILEND_RESPONSE" ".*::lending_market_registry::Registry")
 registry=$(find_object_id "$STEAMM_RESPONSE" ".*::registry::Registry")
@@ -168,9 +165,6 @@ b_usdc_metadata=$(find_object_id "$STEAMM_RESPONSE" "0x2::coin::CoinMetadata<.*:
 b_sui_metadata=$(find_object_id "$STEAMM_RESPONSE" "0x2::coin::CoinMetadata<.*::b_sui::B_SUI>")
 b_usdc_treasury_cap=$(find_object_id "$STEAMM_RESPONSE" "0x2::coin::TreasuryCap<.*::b_usdc::B_USDC>")
 b_sui_treasury_cap=$(find_object_id "$STEAMM_RESPONSE" "0x2::coin::TreasuryCap<.*::b_sui::B_SUI>")
-
-# sui_treasury_cap=$(find_object_id "$STEAMM_RESPONSE" "0x2::coin::TreasuryCap<.*::sui::SUI>")
-# usdc_treasury_cap=$(find_object_id "$STEAMM_RESPONSE" "0x2::coin::TreasuryCap<.*::usdc::USDC>")
 
 echo "lending_market_registry: $lending_market_registry"
 echo "registry: $registry"
