@@ -67,7 +67,7 @@ const EInsufficientFunds: u64 = 7;
 // ===== Structs =====
 
 /// Capability object given to the pool creator
-public struct PoolCap<phantom A, phantom B, phantom Quoter: store, phantom LpType: drop> has key {
+public struct PoolCap<phantom A, phantom B, phantom Quoter: store, phantom LpType: drop> has key, store {
     id: UID,
     pool_id: ID,
 }
