@@ -177,7 +177,7 @@ public fun init_lending<P, T, BToken>(
 /// This function will panic if:
 /// - The bank version is not current
 /// - The coin amount exceeds the available balance
-public fun mint_btokens<P, T, BToken>(
+public fun  mint_btokens<P, T, BToken>(
     bank: &mut Bank<P, T, BToken>,
     lending_market: &mut LendingMarket<P>,
     coin_t: &mut Coin<T>,
@@ -491,7 +491,7 @@ public(package) fun funds_deployed<P, T, BToken>(
 
 // ====== Private Functions =====
 
-fun to_btokens<P, T, BToken>(
+public(package) fun to_btokens<P, T, BToken>(
     bank: &Bank<P, T, BToken>,
     lending_market: &LendingMarket<P>,
     amount: u64,
@@ -502,7 +502,7 @@ fun to_btokens<P, T, BToken>(
     decimal::from(amount).mul(btoken_supply).div(total_funds)
 }
 
-fun from_btokens<P, T, BToken>(
+public(package) fun from_btokens<P, T, BToken>(
     bank: &Bank<P, T, BToken>,
     lending_market: &LendingMarket<P>,
     btoken_amount: u64,
@@ -670,7 +670,7 @@ fun update_btoken_metadata<T, BToken: drop>(
     treasury_btoken.update_icon_url(meta_btoken, ascii::string(BTOKEN_ICON_URL));
 }
 
-fun compound_interest_if_any<P, T, BToken>(
+public(package) fun compound_interest_if_any<P, T, BToken>(
     bank: &Bank<P, T, BToken>,
     lending_market: &mut LendingMarket<P>,
     clock: &Clock,
