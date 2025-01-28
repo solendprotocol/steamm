@@ -13,5 +13,3 @@ default:
 
 # Commands for Sui contracts
 mod sui 'contracts/.just'
-# Commands for Sdk
-mod sdk 'sdk/.just'

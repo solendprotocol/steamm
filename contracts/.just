@@ -32,7 +32,7 @@ faucet: _check_sui
 
 # Resets localnet state and starts the network
 localnew: _check_sui
-    sui genesis -f
+    sui genesis
     sui start
 
 # Starts the localnet network
