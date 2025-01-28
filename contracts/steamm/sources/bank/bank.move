@@ -169,7 +169,7 @@ public fun init_lending<P, T, BToken>(
 /// This function will panic if:
 /// - The bank version is not current
 /// - The coin amount exceeds the available balance
-public fun  mint_btokens<P, T, BToken>(
+public fun mint_btokens<P, T, BToken>(
     bank: &mut Bank<P, T, BToken>,
     lending_market: &mut LendingMarket<P>,
     coins: &mut Coin<T>,
