@@ -244,7 +244,6 @@ public fun test_setup_dummy_no_fees(): (
     let (mut pool, bank_a, bank_b) = test_setup_dummy(0);
 
     pool.no_protocol_fees_for_testing();
-    pool.no_redemption_fees_for_testing();
 
     (pool, bank_a, bank_b)
 }
