@@ -28,10 +28,6 @@ public use fun steamm::cpmm::k as Pool.cpmm_k;
 
 // Protocol Fee numerator in basis points
 const SWAP_FEE_NUMERATOR: u64 = 2_000;
-// Redemption Fee numerator in basis points
-const REDEMPTION_FEE_NUMERATOR: u64 = 10;
-// Minimum redemption fee
-const MINIMUM_REDEMPTION_FEE: u64 = 1;
 // Protocol Fee denominator in basis points (100%)
 const BPS_DENOMINATOR: u64 = 10_000;
 // Minimum liquidity burned during
@@ -63,14 +59,14 @@ const ELpSupplyToReserveRatioViolation: u64 = 5;
 const ESwapOutputAmountIsZero: u64 = 6;
 // When the user coin object does not have enough balance to fulfil the swap
 const EInsufficientFunds: u64 = 7;
+// When creating a pool and the type `A` and `B` are duplicated
+const ETypeAandBDuplicated: u64 = 8;
+// Empty LP Token when redeeming liquidity
+const ELpTokenEmpty: u64 = 9;
+// Empty coin A and B when depositing or swapping
+const EEmptyCoins: u64 = 9;
 
 // ===== Structs =====
-
-/// Capability object given to the pool creator
-public struct PoolCap<phantom A, phantom B, phantom Quoter: store, phantom LpType: drop> has key, store {
-    id: UID,
-    pool_id: ID,
-}
 
 /// AMM pool object. This object is the top-level object and sits at the
 /// core of the protocol. The generic types `A` and `B` correspond to the
@@ -102,8 +98,6 @@ public struct Pool<phantom A, phantom B, Quoter: store, phantom LpType: drop> ha
     protocol_fees: Fees<A, B>,
     // Pool fee configuration
     pool_fee_config: FeeConfig,
-    // Redemption fees
-    redemption_fees: Fees<A, B>,
     // Lifetime trading and fee data
     trading_data: TradingData,
     version: Version,
@@ -119,9 +113,6 @@ public struct TradingData has store {
     // protocol fees
     protocol_fees_a: u64,
     protocol_fees_b: u64,
-    // Redemption fees
-    redemption_fees_a: u64,
-    redemption_fees_b: u64,
     // pool fees
     pool_fees_a: u64,
     pool_fees_b: u64,
@@ -163,6 +154,7 @@ public fun deposit_liquidity<A, B, Quoter: store, LpType: drop>(
     ctx: &mut TxContext,
 ): (Coin<LpType>, DepositResult) {
     pool.version.assert_version_and_upgrade(CURRENT_VERSION);
+    assert!(!(coin_a.value() == 0 && coin_b.value() == 0), EEmptyCoins);
 
     // Compute token deposits and delta lp tokens
     let quote = quote_deposit_(
@@ -253,6 +245,7 @@ public fun redeem_liquidity<A, B, Quoter: store, LpType: drop>(
     min_b: u64,
     ctx: &mut TxContext,
 ): (Coin<A>, Coin<B>, RedeemResult) {
+    assert!(lp_tokens.value() > 0, ELpTokenEmpty);
     pool.version.assert_version_and_upgrade(CURRENT_VERSION);
 
     // Compute amounts to withdraw
@@ -265,6 +258,7 @@ public fun redeem_liquidity<A, B, Quoter: store, LpType: drop>(
 
     let initial_lp_supply = pool.lp_supply.supply_value();
     let initial_reserve_a = pool.balance_amount_a();
+    let initial_reserve_b = pool.balance_amount_b();
     let lp_burn = lp_tokens.value();
 
     assert!(quote.burn_lp() == lp_burn, 0);
@@ -273,21 +267,8 @@ public fun redeem_liquidity<A, B, Quoter: store, LpType: drop>(
     pool.lp_supply.decrease_supply(lp_tokens.into_balance());
 
     // Withdraw
-    let mut balance_a = pool.balance_a.split(quote.withdraw_a());
-    let mut balance_b = pool.balance_b.split(quote.withdraw_b());
-
-    // Charge redemption fees
-    let (fee_balance_a, fee_balance_b) = pool.redemption_fees.balances_mut();
-
-    let balance_a_value = balance_a.value();
-    let balance_b_value = balance_b.value();
-
-    fee_balance_a.join(balance_a.split(quote.fees_a().min(balance_a_value)));
-    fee_balance_b.join(balance_b.split(quote.fees_b().min(balance_b_value)));
-
-    // Update redemption fee data
-    pool.trading_data.redemption_fees_a = pool.trading_data.redemption_fees_a + quote.fees_a();
-    pool.trading_data.redemption_fees_b = pool.trading_data.redemption_fees_b + quote.fees_b();
+    let balance_a = pool.balance_a.split(quote.withdraw_a());
+    let balance_b = pool.balance_b.split(quote.withdraw_b());
 
     // Prepare tokens to send
     let tokens_a = coin::from_balance(
@@ -306,14 +287,19 @@ public fun redeem_liquidity<A, B, Quoter: store, LpType: drop>(
         pool.lp_supply.supply_value(),
     );
 
+    assert_lp_supply_reserve_ratio(
+        initial_reserve_b,
+        initial_lp_supply,
+        pool.balance_amount_b(),
+        pool.lp_supply.supply_value(),
+    );
+
     // Emit events
     let result = RedeemResult {
         user: sender(ctx),
         pool_id: object::id(pool),
         withdraw_a: tokens_a.value(),
         withdraw_b: tokens_b.value(),
-        fees_a: quote.fees_a(),
-        fees_b: quote.fees_b(),
         burn_lp: lp_burn,
     };
 
@@ -371,57 +357,6 @@ public fun quote_redeem<A, B, Quoter: store, LpType: drop>(
 
 // ===== Admin Functions =====
 
-/// Updates the pool's swap fee configuration. The swap fee is charged on each trade and is split
-/// between the protocol and the pool's liquidity providers.
-///
-/// # Arguments
-///
-/// * `pool` - The pool object to update fees for
-/// * `_pool_cap` - Capability object proving authority to modify pool parameters
-/// * `swap_fee_bps` - New swap fee in basis points (1 bp = 0.01%)
-///
-/// # Panics
-///
-/// This function will panic if:
-/// - `swap_fee_bps` is greater than or equal to `BPS_DENOMINATOR` (100%)
-public fun set_pool_swap_fees<A, B, Quoter: store, LpType: drop>(
-    pool: &mut Pool<A, B, Quoter, LpType>,
-    _pool_cap: &PoolCap<A, B, Quoter, LpType>,
-    swap_fee_bps: u64,
-) {
-    assert!(swap_fee_bps < BPS_DENOMINATOR, EFeeAbove100Percent);
-    pool.pool_fee_config = fees::new_config(swap_fee_bps, BPS_DENOMINATOR, 0);
-}
-
-/// Updates the pool's redemption fee configuration. The redemption fee is charged when liquidity
-/// providers withdraw their funds from the pool.
-///
-/// # Arguments
-///
-/// * `pool` - The pool object to update fees for
-/// * `_pool_cap` - Capability object proving authority to modify pool parameters
-/// * `redemption_fee_bps` - New redemption fee in basis points (1 bp = 0.01%)
-///
-/// # Panics
-///
-/// This function will panic if:
-/// - `redemption_fee_bps` is greater than or equal to `BPS_DENOMINATOR` (100%)
-public fun set_redemption_fees<A, B, Quoter: store, LpType: drop>(
-    pool: &mut Pool<A, B, Quoter, LpType>,
-    _pool_cap: &PoolCap<A, B, Quoter, LpType>,
-    redemption_fee_bps: u64,
-) {
-    assert!(redemption_fee_bps < BPS_DENOMINATOR, EFeeAbove100Percent);
-
-    pool
-        .redemption_fees
-        .set_config(
-            redemption_fee_bps,
-            BPS_DENOMINATOR,
-            MINIMUM_REDEMPTION_FEE,
-        );
-}
-
 public fun collect_protocol_fees<A, B, Quoter: store, LpType: drop>(
     pool: &mut Pool<A, B, Quoter, LpType>,
     _global_admin: &GlobalAdmin,
@@ -430,18 +365,6 @@ public fun collect_protocol_fees<A, B, Quoter: store, LpType: drop>(
     pool.version.assert_version_and_upgrade(CURRENT_VERSION);
 
     let (fees_a, fees_b) = pool.protocol_fees.withdraw();
-
-    (coin::from_balance(fees_a, ctx), coin::from_balance(fees_b, ctx))
-}
-
-public fun collect_redemption_fees<A, B, Quoter: store, LpType: drop>(
-    pool: &mut Pool<A, B, Quoter, LpType>,
-    _cap: &PoolCap<A, B, Quoter, LpType>,
-    ctx: &mut TxContext,
-): (Coin<A>, Coin<B>) {
-    pool.version.assert_version_and_upgrade(CURRENT_VERSION);
-
-    let (fees_a, fees_b) = pool.redemption_fees.withdraw();
 
     (coin::from_balance(fees_a, ctx), coin::from_balance(fees_b, ctx))
 }
@@ -492,9 +415,10 @@ public(package) fun new<A, B, Quoter: store, LpType: drop>(
     meta_lp: &mut CoinMetadata<LpType>,
     lp_treasury: TreasuryCap<LpType>,
     ctx: &mut TxContext,
-): (Pool<A, B, Quoter, LpType>, PoolCap<A, B, Quoter, LpType>) {
+): Pool<A, B, Quoter, LpType> {
     assert!(lp_treasury.total_supply() == 0, ELpSupplyMustBeZero);
     assert!(swap_fee_bps < BPS_DENOMINATOR, EFeeAbove100Percent);
+    assert!(get<A>() != get<B>(), ETypeAandBDuplicated);
 
     update_lp_metadata(meta_a, meta_b, meta_lp, &lp_treasury);
 
@@ -507,11 +431,6 @@ public(package) fun new<A, B, Quoter: store, LpType: drop>(
         balance_b: balance::zero(),
         protocol_fees: fees::new(SWAP_FEE_NUMERATOR, BPS_DENOMINATOR, 0),
         pool_fee_config: fees::new_config(swap_fee_bps, BPS_DENOMINATOR, 0),
-        redemption_fees: fees::new(
-            REDEMPTION_FEE_NUMERATOR,
-            BPS_DENOMINATOR,
-            MINIMUM_REDEMPTION_FEE,
-        ),
         lp_supply,
         trading_data: TradingData {
             swap_a_in_amount: 0,
@@ -520,8 +439,6 @@ public(package) fun new<A, B, Quoter: store, LpType: drop>(
             swap_b_in_amount: 0,
             protocol_fees_a: 0,
             protocol_fees_b: 0,
-            redemption_fees_a: 0,
-            redemption_fees_b: 0,
             pool_fees_a: 0,
             pool_fees_b: 0,
         },
@@ -530,24 +447,17 @@ public(package) fun new<A, B, Quoter: store, LpType: drop>(
 
     registry.add_amm(&pool);
 
-    // Create pool cap
-    let pool_cap = PoolCap {
-        id: object::new(ctx),
-        pool_id: pool.id.uid_to_inner(),
-    };
-
     // Emit event
     emit_event(NewPoolResult {
         creator: sender(ctx),
         pool_id: object::id(&pool),
-        pool_cap_id: object::id(&pool_cap),
         coin_type_a: get<A>(),
         coin_type_b: get<B>(),
         lp_token_type: get<LpType>(),
         quoter_type: get<Quoter>(),
     });
 
-    (pool, pool_cap)
+    pool
 }
 
 /// Executes inner swap logic that is generalised accross all quoters. It takes
@@ -586,6 +496,7 @@ public(package) fun swap<A, B, Quoter: store, LpType: drop>(
     ctx: &mut TxContext,
 ): SwapResult {
     pool.version.assert_version_and_upgrade(CURRENT_VERSION);
+    assert!(!(coin_a.value() == 0 && coin_b.value() == 0), EEmptyCoins);
 
     assert!(quote.amount_out() > 0, ESwapOutputAmountIsZero);
     assert!(quote.amount_out() >= min_amount_out, ESwapExceedsSlippage);
@@ -670,20 +581,6 @@ public(package) fun compute_swap_fees_<A, B, Quoter: store, LpType: drop>(
     let pool_fees = total_fees - protocol_fees;
 
     (protocol_fees, pool_fees)
-}
-
-public(package) fun compute_redemption_fees_<A, B, Quoter: store, LpType: drop>(
-    pool: &Pool<A, B, Quoter, LpType>,
-    amount_a: u64,
-    amount_b: u64,
-): (u64, u64) {
-    let (fee_num, fee_denom) = pool.redemption_fees.fee_ratio();
-    let min_fee = pool.redemption_fees.config().min_fee();
-
-    let fees_a = safe_mul_div_up(amount_a, fee_num, fee_denom).max(min_fee);
-    let fees_b = safe_mul_div_up(amount_b, fee_num, fee_denom).max(min_fee);
-
-    (fees_a, fees_b)
 }
 
 public(package) fun quoter_mut<A, B, Quoter: store, LpType: drop>(
@@ -860,13 +757,9 @@ fun quote_redeem_<A, B, Quoter: store, LpType: drop>(
         min_b,
     );
 
-    let (fee_amount_a, fee_amount_b) = pool.compute_redemption_fees_(withdraw_a, withdraw_b);
-
     quote::redeem_quote(
         withdraw_a,
         withdraw_b,
-        fee_amount_a,
-        fee_amount_b,
         lp_tokens,
     )
 }
@@ -918,7 +811,6 @@ fun update_lp_metadata<A, B, LpType: drop>(
 public struct NewPoolResult has copy, drop, store {
     creator: address,
     pool_id: ID,
-    pool_cap_id: ID,
     coin_type_a: TypeName,
     coin_type_b: TypeName,
     quoter_type: TypeName,
@@ -947,8 +839,6 @@ public struct RedeemResult has copy, drop, store {
     pool_id: ID,
     withdraw_a: u64,
     withdraw_b: u64,
-    fees_a: u64,
-    fees_b: u64,
     burn_lp: u64,
 }
 
@@ -1022,24 +912,6 @@ public(package) fun no_protocol_fees_for_testing<A, B, Quoter: store, LpType: dr
 ) {
     let fee_num = pool.protocol_fees.config_mut().fee_numerator_mut();
     *fee_num = 0;
-}
-
-#[test_only]
-public(package) fun no_redemption_fees_for_testing_with_min_fee<A, B, Quoter: store, LpType: drop>(
-    pool: &mut Pool<A, B, Quoter, LpType>,
-) {
-    let fee_num = pool.redemption_fees.config_mut().fee_numerator_mut();
-    *fee_num = 0;
-}
-
-#[test_only]
-public(package) fun no_redemption_fees_for_testing<A, B, Quoter: store, LpType: drop>(
-    pool: &mut Pool<A, B, Quoter, LpType>,
-) {
-    let fee_num = pool.redemption_fees.config_mut().fee_numerator_mut();
-    *fee_num = 0;
-    let min_fee = pool.redemption_fees.config_mut().min_fee_mut();
-    *min_fee = 0;
 }
 
 #[test_only]
