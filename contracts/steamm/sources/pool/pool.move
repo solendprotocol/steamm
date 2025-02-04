@@ -562,10 +562,11 @@ public(package) fun get_quote<A, B, Quoter: store, LpType: drop>(
     a2b: bool,
 ): SwapQuote {
     let (protocol_fees, pool_fees) = pool.compute_swap_fees_(amount_out);
+    let amount_out_net = amount_out - protocol_fees - pool_fees;
 
     quote::quote(
         amount_in,
-        amount_out,
+        amount_out_net,
         protocol_fees,
         pool_fees,
         a2b,
@@ -693,15 +694,12 @@ fun swap_inner<In, Out>(
     // Transfers amount out - post fees if any
     let protocol_fees = quote.output_fees().protocol_fees();
     let pool_fees = quote.output_fees().pool_fees();
-    let total_fees = protocol_fees + pool_fees;
-
-    let net_output = quote.amount_out() - total_fees;
 
     // Transfer protocol fees out
     protocol_fee_balance.join(reserve_out.split(protocol_fees));
 
     // Transfers amount out
-    coin_out.balance_mut().join(reserve_out.split(net_output));
+    coin_out.balance_mut().join(reserve_out.split(quote.amount_out()));
 
     // Update trading data
     *lifetime_protocol_fee = *lifetime_protocol_fee + protocol_fees;

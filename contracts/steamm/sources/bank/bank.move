@@ -1,7 +1,6 @@
 #[allow(lint(share_owned))]
 module steamm::bank;
 
-use std::debug::print;
 use std::ascii;
 use std::option::none;
 use std::string;
