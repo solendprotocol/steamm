@@ -344,7 +344,7 @@ public fun quote_deposit<A, B, Quoter: store, LpType: drop>(
 ///
 /// `RedeemQuote`: A quote containing the amounts of tokens A and B to be received and any fees
 public fun quote_redeem<A, B, Quoter: store, LpType: drop>(
-    pool: &mut Pool<A, B, Quoter, LpType>,
+    pool: &Pool<A, B, Quoter, LpType>,
     lp_tokens: u64,
 ): RedeemQuote {
     quote_redeem_(
