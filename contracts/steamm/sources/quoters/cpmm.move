@@ -1,12 +1,10 @@
 /// Constant-Product AMM Quoter implementation
 module steamm::cpmm;
-
-use std::option::none;
 use steamm::global_admin::GlobalAdmin;
-use steamm::registry::Registry;
-use steamm::math::{safe_mul_div, checked_mul_div};
-use steamm::pool::{Self, Pool, PoolCap, SwapResult, assert_liquidity};
+use steamm::math::safe_mul_div;
+use steamm::pool::{Self, Pool, SwapResult, assert_liquidity};
 use steamm::quote::SwapQuote;
+use steamm::registry::Registry;
 use steamm::version::{Self, Version};
 use sui::coin::{Coin, TreasuryCap, CoinMetadata};
 
@@ -61,10 +59,10 @@ public fun new<A, B, LpType: drop>(
     meta_lp: &mut CoinMetadata<LpType>,
     lp_treasury: TreasuryCap<LpType>,
     ctx: &mut TxContext,
-): (Pool<A, B, CpQuoter, LpType>, PoolCap<A, B, CpQuoter, LpType>) {
+): Pool<A, B, CpQuoter, LpType> {
     let quoter = CpQuoter { version: version::new(CURRENT_VERSION), offset };
 
-    let (pool, pool_cap) = pool::new<A, B, CpQuoter, LpType>(
+    pool::new<A, B, CpQuoter, LpType>(
         registry,
         swap_fee_bps,
         quoter,
@@ -73,9 +71,7 @@ public fun new<A, B, LpType: drop>(
         meta_lp,
         lp_treasury,
         ctx,
-    );
-
-    (pool, pool_cap)
+    )
 }
 
 /// Executes a swap between coin A and coin B in the constant product AMM pool.
@@ -238,6 +234,12 @@ public(package) fun check_invariance<A, B, Quoter: store, LpType: drop>(
     assert!(k1 >= k0, EInvariantViolation);
 }
 
+#[test_only]
+use std::option::none;
+#[test_only]
+use steamm::math::checked_mul_div_up;
+
+#[test_only]
 public(package) fun max_amount_in_on_a2b<A, B, LpType: drop>(
     pool: &Pool<A, B, CpQuoter, LpType>,
 ): Option<u64> {
@@ -248,7 +250,7 @@ public(package) fun max_amount_in_on_a2b<A, B, LpType: drop>(
         return none()
     };
 
-    checked_mul_div(reserve_out, reserve_in, offset) // max_amount_in
+    checked_mul_div_up(reserve_out, reserve_in, offset) // max_amount_in
 }
 
 // ===== Private Functions =====
