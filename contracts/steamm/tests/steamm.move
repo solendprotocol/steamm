@@ -1076,7 +1076,7 @@ fun test_fail_create_pool_duplicated_type() {
 
     // Create pool
 
-    let (pool, pool_cap) = dummy_quoter::new<B_TEST_USDC, B_TEST_USDC, LP_USDC_SUI>(
+    let pool = dummy_quoter::new<B_TEST_USDC, B_TEST_USDC, LP_USDC_SUI>(
         &meta_b_usdc,
         &meta_b_usdc,
         &mut meta_lp_usdc_sui,
@@ -1086,7 +1086,6 @@ fun test_fail_create_pool_duplicated_type() {
     );
 
     destroy(pool);
-    destroy(pool_cap);
     destroy(treasury_cap_b_usdc);
     destroy(meta_lp_usdc_sui);
     destroy(meta_b_usdc);
