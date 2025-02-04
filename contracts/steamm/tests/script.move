@@ -1,7 +1,6 @@
 #[test_only]
 module steamm::script_tests;
 
-use std::debug::print;
 use steamm::script_v1;
 use suilend::test_sui::TEST_SUI;
 use suilend::test_usdc::TEST_USDC;
@@ -160,8 +159,6 @@ fun script_redeem() {
         &clock
     );
 
-    print(&quote);
-
     let (coin_a, coin_b) = script_v1::redeem_liquidity(
         &mut pool,
         &mut bank_a,
@@ -244,14 +241,6 @@ fun script_swap() {
     destroy(coin_a);
     destroy(coin_b);
 
-    // pool
-    // bank_a
-    // bank_b
-    // lending_market
-    // amount_in
-    // a2b
-    // clock
-
     let quote = script_v1::quote_cpmm_swap(
         &pool,
         &bank_a,
@@ -261,8 +250,6 @@ fun script_swap() {
         10_000,
         &clock
     );
-
-    print(&quote);
 
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(10_000, scenario.ctx());
     let mut coin_b = coin::zero<TEST_SUI>(scenario.ctx());
@@ -281,12 +268,8 @@ fun script_swap() {
         scenario.ctx()
     );
 
-    print(&coin_b.value());
-
-    // assert_eq(quote.withdraw_a(), 500_000 - 10);
-    // assert_eq(quote.withdraw_b(), 500_000 - 10);
-    // assert_eq(coin_a.value(), quote.withdraw_a());
-    // assert_eq(coin_b.value(), quote.withdraw_b());
+    assert_eq(quote.amount_in(), 10_000);
+    assert_eq(quote.amount_out(), coin_b.value());
 
     destroy(coin_a);
     destroy(coin_b);

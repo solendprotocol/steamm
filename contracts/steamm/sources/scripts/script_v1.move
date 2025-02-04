@@ -1,7 +1,6 @@
 #[allow(lint(self_transfer))]
 module steamm::script_v1;
 
-use std::debug::print;
 use sui::coin::{Self, Coin};
 use sui::clock::Clock;
 use steamm::bank::Bank;
