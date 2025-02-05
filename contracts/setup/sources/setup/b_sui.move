@@ -1,4 +1,4 @@
-module steamm::b_sui {
+module steamm_setup::b_sui {
     use sui::url::Url;
     use sui::coin::{Self, TreasuryCap, CoinMetadata};
 

@@ -1,9 +1,10 @@
-module steamm::setup {
-    use suilend::lending_market_registry::{Self, Registry as SuilendRegistry};
-    use suilend::lending_market::{LendingMarket, LendingMarketOwnerCap};
-    use sui::transfer;
-    use steamm::{
-        lp_usdc_sui::LP_USDC_SUI,
+#[allow(lint(share_owned, self_transfer))]
+module steamm_setup::setup {
+    use sui::coin::{CoinMetadata, TreasuryCap};
+    use suilend::lending_market_registry::{create_lending_market, Registry as SuilendRegistry};
+    use steamm::registry::Registry;
+    use steamm::cpmm;
+    use steamm_setup::{
         lp_usdc_sui::LP_USDC_SUI,
         usdc::USDC,
         sui::SUI,
@@ -11,7 +12,7 @@ module steamm::setup {
         b_sui::B_SUI,
     };
 
-    struct LENDING_MARKET has drop {}
+    public struct LENDING_MARKET has drop {}
     
     public fun setup(
         suilend_registry: &mut SuilendRegistry,
@@ -28,7 +29,7 @@ module steamm::setup {
     ) {
         let (owner_cap, lending_market) = create_lending_market<LENDING_MARKET>(suilend_registry, ctx);
 
-        let (pool, pool_cap) = cpmm::new<B_USDC, B_SUI, LP_USDC_SUI>(
+        let pool = cpmm::new<B_USDC, B_SUI, LP_USDC_SUI>(
             steamm_registry,
             100,
             0,
@@ -45,7 +46,6 @@ module steamm::setup {
         transfer::public_share_object(lending_market);
         transfer::public_share_object(pool);
         transfer::public_transfer(owner_cap, ctx.sender());
-        transfer::public_transfer(pool_cap, ctx.sender());
     }
 }
 

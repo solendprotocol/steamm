@@ -1,4 +1,4 @@
-module steamm::lp_usdc_sui {
+module steamm_setup::lp_usdc_sui {
     use sui::url::Url;
     use sui::coin::{Self, TreasuryCap, CoinMetadata};
     
