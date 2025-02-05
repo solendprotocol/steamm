@@ -67,12 +67,6 @@ const EEmptyCoins: u64 = 9;
 
 // ===== Structs =====
 
-/// Capability object given to the pool creator
-public struct PoolCap<phantom A, phantom B, phantom Quoter: store, phantom LpType: drop> has key {
-    id: UID,
-    pool_id: ID,
-}
-
 /// AMM pool object. This object is the top-level object and sits at the
 /// core of the protocol. The generic types `A` and `B` correspond to the
 /// associated coin types of the AMM. The `Quoter` type corresponds to the
@@ -362,28 +356,6 @@ public fun quote_redeem<A, B, Quoter: store, LpType: drop>(
 
 // ===== Admin Functions =====
 
-/// Updates the pool's swap fee configuration. The swap fee is charged on each trade and is split
-/// between the protocol and the pool's liquidity providers.
-///
-/// # Arguments
-///
-/// * `pool` - The pool object to update fees for
-/// * `_pool_cap` - Capability object proving authority to modify pool parameters
-/// * `swap_fee_bps` - New swap fee in basis points (1 bp = 0.01%)
-///
-/// # Panics
-///
-/// This function will panic if:
-/// - `swap_fee_bps` is greater than or equal to `BPS_DENOMINATOR` (100%)
-public fun set_pool_swap_fees<A, B, Quoter: store, LpType: drop>(
-    pool: &mut Pool<A, B, Quoter, LpType>,
-    _pool_cap: &PoolCap<A, B, Quoter, LpType>,
-    swap_fee_bps: u64,
-) {
-    assert!(swap_fee_bps < BPS_DENOMINATOR, EFeeAbove100Percent);
-    pool.pool_fee_config = fees::new_config(swap_fee_bps, BPS_DENOMINATOR, 0);
-}
-
 public fun collect_protocol_fees<A, B, Quoter: store, LpType: drop>(
     pool: &mut Pool<A, B, Quoter, LpType>,
     _global_admin: &GlobalAdmin,
@@ -441,7 +413,7 @@ public(package) fun new<A, B, Quoter: store, LpType: drop>(
     swap_fee_bps: u64,
     quoter: Quoter,
     ctx: &mut TxContext,
-): (Pool<A, B, Quoter, LpType>, PoolCap<A, B, Quoter, LpType>) {
+): Pool<A, B, Quoter, LpType> {
     assert!(lp_treasury.total_supply() == 0, ELpSupplyMustBeZero);
     assert!(swap_fee_bps < BPS_DENOMINATOR, EFeeAbove100Percent);
     assert!(get<A>() != get<B>(), ETypeAandBDuplicated);
@@ -471,24 +443,17 @@ public(package) fun new<A, B, Quoter: store, LpType: drop>(
         version: version::new(CURRENT_VERSION),
     };
 
-    // Create pool cap
-    let pool_cap = PoolCap {
-        id: object::new(ctx),
-        pool_id: pool.id.uid_to_inner(),
-    };
-
     // Emit event
     emit_event(NewPoolResult {
         creator: sender(ctx),
         pool_id: object::id(&pool),
-        pool_cap_id: object::id(&pool_cap),
         coin_type_a: get<A>(),
         coin_type_b: get<B>(),
         lp_token_type: get<LpType>(),
         quoter_type: get<Quoter>(),
     });
 
-    (pool, pool_cap)
+    pool
 }
 
 /// Executes inner swap logic that is generalised accross all quoters. It takes
@@ -842,7 +807,6 @@ fun update_lp_metadata<A, B, LpType: drop>(
 public struct NewPoolResult has copy, drop, store {
     creator: address,
     pool_id: ID,
-    pool_cap_id: ID,
     coin_type_a: TypeName,
     coin_type_b: TypeName,
     quoter_type: TypeName,
