@@ -31,7 +31,7 @@ const SWAP_FEE_NUMERATOR: u64 = 2_000;
 const BPS_DENOMINATOR: u64 = 10_000;
 // Minimum liquidity burned during
 // the seed depositing phase
-const MINIMUM_LIQUIDITY: u64 = 10;
+const MINIMUM_LIQUIDITY: u64 = 1_000;
 
 const CURRENT_VERSION: u16 = 1;
 const LP_ICON_URL: vector<u8> = b"TODO";
@@ -64,6 +64,7 @@ const ETypeAandBDuplicated: u64 = 8;
 const ELpTokenEmpty: u64 = 9;
 // Empty coin A and B when depositing or swapping
 const EEmptyCoins: u64 = 9;
+const EEmptyLpCoin: u64 = 10;
 
 // ===== Structs =====
 
@@ -193,6 +194,8 @@ public fun deposit_liquidity<A, B, Quoter: store, LpType: drop>(
     if (quote.initial_deposit()) {
         public_transfer(lp_coins.split(MINIMUM_LIQUIDITY, ctx), @0x0);
     };
+
+    assert!(lp_coins.value() > 0, EEmptyLpCoin);
 
     assert_lp_supply_reserve_ratio(
         initial_total_funds_a,
