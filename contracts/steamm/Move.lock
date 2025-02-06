@@ -2,7 +2,7 @@
 
 [move]
 version = 3
-manifest_digest = "8A5076DC00640498DE2CB73088FFA7C25AB6150FF1AC101137515705A6AD967D"
+manifest_digest = "BF079973FD61E3B29B629E572AC88290571450181A4B53D1563BDC9A25D61E4A"
 deps_digest = "3C4103934B1E040BB6B23F1D610B4EF9F2F1166A50A104EADCF77467C004C600"
 dependencies = [
   { id = "Sui", name = "Sui" },
@@ -11,11 +11,11 @@ dependencies = [
 
 [[move.package]]
 id = "MoveStdlib"
-source = { git = "https://github.com/MystenLabs/sui.git", rev = "testnet-v1.40.1", subdir = "crates/sui-framework/packages/move-stdlib" }
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "framework/mainnet", subdir = "crates/sui-framework/packages/move-stdlib" }
 
 [[move.package]]
 id = "Pyth"
-source = { local = "../dependencies/pyth" }
+source = { git = "https://github.com/solendprotocol/pyth-crosschain.git", rev = "98e218c64bb75cf1350eb7b021e1ffcc3aedfd62", subdir = "target_chains/sui/contracts" }
 
 dependencies = [
   { id = "Sui", name = "Sui" },
@@ -24,7 +24,7 @@ dependencies = [
 
 [[move.package]]
 id = "Sui"
-source = { git = "https://github.com/MystenLabs/sui.git", rev = "testnet-v1.40.1", subdir = "crates/sui-framework/packages/sui-framework" }
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "framework/mainnet", subdir = "crates/sui-framework/packages/sui-framework" }
 
 dependencies = [
   { id = "MoveStdlib", name = "MoveStdlib" },
@@ -32,7 +32,7 @@ dependencies = [
 
 [[move.package]]
 id = "SuiSystem"
-source = { git = "https://github.com/MystenLabs/sui.git", rev = "testnet-v1.40.1", subdir = "crates/sui-framework/packages/sui-system" }
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "framework/mainnet", subdir = "crates/sui-framework/packages/sui-system" }
 
 dependencies = [
   { id = "MoveStdlib", name = "MoveStdlib" },
@@ -41,7 +41,7 @@ dependencies = [
 
 [[move.package]]
 id = "Wormhole"
-source = { local = "../dependencies/wormhole" }
+source = { git = "https://github.com/solendprotocol/wormhole.git", rev = "e1698d3c72b15cdddd7da98ad43e151f83b72a0a", subdir = "sui/wormhole" }
 
 dependencies = [
   { id = "Sui", name = "Sui" },
@@ -49,7 +49,7 @@ dependencies = [
 
 [[move.package]]
 id = "liquid_staking"
-source = { local = "../dependencies/liquid_staking" }
+source = { git = "https://github.com/solendprotocol/liquid-staking.git", rev = "main", subdir = "contracts" }
 
 dependencies = [
   { id = "Sui", name = "Sui" },
@@ -58,7 +58,7 @@ dependencies = [
 
 [[move.package]]
 id = "sprungsui"
-source = { local = "../dependencies/sprungsui" }
+source = { git = "https://github.com/solendprotocol/suilend.git", rev = "beta", subdir = "contracts/sprungsui" }
 
 dependencies = [
   { id = "Sui", name = "Sui" },
@@ -66,7 +66,7 @@ dependencies = [
 
 [[move.package]]
 id = "suilend"
-source = { local = "../dependencies/suilend" }
+source = { git = "https://github.com/solendprotocol/suilend.git", rev = "beta", subdir = "contracts/suilend" }
 
 dependencies = [
   { id = "Pyth", name = "Pyth" },
@@ -82,8 +82,8 @@ flavor = "sui"
 
 [env]
 
-[env.testnet]
-chain-id = "4c78adac"
-original-published-id = "0x0248d02e356aa2954eeca9ead0bd3df976eda06044a7d29009f31740d612ac8e"
-latest-published-id = "0x0248d02e356aa2954eeca9ead0bd3df976eda06044a7d29009f31740d612ac8e"
+[env.mainnet]
+chain-id = "35834a8a"
+original-published-id = "0x2e868e44010e06c0fc925d29f35029b6ef75a50e03d997585980fb2acea45ec6"
+latest-published-id = "0x2e868e44010e06c0fc925d29f35029b6ef75a50e03d997585980fb2acea45ec6"
 published-version = "1"
