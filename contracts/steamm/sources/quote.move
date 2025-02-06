@@ -5,7 +5,7 @@ use suilend::decimal::{Self, Decimal};
 
 public use fun steamm::pool::swap_inner as SwapQuote.swap_inner;
 
-public struct SwapQuote has drop, store {
+public struct SwapQuote has copy, drop, store {
     amount_in: u64,
     amount_out: u64,
     output_fees: SwapFee,
@@ -17,14 +17,14 @@ public struct SwapFee has copy, drop, store {
     pool_fees: u64,
 }
 
-public struct DepositQuote has drop, store {
+public struct DepositQuote has copy, drop, store {
     initial_deposit: bool,
     deposit_a: u64,
     deposit_b: u64,
     mint_lp: u64,
 }
 
-public struct RedeemQuote has drop, store {
+public struct RedeemQuote has copy, drop, store {
     withdraw_a: u64,
     withdraw_b: u64,
     burn_lp: u64,

@@ -1,0 +1,21 @@
+module steamm::faucets {
+    use sui::coin::{Coin, TreasuryCap};
+
+    public struct Faucet<phantom T> has store, key {
+        id: UID,
+        treasury_cap: TreasuryCap<T>,
+    }
+    
+    public fun new<T>(cap: TreasuryCap<T>, ctx: &mut TxContext) {
+        let faucet = Faucet<T>{
+            id           : object::new(ctx), 
+            treasury_cap : cap,
+        };
+        transfer::public_share_object<Faucet<T>>(faucet);
+    }
+    
+    public fun get_coins<T>(faucet: &mut Faucet<T>, amount: u64, ctx: &mut TxContext): Coin<T> {
+        faucet.treasury_cap.mint(amount, ctx)
+    }
+}
+

@@ -3,6 +3,7 @@ module steamm::script_v1;
 
 use sui::coin::{Self, Coin};
 use sui::clock::Clock;
+use steamm::events::emit_event;
 use steamm::bank::Bank;
 use steamm::quote;
 use steamm::pool::Pool;
@@ -157,6 +158,8 @@ public fun quote_cpmm_swap<P, A, B, BTokenA, BTokenB, LpType: drop>(
         a2b,
     );
 
+    emit_event(quote);
+
     quote
 }
 
@@ -184,6 +187,8 @@ public fun quote_deposit<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: drop>
         btoken_quote.mint_lp(),
     );
 
+    emit_event(quote);
+
     quote
 }
 
@@ -202,6 +207,8 @@ public fun quote_redeem<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: drop>(
         bank_b.from_btokens(lending_market, btoken_quote.withdraw_b(), clock).floor(),
         btoken_quote.burn_lp()
     );
+
+    emit_event(quote);
 
     quote
 }

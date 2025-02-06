@@ -2,6 +2,8 @@ local/*
 .vscode/*
 temp/*
 sdk/.env
+contracts/dependencies/*/build
+contracts/dependencies/*/Move.lock
 
 contracts/*/build/*
 

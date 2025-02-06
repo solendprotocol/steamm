@@ -1,0 +1,13 @@
+[package]
+name = "suilend"
+edition = "2024.beta"
+published-at = "0xf8659699b500cb66c7625b9859e796bbdb62777632c6ea900c937bbe0578acd7"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "testnet-v1.40.1" }
+Pyth = { local = "../pyth" }
+liquid_staking = { local = "../liquid_staking" }
+sprungsui = { local = "../sprungsui" }
+
+[addresses]
+suilend = "0xf8659699b500cb66c7625b9859e796bbdb62777632c6ea900c937bbe0578acd7"

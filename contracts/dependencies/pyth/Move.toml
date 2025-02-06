@@ -1,0 +1,12 @@
+[package]
+name = "Pyth"
+published-at = "0x7788d9e8f33cd8722411a5f76d6124adf92ed56af4920d523a0d580cbca204b3"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "testnet-v1.40.1" }
+
+[dependencies.Wormhole]
+local = "../wormhole"
+
+[addresses]
+pyth = "0x7788d9e8f33cd8722411a5f76d6124adf92ed56af4920d523a0d580cbca204b3"
