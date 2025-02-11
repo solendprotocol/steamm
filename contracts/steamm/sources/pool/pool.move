@@ -18,6 +18,7 @@ use sui::balance::{Self, Balance, Supply};
 use sui::coin::{Self, Coin, TreasuryCap, CoinMetadata};
 use sui::transfer::public_transfer;
 use sui::tx_context::sender;
+use steamm::registry::Registry;
 
 public use fun steamm::cpmm::swap as Pool.cpmm_swap;
 public use fun steamm::cpmm::quote_swap as Pool.cpmm_quote_swap;
@@ -483,6 +484,7 @@ entry fun migrate<A, B, Quoter: store, LpType: drop>(
 /// - `swap_fee_bps` is greater than or equal to `BPS_DENOMINATOR`
 /// - `lp_treasury` has non-zero total supply
 public(package) fun new<A, B, Quoter: store, LpType: drop>(
+    registry: &mut Registry,
     meta_a: &CoinMetadata<A>,
     meta_b: &CoinMetadata<B>,
     meta_lp: &mut CoinMetadata<LpType>,
@@ -525,6 +527,8 @@ public(package) fun new<A, B, Quoter: store, LpType: drop>(
         },
         version: version::new(CURRENT_VERSION),
     };
+
+    registry.add_pool_to_registry(object::id(&pool));
 
     // Create pool cap
     let pool_cap = PoolCap {

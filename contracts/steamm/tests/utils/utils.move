@@ -25,6 +25,7 @@ use suilend::lending_market_tests::{Self, LENDING_MARKET};
 use suilend::reserve_config;
 use suilend::test_sui::{Self, TEST_SUI};
 use suilend::test_usdc::{Self, TEST_USDC};
+use steamm::registry::{Self};
 
 public fun e9(amt: u64): u64 {
     1_000_000_000 * amt
@@ -138,15 +139,18 @@ public fun test_setup_cpmm(
     let (treasury_cap_lp, mut meta_lp_usdc_sui) = steamm::lp_usdc_sui::create_currency(ctx);
     let (treasury_cap_b_usdc, mut meta_b_usdc) = steamm::b_test_usdc::create_currency(ctx);
     let (treasury_cap_b_sui, mut meta_b_sui) = steamm::b_test_sui::create_currency(ctx);
+    let mut registry = registry::create_for_testing(ctx);
 
     // Create banks
     let bank_a = bank::create_bank<LENDING_MARKET, TEST_USDC, B_TEST_USDC>(
+        &mut registry,
         &meta_usdc,
         &mut meta_b_usdc,
         treasury_cap_b_usdc,
         ctx,
     );
     let bank_b = bank::create_bank<LENDING_MARKET, TEST_SUI, B_TEST_SUI>(
+        &mut registry,
         &meta_sui,
         &mut meta_b_sui,
         treasury_cap_b_sui,
@@ -156,6 +160,7 @@ public fun test_setup_cpmm(
     // Create pool
 
     let (pool, pool_cap) = cpmm::new<B_TEST_USDC, B_TEST_SUI, LP_USDC_SUI>(
+        &mut registry,
         &meta_b_usdc,
         &meta_b_sui,
         &mut meta_lp_usdc_sui,
@@ -173,6 +178,7 @@ public fun test_setup_cpmm(
     destroy(meta_sui);
     destroy(meta_usdc);
     destroy(pool_cap);
+    destroy(registry);
 
     test_scenario::end(scenario);
 
@@ -195,15 +201,18 @@ public fun test_setup_dummy(
     let (treasury_cap_lp, mut meta_lp_usdc_sui) = steamm::lp_usdc_sui::create_currency(ctx);
     let (treasury_cap_b_usdc, mut meta_b_usdc) = steamm::b_test_usdc::create_currency(ctx);
     let (treasury_cap_b_sui, mut meta_b_sui) = steamm::b_test_sui::create_currency(ctx);
+    let mut registry = registry::create_for_testing(ctx);
 
     // Create banks
     let bank_a = bank::create_bank<LENDING_MARKET, TEST_USDC, B_TEST_USDC>(
+        &mut registry,
         &meta_usdc,
         &mut meta_b_usdc,
         treasury_cap_b_usdc,
         ctx,
     );
     let bank_b = bank::create_bank<LENDING_MARKET, TEST_SUI, B_TEST_SUI>(
+        &mut registry,
         &meta_sui,
         &mut meta_b_sui,
         treasury_cap_b_sui,
@@ -213,6 +222,7 @@ public fun test_setup_dummy(
     // Create pool
 
     let (pool, pool_cap) = dummy_quoter::new<B_TEST_USDC, B_TEST_SUI, LP_USDC_SUI>(
+        &mut registry,
         &meta_b_usdc,
         &meta_b_sui,
         &mut meta_lp_usdc_sui,
@@ -229,6 +239,7 @@ public fun test_setup_dummy(
     destroy(meta_sui);
     destroy(meta_usdc);
     destroy(pool_cap);
+    destroy(registry);
 
     test_scenario::end(scenario);
 

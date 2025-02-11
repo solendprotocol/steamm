@@ -17,6 +17,7 @@ use sui::transfer::share_object;
 use suilend::decimal::{Self, Decimal};
 use suilend::lending_market::{LendingMarket, ObligationOwnerCap};
 use suilend::reserve::CToken;
+use steamm::registry::Registry;
 
 // ===== Constants =====
 
@@ -77,12 +78,14 @@ public struct Lending<phantom P> has store {
 /// * `ID` - The object ID of the created bank
 #[allow(lint(share_owned))]
 public entry fun create_bank_and_share<P, T, BToken: drop>(
+    registry: &mut Registry,
     meta_t: &CoinMetadata<T>,
     meta_b: &mut CoinMetadata<BToken>,
     btoken_treasury: TreasuryCap<BToken>,
     ctx: &mut TxContext,
 ): ID {
     let bank = create_bank<P, T, BToken>(
+        registry,
         meta_t,
         meta_b,
         btoken_treasury,
@@ -345,6 +348,7 @@ entry fun migrate<P, T, BToken>(bank: &mut Bank<P, T, BToken>, _admin: &GlobalAd
 // ====== Package Functions =====
 
 public(package) fun create_bank<P, T, BToken: drop>(
+    registry: &mut Registry,
     meta_t: &CoinMetadata<T>,
     meta_b: &mut CoinMetadata<BToken>,
     btoken_treasury: TreasuryCap<BToken>,
@@ -362,6 +366,8 @@ public(package) fun create_bank<P, T, BToken: drop>(
         btoken_supply: btoken_treasury.treasury_into_supply(),
         version: version::new(CURRENT_VERSION),
     };
+
+    registry.add_bank_to_registry(object::id(&bank));
 
     emit_event(NewBankEvent {
         bank_id: object::id(&bank),
@@ -642,7 +648,7 @@ fun compound_interest_if_any<P, T, BToken>(
     clock: &Clock,
 ) {
     if (bank.lending.is_some()) {
-        lending_market.compound_interest<P, T>(bank.reserve_array_index(), clock);
+        lending_market.compound_interest<P>(bank.reserve_array_index(), clock);
     }
 }
 

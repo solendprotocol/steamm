@@ -14,6 +14,7 @@ use sui::test_scenario::{Self, Scenario, ctx};
 use sui::test_utils::{destroy, assert_eq};
 use suilend::lending_market::{LendingMarketOwnerCap, LendingMarket};
 use suilend::lending_market_tests::{LENDING_MARKET, setup as suilend_setup};
+use steamm::registry::Self;
 
 const ADMIN: address = @0x10;
 const POOL_CREATOR: address = @0x11;

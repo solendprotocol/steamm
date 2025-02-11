@@ -4,12 +4,14 @@ module steamm::dummy_quoter;
 use steamm::pool::{Self, Pool, PoolCap, SwapResult};
 use steamm::quote::SwapQuote;
 use sui::coin::{Coin, TreasuryCap, CoinMetadata};
+use steamm::registry::Registry;
 
 public struct DummyQuoter has store {}
 
 // ===== Public Methods =====
 
 public fun new<A, B, LpType: drop>(
+    registry: &mut Registry,
     meta_a: &CoinMetadata<A>,
     meta_b: &CoinMetadata<B>,
     meta_lp: &mut CoinMetadata<LpType>,
@@ -20,6 +22,7 @@ public fun new<A, B, LpType: drop>(
     let quoter = DummyQuoter {};
 
     let (pool, pool_cap) = pool::new<A, B, DummyQuoter, LpType>(
+        registry,
         meta_a,
         meta_b,
         meta_lp,

@@ -695,9 +695,11 @@ fun test_steamm_fees() {
         &mut scenario,
     ).destruct_state();
 
-    let ctx = ctx(&mut scenario);
 
     let mut pool = test_setup_dummy_no_banks(100);
+    scenario.next_tx(POOL_CREATOR);
+
+    let ctx = ctx(&mut scenario);
     let mut pool_2 = test_setup_dummy_no_banks(100);
 
     let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(e9(200_000_000), ctx);
