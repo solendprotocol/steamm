@@ -4,7 +4,7 @@ set -eE
 
 
 cd contracts/steamm
-STEAMM_RESPONSE=$(sui client publish --silence-warnings --no-lint --json)
+STEAMM_RESPONSE=$(sui client publish --silence-warnings --no-lint --skip-dependency-verification --json)
 # STEAMM_RESPONSE=$(cat steamm.json)
 
 find_object_id() {
@@ -61,7 +61,7 @@ echo "usdc_treasury_cap: $usdc_treasury_cap"
 PACKAGE_ID=$(echo "$STEAMM_RESPONSE" | grep -A 3 '"type": "published"' | grep "packageId" | cut -d'"' -f4)
 echo "PACKAGE_ID: $PACKAGE_ID"
 
-LENDING_MARKET_REGISTRY="0x4b7912ba1d96ec95954683e0ee94e6d95f511d8be2af88017ffeaff0bd56e422"
+LENDING_MARKET_REGISTRY="0x8a0554174e3366f6c27a2af0c6d091b39ac849fbca83a138f77f1cef37ba817f"
 
 SETUP_RESPONSE=$(sui client call --package "$PACKAGE_ID" --module setup --function setup --args "$LENDING_MARKET_REGISTRY" "$registry" "$lp_metadata" "$lp_treasury_cap" "$usdc_metadata" "$sui_metadata" "$b_usdc_metadata" "$b_sui_metadata" "$b_usdc_treasury_cap" "$b_sui_treasury_cap" --json)
 # SETUP_RESPONSE=$(cat setup.json)

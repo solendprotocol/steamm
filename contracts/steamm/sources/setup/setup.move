@@ -13,9 +13,6 @@ use suilend::lending_market_registry::{Self as lending, Registry as LendingRegis
 
 public struct LENDING_MARKET has drop {}
 
-// TODO: You are here!!
-// 1. swrite move module - has lending market type, function to setup lending market, banks, amm pool, setups test currencies, deploys liquidity to pool
-
 #[allow(lint(self_transfer, share_owned))]
 public fun setup(
     lending_registry: &mut LendingRegistry,
