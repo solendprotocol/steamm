@@ -3,12 +3,9 @@ module steamm::lend_tests;
 
 use std::option::some;
 use std::type_name;
-use steamm::b_test_sui::B_TEST_SUI;
-use steamm::b_test_usdc::B_TEST_USDC;
-use steamm::dummy_quoter::{Self, swap as dummy_swap};
+use steamm::dummy_quoter::{swap as dummy_swap};
 use steamm::global_admin;
 use steamm::bank;
-use steamm::lp_usdc_sui::LP_USDC_SUI;
 use steamm::pool::minimum_liquidity;
 use steamm::test_utils::{
     reserve_args_2,
@@ -1740,25 +1737,12 @@ public fun test_no_op_below_min_deploy_amount() {
         prices,
         type_to_index,
         clock,
-        mut registry,
+        registry,
         meta_b_usdc,
         meta_b_sui,
-        mut meta_lp_usdc_sui,
+        meta_lp_usdc_sui,
         treasury_cap_lp,
     ) = base_setup(some(reserve_args), &mut scenario);
-
-    // Create pool
-    let mut pool = dummy_quoter::new<B_TEST_USDC, B_TEST_SUI, LP_USDC_SUI>(
-        &mut registry,
-        0,
-        &meta_b_usdc,
-        &meta_b_sui,
-        &mut meta_lp_usdc_sui,
-        treasury_cap_lp,
-        scenario.ctx(),
-    );
-
-    pool.no_protocol_fees_for_testing();
 
     destroy(registry);
     destroy(meta_lp_usdc_sui);
@@ -1795,7 +1779,7 @@ public fun test_no_op_below_min_deploy_amount() {
 
     assert!(effective_utilisation_bps_before == effective_utilisation_bps_after, 0);
 
-    test_utils::destroy(pool);
+    test_utils::destroy(treasury_cap_lp);
     test_utils::destroy(owner_cap);
     test_utils::destroy(lending_market);
     test_utils::destroy(clock);

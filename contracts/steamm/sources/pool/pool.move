@@ -43,9 +43,8 @@ const LP_ICON_URL: vector<u8> = b"TODO";
 const EInvalidLpDecimals: u64 = 0;
 /// Error when trying to initialize a pool with non-zero LP supply
 const ELpSupplyMustBeZero: u64 = 1;
-// The pool swap fee is a percentage and therefore
-// can't surpass 100%
-const EFeeAbove100Percent: u64 = 2;
+/// Error when swap fee bps is not one of the allowed values
+const EInvalidSwapFeeBpsType: u64 = 2;
 // Occurs when the swap amount_out is below the
 // minimum amount out declared
 const ESwapExceedsSlippage: u64 = 3;
@@ -420,7 +419,8 @@ public(package) fun new<A, B, Quoter: store, LpType: drop>(
     ctx: &mut TxContext,
 ): Pool<A, B, Quoter, LpType> {
     assert!(lp_treasury.total_supply() == 0, ELpSupplyMustBeZero);
-    assert!(swap_fee_bps < BPS_DENOMINATOR, EFeeAbove100Percent);
+    assert_swap_fee_bps(swap_fee_bps);
+    // assert!(swap_fee_bps < BPS_DENOMINATOR, EFeeAbove100Percent);
     assert!(get<A>() != get<B>(), ETypeAandBDuplicated);
 
     update_lp_metadata(meta_a, meta_b, meta_lp, &lp_treasury);
@@ -775,6 +775,17 @@ fun assert_lp_supply_reserve_ratio(
     );
 }
 
+fun assert_swap_fee_bps(swap_fee_bps: u64) {
+    assert!(
+        swap_fee_bps == 1 || 
+        swap_fee_bps == 5 || 
+        swap_fee_bps == 30 || 
+        swap_fee_bps == 100 ||
+        swap_fee_bps == 200,
+        EInvalidSwapFeeBpsType,
+    );
+}
+
 fun update_lp_metadata<A, B, LpType: drop>(
     meta_a: &CoinMetadata<A>,
     meta_b: &CoinMetadata<B>,
@@ -900,6 +911,14 @@ public(package) fun no_protocol_fees_for_testing<A, B, Quoter: store, LpType: dr
     pool: &mut Pool<A, B, Quoter, LpType>,
 ) {
     let fee_num = pool.protocol_fees.config_mut().fee_numerator_mut();
+    *fee_num = 0;
+}
+
+#[test_only]
+public(package) fun no_swap_fees_for_testing<A, B, Quoter: store, LpType: drop>(
+    pool: &mut Pool<A, B, Quoter, LpType>,
+) {
+    let fee_num = pool.pool_fee_config.fee_numerator_mut();
     *fee_num = 0;
 }
 
