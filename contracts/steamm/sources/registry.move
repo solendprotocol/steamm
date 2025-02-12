@@ -3,6 +3,7 @@
 module steamm::registry;
 
 use std::type_name::TypeName;
+use sui::vec_set::{Self, VecSet};
 use steamm::global_admin::GlobalAdmin;
 use steamm::version::{Self, Version};
 use steamm::events::emit_event;
@@ -12,13 +13,12 @@ use sui::bag::{Self, Bag};
 
 const CURRENT_VERSION: u16 = 1;
 
-public struct BankKey has copy, store, drop { lending_market: TypeName, coin_type: TypeName }
-public struct PoolKey has copy, store, drop { coin_type_a: TypeName, coin_type_b: TypeName, swap_fee_bps: u64, quoter_type: TypeName }
+public struct BankKey has copy, store, drop { lending_market_id: ID, coin_type: TypeName }
+public struct PoolKey has copy, store, drop { coin_type_a: TypeName, coin_type_b: TypeName }
 
 // ===== Errors =====
 
-const EDuplicatedPoolType: u64 = 1;
-const EDuplicatedBankType: u64 = 2;
+const EDuplicatedBankType: u64 = 1;
 
 public struct Registry has key {
     id: UID,
@@ -29,16 +29,12 @@ public struct Registry has key {
 
 public struct BankData has store {
     bank_id: ID,
-    coin_type: TypeName,
     btoken_type: TypeName,
-    lending_market_id: ID,
     lending_market_type: TypeName,
 }
 
 public struct PoolData has copy, drop, store {
     pool_id: ID,
-    coin_type_a: TypeName,
-    coin_type_b: TypeName,
     quoter_type: TypeName,
     swap_fee_bps: u64,
     lp_token_type: TypeName,
@@ -79,19 +75,19 @@ public(package) fun register_pool(
     let key = PoolKey {
         coin_type_a,
         coin_type_b,
-        swap_fee_bps,
-        quoter_type,
     };
 
-    assert!(!registry.pools.contains(key), EDuplicatedPoolType);
+    if (!registry.pools.contains(key)) {
+        registry.pools.add(key, vec_set::empty<PoolData>());
+    };
 
-    registry.pools.add(key, PoolData {
+    let pools: &mut VecSet<PoolData> = registry.pools.borrow_mut(key);
+    
+    pools.insert(PoolData {
         pool_id,
-        coin_type_a,
-        coin_type_b,
-        lp_token_type,
-        swap_fee_bps,
         quoter_type,
+        swap_fee_bps,
+        lp_token_type,
     });
 
     emit_event(event);
@@ -116,7 +112,7 @@ public(package) fun register_bank(
     };
 
     let key = BankKey {
-        lending_market: lending_market_type,
+        lending_market_id: lending_market_id,
         coin_type: coin_type,
     };
 
@@ -124,9 +120,7 @@ public(package) fun register_bank(
 
     registry.banks.add(key, BankData {
         bank_id,
-        coin_type,
         btoken_type,
-        lending_market_id,
         lending_market_type,
     });
 
