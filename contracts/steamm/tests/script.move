@@ -171,8 +171,8 @@ fun script_redeem() {
         scenario.ctx()
     );
 
-    assert_eq(quote.withdraw_a(), 500_000 - 10);
-    assert_eq(quote.withdraw_b(), 500_000 - 10);
+    assert_eq(quote.withdraw_a(), 500_000 - 1000);
+    assert_eq(quote.withdraw_b(), 500_000 - 1000);
     assert_eq(coin_a.value(), quote.withdraw_a());
     assert_eq(coin_b.value(), quote.withdraw_b());
 
