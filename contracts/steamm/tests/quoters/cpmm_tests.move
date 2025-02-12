@@ -49,11 +49,19 @@ public fun setup_pool(
     offset: u64,
     scenario: &mut Scenario,
 ): (Pool<B_TEST_USDC, B_TEST_SUI, CpQuoter, LP_USDC_SUI>) {
-    let (pool, bank_a, bank_b, lending_market, lend_cap, prices, bag, clock) = test_setup_cpmm(
+    let is_no_fee = fee == 0;
+    let fee = if (is_no_fee) { 100 } else { fee };
+
+    let (mut pool, bank_a, bank_b, lending_market, lend_cap, prices, bag, clock) = test_setup_cpmm(
         fee,
         offset,
         scenario,
     );
+
+    if (is_no_fee) {
+        pool.no_protocol_fees_for_testing();
+        pool.no_swap_fees_for_testing();
+    };
 
     destroy(bank_a);
     destroy(bank_b);

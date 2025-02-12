@@ -18,10 +18,8 @@ fun setup_pool(
     reserve_a: u64,
     reserve_b: u64,
     lp_supply: u64,
-    swap_fee_bps: u64,
     scenario: &mut Scenario,
 ): (Pool<B_TEST_USDC, B_TEST_SUI, CpQuoter, LP_USDC_SUI>) {
-    // let (mut pool, bank_a, bank_b) = test_utils::test_setup_cpmm(swap_fee_bps, 0, scenario);
     let (
         mut pool,
         bank_a,
@@ -31,7 +29,10 @@ fun setup_pool(
         prices,
         bag,
         clock,
-    ) = test_utils::test_setup_cpmm(swap_fee_bps, 0, scenario);
+    ) = test_utils::test_setup_cpmm(100, 0, scenario);
+
+    pool.no_swap_fees_for_testing();
+    pool.no_protocol_fees_for_testing();
 
     pool.mut_reserve_a(reserve_a, true);
     pool.mut_reserve_b(reserve_b, true);
@@ -54,7 +55,6 @@ fun test_initial_deposit() {
     let mut scenario = test_scenario::begin(@0x10);
 
     let pool = setup_pool(
-        0,
         0,
         0,
         0,
@@ -83,7 +83,6 @@ fun test_simple_deposit() {
         5,
         1,
         sqrt(5 as u128) as u64,
-        0,
         &mut scenario,
     );
 
@@ -109,7 +108,6 @@ fun test_simple_redeem() {
         6,
         6,
         6,
-        0,
         &mut scenario,
     );
 
@@ -135,7 +133,6 @@ fun test_fail_min_a_too_high() {
         6,
         6,
         6,
-        0,
         &mut scenario,
     );
 
@@ -161,7 +158,6 @@ fun test_fail_min_b_too_high() {
         6,
         6,
         6,
-        0,
         &mut scenario,
     );
 
@@ -186,7 +182,6 @@ fun test_last_redeem() {
         6,
         6,
         6,
-        0,
         &mut scenario,
     );
 
@@ -335,7 +330,6 @@ fun test_fail_max_params_as_zero() {
         5,
         5,
         sqrt(5 as u128) as u64,
-        0,
         &mut scenario,
     );
 
@@ -357,7 +351,6 @@ fun test_fail_deposit_maximally_imbalanced_pool() {
         1,
         5_000_000_000_000_000,
         sqrt(5_000_000_000_000_00 as u128) as u64,
-        0,
         &mut scenario,
     );
 
