@@ -2,14 +2,18 @@
 /// Ensures that there is only one AMM pool of each type.
 module steamm::registry;
 
-use std::type_name::{Self, TypeName};
+use std::type_name::TypeName;
 use steamm::global_admin::GlobalAdmin;
 use steamm::version::{Self, Version};
-use sui::table::{Self, Table};
+use steamm::events::emit_event;
+use sui::bag::{Self, Bag};
 
 // ===== Constants =====
 
 const CURRENT_VERSION: u16 = 1;
+
+public struct BankKey has copy, store, drop { lending_market: TypeName, coin_type: TypeName }
+public struct PoolKey has copy, store, drop { coin_type_a: TypeName, coin_type_b: TypeName, swap_fee_bps: u64, quoter_type: TypeName }
 
 // ===== Errors =====
 
@@ -19,46 +23,133 @@ const EDuplicatedBankType: u64 = 2;
 public struct Registry has key {
     id: UID,
     version: Version,
-    amms: Table<TypeName, ID>,
-    banks: Table<TypeName, BankType>,
+    banks: Bag,
+    pools: Bag,
 }
 
-public struct BankType has store {
+public struct BankData has store {
     bank_id: ID,
-    bank_type: TypeName,
+    coin_type: TypeName,
+    btoken_type: TypeName,
+    lending_market_id: ID,
+    lending_market_type: TypeName,
 }
+
+public struct PoolData has copy, drop, store {
+    pool_id: ID,
+    coin_type_a: TypeName,
+    coin_type_b: TypeName,
+    quoter_type: TypeName,
+    swap_fee_bps: u64,
+    lp_token_type: TypeName,
+}
+
 
 fun init(ctx: &mut TxContext) {
     let registry = Registry {
         id: object::new(ctx),
         version: version::new(CURRENT_VERSION),
-        amms: table::new(ctx),
-        banks: table::new(ctx),
+        banks: bag::new(ctx),
+        pools: bag::new(ctx),
     };
 
     transfer::share_object(registry);
 }
 
-public(package) fun add_amm<AMM: key>(registry: &mut Registry, pool: &AMM) {
+public(package) fun register_pool(
+    registry: &mut Registry,
+    pool_id: ID,
+    coin_type_a: TypeName,
+    coin_type_b: TypeName,
+    lp_token_type: TypeName,
+    swap_fee_bps: u64,
+    quoter_type: TypeName,
+) {
     registry.version.assert_version_and_upgrade(CURRENT_VERSION);
 
-    let amm_type = type_name::get<AMM>();
-    assert!(!table::contains(&registry.amms, amm_type), EDuplicatedPoolType);
+    let event = NewPoolResult {
+        pool_id,
+        coin_type_a,
+        coin_type_b,
+        lp_token_type,
+        swap_fee_bps,
+        quoter_type,
+    };
 
-    table::add(&mut registry.amms, amm_type, object::id(pool));
+    let key = PoolKey {
+        coin_type_a,
+        coin_type_b,
+        swap_fee_bps,
+        quoter_type,
+    };
+
+    assert!(!registry.pools.contains(key), EDuplicatedPoolType);
+
+    registry.pools.add(key, PoolData {
+        pool_id,
+        coin_type_a,
+        coin_type_b,
+        lp_token_type,
+        swap_fee_bps,
+        quoter_type,
+    });
+
+    emit_event(event);
 }
 
-public(package) fun add_bank<BANK: key, T>(registry: &mut Registry, bank: &BANK) {
+public(package) fun register_bank(
+    registry: &mut Registry,
+    bank_id: ID,
+    coin_type: TypeName,
+    btoken_type: TypeName,
+    lending_market_id: ID,
+    lending_market_type: TypeName,
+) {
     registry.version.assert_version_and_upgrade(CURRENT_VERSION);
 
-    let coin_type = type_name::get<T>();
-    let bank_type = type_name::get<BANK>();
-    assert!(!table::contains(&registry.banks, coin_type), EDuplicatedBankType);
+    let event = NewBankEvent {
+        bank_id,
+        coin_type,
+        btoken_type,
+        lending_market_id,
+        lending_market_type,
+    };
 
-    table::add(&mut registry.banks, coin_type, BankType {
-        bank_id: object::id(bank),
-        bank_type: bank_type,
+    let key = BankKey {
+        lending_market: lending_market_type,
+        coin_type: coin_type,
+    };
+
+    assert!(!registry.banks.contains(key), EDuplicatedBankType);
+
+    registry.banks.add(key, BankData {
+        bank_id,
+        coin_type,
+        btoken_type,
+        lending_market_id,
+        lending_market_type,
     });
+
+    emit_event(event);
+}
+
+// ===== Events =====
+
+public struct NewPoolResult has copy, drop, store {
+    pool_id: ID,
+    coin_type_a: TypeName,
+    coin_type_b: TypeName,
+    quoter_type: TypeName,
+    swap_fee_bps: u64,
+    lp_token_type: TypeName,
+}
+
+public struct NewBankEvent has copy, drop, store {
+    bank_id: ID,
+    coin_type: TypeName,
+    btoken_type: TypeName,
+    lending_market_id: ID,
+    lending_market_type: TypeName,
 }
 
 // ===== Versioning =====
@@ -74,77 +165,9 @@ public fun init_for_testing(ctx: &mut TxContext): Registry {
     let registry = Registry {
         id: object::new(ctx),
         version: version::new(CURRENT_VERSION),
-        amms: table::new(ctx),
-        banks: table::new(ctx),
+        pools: bag::new(ctx),
+        banks: bag::new(ctx),
     };
 
     registry
-}
-
-#[test_only]
-public struct AMM_1 has key { id: UID }
-#[test_only]
-public struct AMM_2 has key { id: UID }
-
-#[test]
-fun test_happy() {
-    use sui::test_utils::{Self};
-    use sui::test_scenario::{Self};
-
-    let owner = @0x26;
-    let mut scenario = test_scenario::begin(owner);
-
-    init(test_scenario::ctx(&mut scenario));
-    test_scenario::next_tx(&mut scenario, owner);
-
-    let mut registry = test_scenario::take_shared<Registry>(&scenario);
-
-    let pool_1 = AMM_1 { id: object::new(test_scenario::ctx(&mut scenario)) };
-    let pool_2 = AMM_2 { id: object::new(test_scenario::ctx(&mut scenario)) };
-
-    add_amm(
-        &mut registry,
-        &pool_1,
-    );
-
-    add_amm(
-        &mut registry,
-        &pool_2,
-    );
-
-    test_scenario::return_shared(registry);
-    test_utils::destroy(pool_1);
-    test_utils::destroy(pool_2);
-    test_scenario::end(scenario);
-}
-
-#[test]
-#[expected_failure(abort_code = EDuplicatedPoolType)]
-fun test_fail_duplicate_lending_market_type() {
-    use sui::test_utils::{Self};
-    use sui::test_scenario::{Self};
-
-    let owner = @0x26;
-    let mut scenario = test_scenario::begin(owner);
-
-    init(test_scenario::ctx(&mut scenario));
-    test_scenario::next_tx(&mut scenario, owner);
-
-    let mut registry = test_scenario::take_shared<Registry>(&scenario);
-
-    let pool_1 = AMM_1 { id: object::new(test_scenario::ctx(&mut scenario)) };
-
-    add_amm(
-        &mut registry,
-        &pool_1,
-    );
-
-    add_amm(
-        &mut registry,
-        &pool_1,
-    );
-
-    test_utils::destroy(pool_1);
-    test_scenario::return_shared(registry);
-    test_scenario::end(scenario);
 }

@@ -6,7 +6,7 @@ module steamm::pool;
 
 use std::ascii;
 use std::string;
-use std::type_name::{get, TypeName};
+use std::type_name::get;
 use steamm::events::emit_event;
 use steamm::registry::Registry;
 use steamm::fees::{Self, Fees, FeeConfig};
@@ -448,17 +448,14 @@ public(package) fun new<A, B, Quoter: store, LpType: drop>(
         version: version::new(CURRENT_VERSION),
     };
 
-    registry.add_amm(&pool);
-
-    // Emit event
-    emit_event(NewPoolResult {
-        creator: sender(ctx),
-        pool_id: object::id(&pool),
-        coin_type_a: get<A>(),
-        coin_type_b: get<B>(),
-        lp_token_type: get<LpType>(),
-        quoter_type: get<Quoter>(),
-    });
+    registry.register_pool(
+        object::id(&pool),
+        get<A>(),
+        get<B>(),
+        get<LpType>(),
+        swap_fee_bps,
+        get<Quoter>(),
+    );
 
     pool
 }
@@ -808,15 +805,6 @@ fun update_lp_metadata<A, B, LpType: drop>(
 }
 
 // ===== Events =====
-
-public struct NewPoolResult has copy, drop, store {
-    creator: address,
-    pool_id: ID,
-    coin_type_a: TypeName,
-    coin_type_b: TypeName,
-    quoter_type: TypeName,
-    lp_token_type: TypeName,
-}
 
 public struct SwapResult has copy, drop, store {
     user: address,

@@ -4,7 +4,7 @@ module steamm::bank;
 use std::ascii;
 use std::option::none;
 use std::string;
-use std::type_name::{get, TypeName};
+use std::type_name::get;
 use steamm::bank_math;
 use steamm::registry::Registry;
 use steamm::events::emit_event;
@@ -399,15 +399,13 @@ public(package) fun create_bank<P, T, BToken: drop>(
         version: version::new(CURRENT_VERSION),
     };
 
-    registry.add_bank<_, T>(&bank);
-
-    emit_event(NewBankEvent {
-        bank_id: object::id(&bank),
-        coin_type: get<T>(),
-        btoken_type: get<BToken>(),
-        lending_market_id: object::id(lending_market),
-        lending_market_type: get<P>(),
-    });
+    registry.register_bank(
+        object::id(&bank),
+        get<T>(),
+        get<BToken>(),
+        object::id(lending_market),
+        get<P>(),
+    );
 
     bank
 }
@@ -746,14 +744,6 @@ public fun reserve_array_index<P, T, BToken>(bank: &Bank<P, T, BToken>): u64 {
 public fun minimum_liquidity(): u64 { MINIMUM_LIQUIDITY }
 
 // ===== Events =====
-
-public struct NewBankEvent has copy, drop, store {
-    bank_id: ID,
-    coin_type: TypeName,
-    btoken_type: TypeName,
-    lending_market_id: ID,
-    lending_market_type: TypeName,
-}
 
 public struct MintBTokenEvent has copy, drop, store {
     user: address,
