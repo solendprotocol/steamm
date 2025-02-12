@@ -6,7 +6,7 @@ module steamm::pool;
 
 use std::ascii;
 use std::string;
-use std::type_name::get;
+use std::type_name::{get, TypeName};
 use steamm::events::emit_event;
 use steamm::registry::Registry;
 use steamm::fees::{Self, Fees, FeeConfig};
@@ -420,7 +420,6 @@ public(package) fun new<A, B, Quoter: store, LpType: drop>(
 ): Pool<A, B, Quoter, LpType> {
     assert!(lp_treasury.total_supply() == 0, ELpSupplyMustBeZero);
     assert_swap_fee_bps(swap_fee_bps);
-    // assert!(swap_fee_bps < BPS_DENOMINATOR, EFeeAbove100Percent);
     assert!(get<A>() != get<B>(), ETypeAandBDuplicated);
 
     update_lp_metadata(meta_a, meta_b, meta_lp, &lp_treasury);
@@ -448,13 +447,24 @@ public(package) fun new<A, B, Quoter: store, LpType: drop>(
         version: version::new(CURRENT_VERSION),
     };
 
+    let event = NewPoolResult {
+        pool_id: object::id(&pool),
+        coin_type_a: get<A>(),
+        coin_type_b: get<B>(),
+        lp_token_type: get<LpType>(),
+        quoter_type: get<Quoter>(),
+        swap_fee_bps
+    };
+
+    emit_event(event);
+
     registry.register_pool(
-        object::id(&pool),
-        get<A>(),
-        get<B>(),
-        get<LpType>(),
-        swap_fee_bps,
-        get<Quoter>(),
+        event.pool_id,
+        event.coin_type_a,
+        event.coin_type_b,
+        event.lp_token_type,
+        event.swap_fee_bps,
+        event.quoter_type,
     );
 
     pool
@@ -816,6 +826,15 @@ fun update_lp_metadata<A, B, LpType: drop>(
 }
 
 // ===== Events =====
+
+public struct NewPoolResult has copy, drop, store {
+    pool_id: ID,
+    coin_type_a: TypeName,
+    coin_type_b: TypeName,
+    quoter_type: TypeName,
+    lp_token_type: TypeName,
+    swap_fee_bps: u64,
+}
 
 public struct SwapResult has copy, drop, store {
     user: address,
