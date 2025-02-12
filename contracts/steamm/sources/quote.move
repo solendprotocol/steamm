@@ -1,8 +1,6 @@
 /// Module for informative structs which provide the input/outputs of a given quotation.
 module steamm::quote;
 
-use suilend::decimal::{Self, Decimal};
-
 public use fun steamm::pool::swap_inner as SwapQuote.swap_inner;
 
 public struct SwapQuote has drop, store {
@@ -103,14 +101,6 @@ public fun amount_out_net_of_protocol_fees(swap_quote: &SwapQuote): u64 {
 
 public fun amount_out_net_of_pool_fees(swap_quote: &SwapQuote): u64 {
     swap_quote.amount_out - swap_quote.output_fees.pool_fees
-}
-
-public fun output_fee_rate(swap_quote: &SwapQuote): Decimal {
-    let total_fees = decimal::from(
-        swap_quote.output_fees().pool_fees() + swap_quote.output_fees().protocol_fees(),
-    );
-
-    total_fees.div(decimal::from(swap_quote.amount_out()))
 }
 
 public fun output_fees(swap_quote: &SwapQuote): &SwapFee { &swap_quote.output_fees }
