@@ -140,14 +140,3 @@ public fun to_multi_swap_route<P, X, Y, BTokenX, BTokenY>(
 
     quote
 }
-
-public fun destroy_or_transfer<T>(
-    token: Coin<T>,
-    ctx: &TxContext,
-) {
-    if (token.value() > 0) {
-        transfer::public_transfer(token, ctx.sender());
-    } else {
-        token.destroy_zero();
-    };
-}

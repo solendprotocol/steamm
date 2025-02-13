@@ -1,5 +1,7 @@
 #[allow(lint(self_transfer))]
-module steamm::script_v1;
+module steamm_scripts::pool_script;
+
+use steamm_scripts::events::emit_event;
 
 use sui::coin::{Self, Coin};
 use sui::clock::Clock;
@@ -7,8 +9,13 @@ use steamm::bank::Bank;
 use steamm::quote;
 use steamm::pool::Pool;
 use steamm::cpmm::CpQuoter;
-use suilend::lending_market::{LendingMarket};
 use steamm::quote::{SwapQuote, DepositQuote, RedeemQuote};
+use suilend::lending_market::{LendingMarket};
+
+public struct MultiRouteSwapQuote has store, copy, drop {
+    amount_in: u64,
+    amount_out: u64,
+}
 
 public fun deposit_liquidity<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: drop>(
     pool: &mut Pool<BTokenA, BTokenB, Quoter, LpType>,
@@ -160,6 +167,8 @@ public fun quote_cpmm_swap<P, A, B, BTokenA, BTokenB, LpType: drop>(
         a2b,
     );
 
+    emit_event(quote);
+
     quote
 }
 
@@ -187,6 +196,8 @@ public fun quote_deposit<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: drop>
         btoken_quote.mint_lp(),
     );
 
+    emit_event(quote);
+
     quote
 }
 
@@ -205,6 +216,39 @@ public fun quote_redeem<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: drop>(
         bank_b.from_btokens(lending_market, btoken_quote.withdraw_b(), clock).floor(),
         btoken_quote.burn_lp()
     );
+
+    emit_event(quote);
+
+    quote
+}
+
+public fun to_multi_swap_route<P, X, Y, BTokenX, BTokenY>(
+    bank_x: &mut Bank<P, X, BTokenX>,
+    bank_y: &mut Bank<P, Y, BTokenY>,
+    lending_market: &mut LendingMarket<P>,
+    x2y: bool,
+    amount_in: u64,
+    amount_out: u64,
+    clock: &Clock,
+): MultiRouteSwapQuote {
+    bank_x.compound_interest_if_any(lending_market, clock);
+    bank_y.compound_interest_if_any(lending_market, clock);
+
+    let (amount_in, amount_out) = if (x2y) {
+        (
+            bank_x.from_btokens(lending_market, amount_in, clock).floor(),
+            bank_y.from_btokens(lending_market, amount_out, clock).floor(),
+        )
+    } else {
+        (
+            bank_y.from_btokens(lending_market, amount_in, clock).floor(),
+            bank_x.from_btokens(lending_market, amount_out, clock).floor(),
+        )
+    };
+
+    let quote = MultiRouteSwapQuote { amount_in, amount_out };
+
+    emit_event(quote);
 
     quote
 }

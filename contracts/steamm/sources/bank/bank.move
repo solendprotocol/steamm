@@ -241,6 +241,10 @@ public fun burn_btokens<P, T, BToken>(
 ): Coin<T> {
     bank.version.assert_version_and_upgrade(CURRENT_VERSION);
     bank.compound_interest_if_any(lending_market, clock);
+
+    if (btoken_amount == 0) {
+        return coin::zero(ctx)
+    };
     
     assert!(btokens.value() != 0, EEmptyBToken);
     assert!(btokens.value() >= btoken_amount, EInvalidBtokenBalance);
@@ -348,6 +352,38 @@ public fun rebalance<P, T, BToken>(
             ctx,
         );
     };
+}
+
+public fun compound_interest_if_any<P, T, BToken>(
+    bank: &Bank<P, T, BToken>,
+    lending_market: &mut LendingMarket<P>,
+    clock: &Clock,
+) {
+    if (bank.lending.is_some()) {
+        lending_market.compound_interest<P>(bank.reserve_array_index(), clock);
+    }
+}
+
+public fun to_btokens<P, T, BToken>(
+    bank: &Bank<P, T, BToken>,
+    lending_market: &LendingMarket<P>,
+    amount: u64,
+    clock: &Clock,
+): Decimal {
+    let (total_funds, btoken_supply) = bank.btoken_ratio(lending_market, clock);
+    // Divides by btoken ratio
+    decimal::from(amount).mul(btoken_supply).div(total_funds)
+}
+
+public fun from_btokens<P, T, BToken>(
+    bank: &Bank<P, T, BToken>,
+    lending_market: &LendingMarket<P>,
+    btoken_amount: u64,
+    clock: &Clock,
+): Decimal {
+    let (total_funds, btoken_supply) = bank.btoken_ratio(lending_market, clock);
+    // Multiplies by btoken ratio
+    decimal::from(btoken_amount).mul(total_funds).div(btoken_supply)
 }
 
 // ====== Admin Functions =====
@@ -498,28 +534,6 @@ public(package) fun funds_deployed<P, T, BToken>(
 }
 
 // ====== Private Functions =====
-
-public(package) fun to_btokens<P, T, BToken>(
-    bank: &Bank<P, T, BToken>,
-    lending_market: &LendingMarket<P>,
-    amount: u64,
-    clock: &Clock,
-): Decimal {
-    let (total_funds, btoken_supply) = bank.btoken_ratio(lending_market, clock);
-    // Divides by btoken ratio
-    decimal::from(amount).mul(btoken_supply).div(total_funds)
-}
-
-public(package) fun from_btokens<P, T, BToken>(
-    bank: &Bank<P, T, BToken>,
-    lending_market: &LendingMarket<P>,
-    btoken_amount: u64,
-    clock: &Clock,
-): Decimal {
-    let (total_funds, btoken_supply) = bank.btoken_ratio(lending_market, clock);
-    // Multiplies by btoken ratio
-    decimal::from(btoken_amount).mul(total_funds).div(btoken_supply)
-}
 
 fun deploy<P, T, BToken>(
     bank: &mut Bank<P, T, BToken>,
@@ -678,16 +692,6 @@ fun update_btoken_metadata<T, BToken: drop>(
     treasury_btoken.update_icon_url(meta_btoken, ascii::string(BTOKEN_ICON_URL));
 }
 
-public(package) fun compound_interest_if_any<P, T, BToken>(
-    bank: &Bank<P, T, BToken>,
-    lending_market: &mut LendingMarket<P>,
-    clock: &Clock,
-) {
-    if (bank.lending.is_some()) {
-        lending_market.compound_interest<P>(bank.reserve_array_index(), clock);
-    }
-}
-
 // ====== View Functions =====
 
 public fun needs_rebalance<P, T, BToken>(
@@ -800,7 +804,7 @@ public struct NeedsRebalance has copy, drop, store {
 // ===== Test-Only Functions =====
 
 #[test_only]
-public(package) fun mock_min_token_block_size<P, T, BToken>(
+public fun mock_min_token_block_size<P, T, BToken>(
     bank: &mut Bank<P, T, BToken>,
     amount: u64,
 ) {
