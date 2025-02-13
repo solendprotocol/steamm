@@ -4,7 +4,7 @@ set -eE
 
 
 cd contracts/steamm
-STEAMM_RESPONSE=$(sui client publish --skip-dependency-verification --silence-warnings --no-lint --json)
+STEAMM_RESPONSE=$(sui client publish --silence-warnings --no-lint --skip-dependency-verification --json)
 # STEAMM_RESPONSE=$(cat steamm.json)
 
 find_object_id() {
