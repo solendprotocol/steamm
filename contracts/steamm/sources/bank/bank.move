@@ -499,7 +499,7 @@ public(package) fun funds_deployed<P, T, BToken>(
 
 // ====== Private Functions =====
 
-public(package) fun to_btokens<P, T, BToken>(
+fun to_btokens<P, T, BToken>(
     bank: &Bank<P, T, BToken>,
     lending_market: &LendingMarket<P>,
     amount: u64,
@@ -510,7 +510,7 @@ public(package) fun to_btokens<P, T, BToken>(
     decimal::from(amount).mul(btoken_supply).div(total_funds)
 }
 
-public(package) fun from_btokens<P, T, BToken>(
+fun from_btokens<P, T, BToken>(
     bank: &Bank<P, T, BToken>,
     lending_market: &LendingMarket<P>,
     btoken_amount: u64,
@@ -678,7 +678,7 @@ fun update_btoken_metadata<T, BToken: drop>(
     treasury_btoken.update_icon_url(meta_btoken, ascii::string(BTOKEN_ICON_URL));
 }
 
-public(package) fun compound_interest_if_any<P, T, BToken>(
+fun compound_interest_if_any<P, T, BToken>(
     bank: &Bank<P, T, BToken>,
     lending_market: &mut LendingMarket<P>,
     clock: &Clock,
