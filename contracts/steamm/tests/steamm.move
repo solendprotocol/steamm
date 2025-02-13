@@ -174,7 +174,7 @@ fun test_steamm_deposit_redeem_swap() {
     );
 
     assert_eq(swap_result.a2b(), true);
-    assert_eq(swap_result.amount_out(), 200000000000);
+    assert_eq(swap_result.amount_out(), 198000000000);
     assert_eq(swap_result.pool_fees(), 1600000000);
     assert_eq(swap_result.protocol_fees(), 400000000);
 
@@ -299,7 +299,7 @@ fun test_full_amm_cycle() {
     assert_eq(swap_result.a2b(), true);
     assert_eq(swap_result.pool_fees(), 400);
     assert_eq(swap_result.protocol_fees(), 100);
-    assert_eq(swap_result.amount_out(), 50_000);
+    assert_eq(swap_result.amount_out(), 49_500);
 
     destroy(coin_a);
     destroy(coin_b);
@@ -339,7 +339,7 @@ fun test_full_amm_cycle() {
     assert_eq(pool.trading_data().pool_fees_b(), 400);
 
     assert_eq(pool.trading_data().total_swap_a_in_amount(), 50_000);
-    assert_eq(pool.trading_data().total_swap_b_out_amount(), 50_000);
+    assert_eq(pool.trading_data().total_swap_b_out_amount(), 49_500);
     assert_eq(pool.trading_data().total_swap_a_out_amount(), 0);
     assert_eq(pool.trading_data().total_swap_b_in_amount(), 0);
 
@@ -684,7 +684,7 @@ fun test_fail_redeem_slippage_b() {
 }
 
 #[test]
-#[expected_failure(abort_code = pool::EFeeAbove100Percent)]
+#[expected_failure(abort_code = pool::EInvalidSwapFeeBpsType)]
 fun test_fail_fee_above_100() {
     let mut scenario = test_scenario::begin(ADMIN);
 
@@ -699,6 +699,56 @@ fun test_fail_fee_above_100() {
     let pool = test_setup_dummy_no_banks(10_000 + 1, &mut scenario);
 
     destroy(pool);
+    destroy(lend_cap);
+    destroy(prices);
+    destroy(clock);
+    destroy(bag);
+    destroy(lending_market);
+    test_scenario::end(scenario);
+}
+
+#[test]
+#[expected_failure(abort_code = pool::EInvalidSwapFeeBpsType)]
+fun test_fail_invalid_fee_type() {
+    let mut scenario = test_scenario::begin(ADMIN);
+
+    // Init Pool
+    test_scenario::next_tx(&mut scenario, POOL_CREATOR);
+
+    let (clock, lend_cap, lending_market, prices, bag) = suilend_setup(
+        reserve_args(&mut scenario),
+        &mut scenario,
+    ).destruct_state();
+
+    let pool = test_setup_dummy_no_banks(31, &mut scenario);
+
+    destroy(pool);
+    destroy(lend_cap);
+    destroy(prices);
+    destroy(clock);
+    destroy(bag);
+    destroy(lending_market);
+    test_scenario::end(scenario);
+}
+
+#[test]
+fun test_valid_fee_types() {
+    let mut scenario = test_scenario::begin(ADMIN);
+
+    // Init Pool
+    test_scenario::next_tx(&mut scenario, POOL_CREATOR);
+
+    let (clock, lend_cap, lending_market, prices, bag) = suilend_setup(
+        reserve_args(&mut scenario),
+        &mut scenario,
+    ).destruct_state();
+
+    destroy(test_setup_dummy_no_banks(1, &mut scenario));
+    destroy(test_setup_dummy_no_banks(5, &mut scenario));
+    destroy(test_setup_dummy_no_banks(30, &mut scenario));
+    destroy(test_setup_dummy_no_banks(100, &mut scenario));
+    destroy(test_setup_dummy_no_banks(200, &mut scenario));
+
     destroy(lend_cap);
     destroy(prices);
     destroy(clock);

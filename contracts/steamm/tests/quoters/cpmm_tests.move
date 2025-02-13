@@ -49,11 +49,19 @@ public fun setup_pool(
     offset: u64,
     scenario: &mut Scenario,
 ): (Pool<B_TEST_USDC, B_TEST_SUI, CpQuoter, LP_USDC_SUI>) {
-    let (pool, bank_a, bank_b, lending_market, lend_cap, prices, bag, clock) = test_setup_cpmm(
+    let is_no_fee = fee == 0;
+    let fee = if (is_no_fee) { 100 } else { fee };
+
+    let (mut pool, bank_a, bank_b, lending_market, lend_cap, prices, bag, clock) = test_setup_cpmm(
         fee,
         offset,
         scenario,
     );
+
+    if (is_no_fee) {
+        pool.no_protocol_fees_for_testing();
+        pool.no_swap_fees_for_testing();
+    };
 
     destroy(bank_a);
     destroy(bank_b);
@@ -170,7 +178,7 @@ fun test_full_cpmm_cycle() {
     assert_eq(swap_result.a2b(), true);
     assert_eq(swap_result.pool_fees(), 364);
     assert_eq(swap_result.protocol_fees(), 91);
-    assert_eq(swap_result.amount_out(), 45_454);
+    assert_eq(swap_result.amount_out(), 44_999);
 
     destroy(coin_a);
     destroy(coin_b);
@@ -210,7 +218,7 @@ fun test_full_cpmm_cycle() {
     assert_eq(pool.trading_data().pool_fees_b(), 364);
 
     assert_eq(pool.trading_data().total_swap_a_in_amount(), 50_000);
-    assert_eq(pool.trading_data().total_swap_b_out_amount(), 45_454);
+    assert_eq(pool.trading_data().total_swap_b_out_amount(), 44_999);
     assert_eq(pool.trading_data().total_swap_a_out_amount(), 0);
     assert_eq(pool.trading_data().total_swap_b_in_amount(), 0);
 
@@ -327,7 +335,7 @@ fun test_cpmm_deposit_redeem_swap() {
     );
 
     assert_eq(swap_result.a2b(), true);
-    assert_eq(swap_result.amount_out(), 83333333333265);
+    assert_eq(swap_result.amount_out(), 82499999999932);
     assert_eq(swap_result.pool_fees(), 666666666666);
     assert_eq(swap_result.protocol_fees(), 166666666667);
 
@@ -434,7 +442,7 @@ fun test_trade_that_balances_highly_imbalanced_pool() {
         ctx,
     );
 
-    assert_eq(swap_result.amount_out(), 499999999999950);
+    assert_eq(swap_result.amount_out(), 494999999999950);
     assert_eq(swap_result.amount_in(), 10000000000000);
     assert_eq(swap_result.protocol_fees(), 1000000000000);
     assert_eq(swap_result.pool_fees(), 4000000000000);

@@ -399,15 +399,23 @@ public(package) fun create_bank<P, T, BToken: drop>(
         version: version::new(CURRENT_VERSION),
     };
 
-    registry.add_bank<_, T>(&bank);
-
-    emit_event(NewBankEvent {
+    let event = NewBankEvent {
         bank_id: object::id(&bank),
         coin_type: get<T>(),
         btoken_type: get<BToken>(),
         lending_market_id: object::id(lending_market),
         lending_market_type: get<P>(),
-    });
+    };
+    
+    registry.register_bank(
+        event.bank_id,
+        event.coin_type,
+        event.btoken_type,
+        event.lending_market_id,
+        event.lending_market_type,
+    );
+
+    emit_event(event);
 
     bank
 }
