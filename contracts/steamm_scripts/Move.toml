@@ -6,8 +6,8 @@ edition = "2024.beta"
 
 [dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/mainnet", override = true }
-suilend = { git = "https://github.com/solendprotocol/suilend.git", subdir = "contracts/suilend", rev = "expose-test-only-fns" }
+suilend = { git = "https://github.com/solendprotocol/suilend.git", subdir = "contracts/suilend", rev = "expose-test-only-fns", override = true }
 steamm = { local = "../steamm" }
 
 [addresses]
-steamm_scripts = "0xf"
+steamm_scripts = "0x0"

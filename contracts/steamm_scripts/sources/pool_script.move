@@ -1,7 +1,7 @@
 #[allow(lint(self_transfer))]
 module steamm_scripts::pool_script;
 
-use steamm_scripts::events::emit_event;
+use steamm_scripts::script_events::emit_event;
 
 use sui::coin::{Self, Coin};
 use sui::clock::Clock;

@@ -1,4 +1,4 @@
-module steamm_scripts::events;
+module steamm_scripts::script_events;
 
 use sui::event;
 
