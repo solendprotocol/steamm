@@ -49,7 +49,7 @@ const EInitialDepositBelowMinimumLiquidity: u64 = 16;
 
 // ===== Structs =====
 
-public struct Bank<phantom P, phantom T, phantom BToken> has key {
+public struct Bank<phantom P, phantom T, phantom BToken> has key, store {
     id: UID,
     funds_available: Balance<T>,
     lending: Option<Lending<P>>,
@@ -198,7 +198,7 @@ public fun mint_btokens<P, T, BToken>(
     bank.compound_interest_if_any(lending_market, clock);
 
     let coin_input = coin_t.split(coin_amount, ctx);
-    let new_btokens = bank.to_btokens(lending_market, coin_amount, clock).floor();
+    let new_btokens = bank.to_btokens(lending_market, coin_amount, clock);
 
     emit_event(MintBTokenEvent {
         user: ctx.sender(),
@@ -258,7 +258,7 @@ public fun burn_btokens<P, T, BToken>(
     assert!(btoken_amount > 0, ENoBTokensToBurn);
 
     let btoken_input = btokens.split(btoken_amount, ctx);
-    let mut tokens_to_withdraw = bank.from_btokens(lending_market, btoken_amount, clock).floor();
+    let mut tokens_to_withdraw = bank.from_btokens(lending_market, btoken_amount, clock);
 
     bank.btoken_supply.decrease_supply(btoken_input.into_balance());
 
@@ -369,10 +369,10 @@ public fun to_btokens<P, T, BToken>(
     lending_market: &LendingMarket<P>,
     amount: u64,
     clock: &Clock,
-): Decimal {
+): u64 {
     let (total_funds, btoken_supply) = bank.btoken_ratio(lending_market, clock);
     // Divides by btoken ratio
-    decimal::from(amount).mul(btoken_supply).div(total_funds)
+    decimal::from(amount).mul(btoken_supply).div(total_funds).floor()
 }
 
 public fun from_btokens<P, T, BToken>(
@@ -380,10 +380,10 @@ public fun from_btokens<P, T, BToken>(
     lending_market: &LendingMarket<P>,
     btoken_amount: u64,
     clock: &Clock,
-): Decimal {
+): u64 {
     let (total_funds, btoken_supply) = bank.btoken_ratio(lending_market, clock);
     // Multiplies by btoken ratio
-    decimal::from(btoken_amount).mul(total_funds).div(btoken_supply)
+    decimal::from(btoken_amount).mul(total_funds).div(btoken_supply).floor()
 }
 
 // ====== Admin Functions =====
@@ -804,6 +804,24 @@ public struct NeedsRebalance has copy, drop, store {
 // ===== Test-Only Functions =====
 
 #[test_only]
+public fun new_for_testing<P, T, BToken: drop>(
+    ctx: &mut TxContext,
+): Bank<P, T, BToken> {
+    let btoken_treasury = coin::create_treasury_cap_for_testing(ctx);
+
+    let bank = Bank<P, T, BToken> {
+        id: object::new(ctx),
+        funds_available: balance::zero(),
+        lending: none(),
+        min_token_block_size: MIN_TOKEN_BLOCK_SIZE,
+        btoken_supply: btoken_treasury.treasury_into_supply(),
+        version: version::new(CURRENT_VERSION),
+    };
+
+    bank
+}
+
+#[test_only]
 public fun mock_min_token_block_size<P, T, BToken>(
     bank: &mut Bank<P, T, BToken>,
     amount: u64,
@@ -879,7 +897,7 @@ public fun needs_rebalance_after_outflow<P, T, BToken>(
     };
 
     let funds_deployed = bank.funds_deployed(lending_market, clock).floor();
-    let amount = bank.from_btokens(lending_market, btoken_amount, clock).floor();
+    let amount = bank.from_btokens(lending_market, btoken_amount, clock);
 
     if (amount > bank.funds_available.value()) {
         return true

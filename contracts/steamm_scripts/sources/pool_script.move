@@ -136,26 +136,26 @@ public fun quote_cpmm_swap<P, A, B, BTokenA, BTokenB, LpType: drop>(
     bank_b.compound_interest_if_any(lending_market, clock);
 
     let amount_in_ = if (a2b) {
-        bank_a.to_btokens(lending_market, amount_in, clock).floor()
+        bank_a.to_btokens(lending_market, amount_in, clock)
     } else {
-        bank_b.to_btokens(lending_market, amount_in, clock).floor()
+        bank_b.to_btokens(lending_market, amount_in, clock)
     };
 
     let btoken_quote = pool.cpmm_quote_swap(amount_in_, a2b);
 
     let (amount_in, amount_out, protocol_fees, pool_fees) = if (a2b) {
         (
-            bank_a.from_btokens(lending_market, btoken_quote.amount_in(), clock).floor(),
-            bank_b.from_btokens(lending_market, btoken_quote.amount_out(), clock).floor(),
-            bank_b.from_btokens(lending_market, btoken_quote.output_fees().protocol_fees(), clock).floor(),
-            bank_b.from_btokens(lending_market, btoken_quote.output_fees().pool_fees(), clock).floor(),
+            bank_a.from_btokens(lending_market, btoken_quote.amount_in(), clock),
+            bank_b.from_btokens(lending_market, btoken_quote.amount_out(), clock),
+            bank_b.from_btokens(lending_market, btoken_quote.output_fees().protocol_fees(), clock),
+            bank_b.from_btokens(lending_market, btoken_quote.output_fees().pool_fees(), clock),
         )
     } else {
         (
-            bank_b.from_btokens(lending_market, btoken_quote.amount_in(), clock).floor(),
-            bank_a.from_btokens(lending_market, btoken_quote.amount_out(), clock).floor(),
-            bank_a.from_btokens(lending_market, btoken_quote.output_fees().protocol_fees(), clock).floor(),
-            bank_a.from_btokens(lending_market, btoken_quote.output_fees().pool_fees(), clock).floor(),
+            bank_b.from_btokens(lending_market, btoken_quote.amount_in(), clock),
+            bank_a.from_btokens(lending_market, btoken_quote.amount_out(), clock),
+            bank_a.from_btokens(lending_market, btoken_quote.output_fees().protocol_fees(), clock),
+            bank_a.from_btokens(lending_market, btoken_quote.output_fees().pool_fees(), clock),
         )
     };
 
@@ -184,15 +184,15 @@ public fun quote_deposit<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: drop>
     bank_a.compound_interest_if_any(lending_market, clock);
     bank_b.compound_interest_if_any(lending_market, clock);
 
-    let btoken_amount_a = bank_a.to_btokens(lending_market, max_a, clock).floor();
-    let btoken_amount_b = bank_b.to_btokens(lending_market, max_b, clock).floor();
+    let btoken_amount_a = bank_a.to_btokens(lending_market, max_a, clock);
+    let btoken_amount_b = bank_b.to_btokens(lending_market, max_b, clock);
 
     let btoken_quote = pool.quote_deposit(btoken_amount_a, btoken_amount_b);
 
     let quote = quote::deposit_quote(
         btoken_quote.initial_deposit(),
-        bank_a.from_btokens(lending_market, btoken_quote.deposit_a(), clock).floor(),
-        bank_b.from_btokens(lending_market, btoken_quote.deposit_b(), clock).floor(),
+        bank_a.from_btokens(lending_market, btoken_quote.deposit_a(), clock),
+        bank_b.from_btokens(lending_market, btoken_quote.deposit_b(), clock),
         btoken_quote.mint_lp(),
     );
 
@@ -212,8 +212,8 @@ public fun quote_redeem<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: drop>(
     let btoken_quote = pool.quote_redeem(lp_tokens);
 
     let quote = quote::redeem_quote(
-        bank_a.from_btokens(lending_market, btoken_quote.withdraw_a(), clock).floor(),
-        bank_b.from_btokens(lending_market, btoken_quote.withdraw_b(), clock).floor(),
+        bank_a.from_btokens(lending_market, btoken_quote.withdraw_a(), clock),
+        bank_b.from_btokens(lending_market, btoken_quote.withdraw_b(), clock),
         btoken_quote.burn_lp()
     );
 
@@ -236,13 +236,13 @@ public fun to_multi_swap_route<P, X, Y, BTokenX, BTokenY>(
 
     let (amount_in, amount_out) = if (x2y) {
         (
-            bank_x.from_btokens(lending_market, amount_in, clock).floor(),
-            bank_y.from_btokens(lending_market, amount_out, clock).floor(),
+            bank_x.from_btokens(lending_market, amount_in, clock),
+            bank_y.from_btokens(lending_market, amount_out, clock),
         )
     } else {
         (
-            bank_y.from_btokens(lending_market, amount_in, clock).floor(),
-            bank_x.from_btokens(lending_market, amount_out, clock).floor(),
+            bank_y.from_btokens(lending_market, amount_in, clock),
+            bank_x.from_btokens(lending_market, amount_out, clock),
         )
     };
 

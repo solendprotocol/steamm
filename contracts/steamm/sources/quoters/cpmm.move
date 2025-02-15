@@ -240,6 +240,13 @@ use std::option::none;
 use steamm::math::checked_mul_div_up;
 
 #[test_only]
+public fun new_for_testing(
+    offset: u64,
+): CpQuoter {
+    CpQuoter { version: version::new(CURRENT_VERSION), offset }
+}
+
+#[test_only]
 public(package) fun max_amount_in_on_a2b<A, B, LpType: drop>(
     pool: &Pool<A, B, CpQuoter, LpType>,
 ): Option<u64> {
