@@ -35,7 +35,7 @@ const BPS_DENOMINATOR: u64 = 10_000;
 const MINIMUM_LIQUIDITY: u64 = 1_000;
 
 const CURRENT_VERSION: u16 = 1;
-const LP_ICON_URL: vector<u8> = b"TODO";
+const LP_ICON_URL: vector<u8> = b"https://suilend-assets.s3.us-east-2.amazonaws.com/steamm/STEAMM+LP+Token.svg";
 
 // ===== Errors =====
 
@@ -186,6 +186,8 @@ public fun deposit_liquidity<A, B, Quoter: store, LpType: drop>(
         deposit_a: quote.deposit_a(),
         deposit_b: quote.deposit_b(),
         mint_lp: quote.mint_lp(),
+        balance_a: pool.balance_a.value(),
+        balance_b: pool.balance_b.value(),
     };
 
     emit_event(result);
@@ -303,6 +305,8 @@ public fun redeem_liquidity<A, B, Quoter: store, LpType: drop>(
         withdraw_a: tokens_a.value(),
         withdraw_b: tokens_b.value(),
         burn_lp: lp_burn,
+        balance_a: pool.balance_a.value(),
+        balance_b: pool.balance_b.value(),
     };
 
     emit_event(result);
@@ -551,6 +555,8 @@ public(package) fun swap<A, B, Quoter: store, LpType: drop>(
         amount_out: quote.amount_out(),
         output_fees: *quote.output_fees(),
         a2b: quote.a2b(),
+        balance_a: pool.balance_a.value(),
+        balance_b: pool.balance_b.value(),
     };
 
     emit_event(result);
@@ -805,21 +811,21 @@ fun update_lp_metadata<A, B, LpType: drop>(
     assert!(meta_lp.get_decimals() == 9, EInvalidLpDecimals);
 
     // Construct and set the LP token name
-    let mut lp_name = string::utf8(b"Steamm LP Token ");
+    let mut lp_name = string::utf8(b"STEAMM LP ");
     lp_name.append(meta_a.get_symbol().to_string());
     lp_name.append(string::utf8(b"-"));
     lp_name.append(meta_b.get_symbol().to_string());
     treasury_lp.update_name(meta_lp, lp_name);
 
     // Construct and set the LP token symbol
-    let mut lp_symbol = ascii::string(b"steammLP ");
+    let mut lp_symbol = ascii::string(b"STEAMM LP ");
     lp_symbol.append(meta_a.get_symbol());
     lp_symbol.append(ascii::string(b"-"));
     lp_symbol.append(meta_b.get_symbol());
     treasury_lp.update_symbol(meta_lp, lp_symbol);
 
     // Set the description
-    treasury_lp.update_description(meta_lp, string::utf8(b"Steamm LP Token"));
+    treasury_lp.update_description(meta_lp, string::utf8(b"STEAMM LP Token"));
 
     // Set the icon URL
     treasury_lp.update_icon_url(meta_lp, ascii::string(LP_ICON_URL));
@@ -843,6 +849,9 @@ public struct SwapResult has copy, drop, store {
     amount_out: u64,
     output_fees: SwapFee,
     a2b: bool,
+
+    balance_a: u64,
+    balance_b: u64,
 }
 
 public struct DepositResult has copy, drop, store {
@@ -851,6 +860,9 @@ public struct DepositResult has copy, drop, store {
     deposit_a: u64,
     deposit_b: u64,
     mint_lp: u64,
+
+    balance_a: u64,
+    balance_b: u64,
 }
 
 public struct RedeemResult has copy, drop, store {
@@ -859,6 +871,9 @@ public struct RedeemResult has copy, drop, store {
     withdraw_a: u64,
     withdraw_b: u64,
     burn_lp: u64,
+
+    balance_a: u64,
+    balance_b: u64,
 }
 
 public use fun swap_result_user as SwapResult.user;
@@ -924,6 +939,37 @@ public fun redeem_result_withdraw_b(redeem_result: &RedeemResult): u64 { redeem_
 public fun redeem_result_burn_lp(redeem_result: &RedeemResult): u64 { redeem_result.burn_lp }
 
 // ===== Test-Only =====
+
+#[test_only]
+public fun new_for_testing<A, B, Quoter: store, LpType: drop>(
+    swap_fee_bps: u64,
+    quoter: Quoter,
+    ctx: &mut TxContext,
+): Pool<A, B, Quoter, LpType> {
+    let lp_treasury = coin::create_treasury_cap_for_testing(ctx);
+    let lp_supply = lp_treasury.treasury_into_supply();
+
+    Pool {
+        id: object::new(ctx),
+        quoter,
+        balance_a: balance::zero(),
+        balance_b: balance::zero(),
+        protocol_fees: fees::new(SWAP_FEE_NUMERATOR, BPS_DENOMINATOR, 0),
+        pool_fee_config: fees::new_config(swap_fee_bps, BPS_DENOMINATOR, 0),
+        lp_supply,
+        trading_data: TradingData {
+            swap_a_in_amount: 0,
+            swap_b_out_amount: 0,
+            swap_a_out_amount: 0,
+            swap_b_in_amount: 0,
+            protocol_fees_a: 0,
+            protocol_fees_b: 0,
+            pool_fees_a: 0,
+            pool_fees_b: 0,
+        },
+        version: version::new(CURRENT_VERSION),
+    }
+}
 
 #[test_only]
 public(package) fun no_protocol_fees_for_testing<A, B, Quoter: store, LpType: drop>(
@@ -1018,6 +1064,8 @@ public(package) fun to_quote(result: SwapResult): SwapQuote {
         amount_out,
         output_fees,
         a2b,
+        balance_a: _,
+        balance_b: _,
     } = result;
 
     quote::quote_for_testing(
