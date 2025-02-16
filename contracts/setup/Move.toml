@@ -1,0 +1,11 @@
+[package]
+name = "setup"
+edition = "2024.beta"
+published-at = "0x0"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "testnet-v1.40.1" }
+suilend = { local = "../dependencies/suilend" }
+
+[addresses]
+setup = "0x0"
