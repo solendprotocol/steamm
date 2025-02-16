@@ -1,24 +1,16 @@
 #[test_only]
 module steamm_scripts::router;
 
-use std::debug::print;
 use steamm_scripts::pool_script;
 use sui::coin;
-use sui::clock;
-use std::u128::sqrt;
 use steamm::bank;
-use steamm::b_test_sui::B_TEST_SUI;
-use steamm::b_test_usdc::B_TEST_USDC;
 use steamm::cpmm::CpQuoter;
-use steamm::lp_usdc_sui::LP_USDC_SUI;
-use steamm::math as steamm_math;
-use steamm::pool::{Self, Pool};
+use steamm::pool::{Self};
 use steamm::cpmm;
-use steamm::pool_math::{Self, quote_deposit_test, quote_redeem_test};
 use steamm::test_utils;
-use sui::test_scenario::{Self, Scenario};
-use sui::test_utils::{destroy, assert_eq};
-use suilend::lending_market_tests::{Self, LENDING_MARKET, setup as suilend_setup};
+use sui::test_scenario::{Self};
+use sui::test_utils::{destroy};
+use suilend::lending_market_tests::{LENDING_MARKET};
 
 public struct A has drop {}
 public struct B has drop {}
@@ -109,9 +101,7 @@ fun test_initial_deposit() {
         &clock,
     );
 
-    print(&quote1);
-
-    let quote2 = pool_script::quote_cpmm_swap(
+    let _quote2 = pool_script::quote_cpmm_swap(
         &pool_bc,
         &bank_b,
         &bank_c,
@@ -120,9 +110,6 @@ fun test_initial_deposit() {
         quote1.amount_out(),
         &clock,
     );
-
-    print(&quote2);
-
 
     destroy(clock);
     destroy(owner_cap);
