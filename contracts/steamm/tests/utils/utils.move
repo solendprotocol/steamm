@@ -336,7 +336,10 @@ public fun test_setup_dummy(
     ) = base_setup(none(), scenario);
 
     // Create pool
-    let pool = dummy_quoter::new<B_TEST_USDC, B_TEST_SUI, LP_USDC_SUI>(
+    let is_no_fee = swap_fee_bps == 0;
+    let swap_fee_bps = if (is_no_fee) { 100 } else { swap_fee_bps };
+
+    let mut pool = dummy_quoter::new<B_TEST_USDC, B_TEST_SUI, LP_USDC_SUI>(
         &mut registry,
         swap_fee_bps,
         &meta_b_usdc,
@@ -345,6 +348,11 @@ public fun test_setup_dummy(
         treasury_cap_lp,
         scenario.ctx(),
     );
+
+    if (is_no_fee) {
+        pool.no_protocol_fees_for_testing();
+        pool.no_swap_fees_for_testing();
+    };
 
     destroy(registry);
     destroy(meta_lp_usdc_sui);
@@ -368,11 +376,12 @@ public fun test_setup_dummy_no_fees(
     Clock,
 ) {
     let (mut pool, bank_a, bank_b, lending_market, lend_cap, prices, bag, clock) = test_setup_dummy(
-        0,
+        100,
         scenario,
     );
 
     pool.no_protocol_fees_for_testing();
+    pool.no_swap_fees_for_testing();
 
     (pool, bank_a, bank_b, lending_market, lend_cap, prices, bag, clock)
 }

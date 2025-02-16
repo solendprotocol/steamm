@@ -43,9 +43,8 @@ const LP_ICON_URL: vector<u8> = b"TODO";
 const EInvalidLpDecimals: u64 = 0;
 /// Error when trying to initialize a pool with non-zero LP supply
 const ELpSupplyMustBeZero: u64 = 1;
-// The pool swap fee is a percentage and therefore
-// can't surpass 100%
-const EFeeAbove100Percent: u64 = 2;
+/// Error when swap fee bps is not one of the allowed values
+const EInvalidSwapFeeBpsType: u64 = 2;
 // Occurs when the swap amount_out is below the
 // minimum amount out declared
 const ESwapExceedsSlippage: u64 = 3;
@@ -187,6 +186,8 @@ public fun deposit_liquidity<A, B, Quoter: store, LpType: drop>(
         deposit_a: quote.deposit_a(),
         deposit_b: quote.deposit_b(),
         mint_lp: quote.mint_lp(),
+        balance_a: pool.balance_a.value(),
+        balance_b: pool.balance_b.value(),
     };
 
     emit_event(result);
@@ -304,6 +305,8 @@ public fun redeem_liquidity<A, B, Quoter: store, LpType: drop>(
         withdraw_a: tokens_a.value(),
         withdraw_b: tokens_b.value(),
         burn_lp: lp_burn,
+        balance_a: pool.balance_a.value(),
+        balance_b: pool.balance_b.value(),
     };
 
     emit_event(result);
@@ -420,7 +423,7 @@ public(package) fun new<A, B, Quoter: store, LpType: drop>(
     ctx: &mut TxContext,
 ): Pool<A, B, Quoter, LpType> {
     assert!(lp_treasury.total_supply() == 0, ELpSupplyMustBeZero);
-    assert!(swap_fee_bps < BPS_DENOMINATOR, EFeeAbove100Percent);
+    assert_swap_fee_bps(swap_fee_bps);
     assert!(get<A>() != get<B>(), ETypeAandBDuplicated);
 
     update_lp_metadata(meta_a, meta_b, meta_lp, &lp_treasury);
@@ -448,17 +451,25 @@ public(package) fun new<A, B, Quoter: store, LpType: drop>(
         version: version::new(CURRENT_VERSION),
     };
 
-    registry.add_amm(&pool);
-
-    // Emit event
-    emit_event(NewPoolResult {
-        creator: sender(ctx),
+    let event = NewPoolResult {
         pool_id: object::id(&pool),
         coin_type_a: get<A>(),
         coin_type_b: get<B>(),
         lp_token_type: get<LpType>(),
         quoter_type: get<Quoter>(),
-    });
+        swap_fee_bps
+    };
+
+    emit_event(event);
+
+    registry.register_pool(
+        event.pool_id,
+        event.coin_type_a,
+        event.coin_type_b,
+        event.lp_token_type,
+        event.swap_fee_bps,
+        event.quoter_type,
+    );
 
     pool
 }
@@ -544,6 +555,8 @@ public(package) fun swap<A, B, Quoter: store, LpType: drop>(
         amount_out: quote.amount_out(),
         output_fees: *quote.output_fees(),
         a2b: quote.a2b(),
+        balance_a: pool.balance_a.value(),
+        balance_b: pool.balance_b.value(),
     };
 
     emit_event(result);
@@ -778,6 +791,17 @@ fun assert_lp_supply_reserve_ratio(
     );
 }
 
+fun assert_swap_fee_bps(swap_fee_bps: u64) {
+    assert!(
+        swap_fee_bps == 1 || 
+        swap_fee_bps == 5 || 
+        swap_fee_bps == 30 || 
+        swap_fee_bps == 100 ||
+        swap_fee_bps == 200,
+        EInvalidSwapFeeBpsType,
+    );
+}
+
 fun update_lp_metadata<A, B, LpType: drop>(
     meta_a: &CoinMetadata<A>,
     meta_b: &CoinMetadata<B>,
@@ -810,12 +834,12 @@ fun update_lp_metadata<A, B, LpType: drop>(
 // ===== Events =====
 
 public struct NewPoolResult has copy, drop, store {
-    creator: address,
     pool_id: ID,
     coin_type_a: TypeName,
     coin_type_b: TypeName,
     quoter_type: TypeName,
     lp_token_type: TypeName,
+    swap_fee_bps: u64,
 }
 
 public struct SwapResult has copy, drop, store {
@@ -825,6 +849,9 @@ public struct SwapResult has copy, drop, store {
     amount_out: u64,
     output_fees: SwapFee,
     a2b: bool,
+
+    balance_a: u64,
+    balance_b: u64,
 }
 
 public struct DepositResult has copy, drop, store {
@@ -833,6 +860,9 @@ public struct DepositResult has copy, drop, store {
     deposit_a: u64,
     deposit_b: u64,
     mint_lp: u64,
+
+    balance_a: u64,
+    balance_b: u64,
 }
 
 public struct RedeemResult has copy, drop, store {
@@ -841,6 +871,9 @@ public struct RedeemResult has copy, drop, store {
     withdraw_a: u64,
     withdraw_b: u64,
     burn_lp: u64,
+
+    balance_a: u64,
+    balance_b: u64,
 }
 
 public use fun swap_result_user as SwapResult.user;
@@ -912,6 +945,14 @@ public(package) fun no_protocol_fees_for_testing<A, B, Quoter: store, LpType: dr
     pool: &mut Pool<A, B, Quoter, LpType>,
 ) {
     let fee_num = pool.protocol_fees.config_mut().fee_numerator_mut();
+    *fee_num = 0;
+}
+
+#[test_only]
+public(package) fun no_swap_fees_for_testing<A, B, Quoter: store, LpType: drop>(
+    pool: &mut Pool<A, B, Quoter, LpType>,
+) {
+    let fee_num = pool.pool_fee_config.fee_numerator_mut();
     *fee_num = 0;
 }
 
@@ -992,6 +1033,8 @@ public(package) fun to_quote(result: SwapResult): SwapQuote {
         amount_out,
         output_fees,
         a2b,
+        balance_a: _,
+        balance_b: _,
     } = result;
 
     quote::quote_for_testing(
