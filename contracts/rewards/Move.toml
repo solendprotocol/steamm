@@ -1,7 +1,7 @@
 [package]
 name = "lp_rewards"
 edition = "2024.beta"
-published-at = "0x0"
+published-at = "0xa3baab8c2e61c49400ec6db50a7123bbea9506bcf58cafbb74f9445e3123e22f"
 # license = ""           # e.g., "MIT", "GPL", "Apache 2.0"
 # authors = ["..."]      # e.g., ["Joe Smith (joesmith@noemail.com)", "John Snow (johnsnow@noemail.com)"]
 
@@ -11,4 +11,4 @@ suilend = { git = "https://github.com/solendprotocol/suilend.git", subdir = "con
 steamm = { local = "../steamm" }
 
 [addresses]
-lp_rewards = "0x0"
+lp_rewards = "0x9e632b0a18df2737f0fc9fa0300a8963ea0c5c88c2dcd7ef6a9d6d7669689615"
