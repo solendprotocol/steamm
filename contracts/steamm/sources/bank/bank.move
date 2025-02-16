@@ -29,22 +29,39 @@ const BTOKEN_ICON_URL: vector<u8> = b"TODO";
 
 // ===== Errors =====
 
+// bToken name must start with "B_" followed by underlying token name
 const EBTokenTypeInvalid: u64 = 0;
+// bToken decimals must be 9
 const EInvalidBTokenDecimals: u64 = 1;
+// bToken treasury must have zero supply when creating bank
 const EBTokenSupplyMustBeZero: u64 = 2;
+// Target utilisation + buffer cannot exceed 100%
 const EUtilisationRangeAboveHundredPercent: u64 = 3;
+// Target utilisation must be greater than buffer
 const EUtilisationRangeBelowZeroPercent: u64 = 4;
+// Bank already has lending initialized
 const ELendingAlreadyActive: u64 = 5;
+// Insufficient cTokens in reserve after redemption
 const ECTokenRatioTooLow: u64 = 6;
+// Lending must be initialized first
 const ELendingNotActive: u64 = 7;
+// Interest must be compounded before operation
 const ECompoundedInterestNotUpdated: u64 = 8;
+// Bank has insufficient funds for withdrawal
 const EInsufficientBankFunds: u64 = 9;
+// Input coin balance too low for requested operation
 const EInsufficientCoinBalance: u64 = 10;
+// Cannot deposit zero coins
 const EEmptyCoinAmount: u64 = 11;
+// Cannot burn empty bToken
 const EEmptyBToken: u64 = 12;
+// bToken balance less than amount to burn
 const EInvalidBtokenBalance: u64 = 13;
+// No bTokens available to burn after minimum liquidity check
 const ENoBTokensToBurn: u64 = 14;
+// No tokens available to withdraw after calculations
 const ENoTokensToWithdraw: u64 = 15;
+// First deposit must be greater than minimum liquidity
 const EInitialDepositBelowMinimumLiquidity: u64 = 16;
 
 // ===== Structs =====
@@ -916,4 +933,4 @@ public fun needs_rebalance_after_outflow<P, T, BToken>(
 }
 
 #[test_only]
-public fun needs_rebalance_(needs_rebalance: NeedsRebalance): bool { needs_rebalance.needs_rebalance } 
+public fun needs_rebalance_(needs_rebalance: NeedsRebalance): bool { needs_rebalance.needs_rebalance }

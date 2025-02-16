@@ -2,7 +2,7 @@
 
 [move]
 version = 3
-manifest_digest = "98C74BFA7D741BFE2779E18E43300A14F58F03DAA64F47EF12AC52347B65C062"
+manifest_digest = "8B4C546D761FF982A8F230B488E065B85D2ADA5676D3FDF8C35218A61590CE34"
 deps_digest = "060AD7E57DFB13104F21BE5F5C3759D03F0553FC3229247D9A7A6B45F50D03A3"
 dependencies = [
   { id = "Sui", name = "Sui" },
@@ -59,7 +59,7 @@ dependencies = [
 
 [[move.package]]
 id = "sprungsui"
-source = { git = "https://github.com/solendprotocol/suilend.git", rev = "expose-test-only-fns", subdir = "contracts/sprungsui" }
+source = { git = "https://github.com/solendprotocol/suilend.git", rev = "devel", subdir = "contracts/sprungsui" }
 
 dependencies = [
   { id = "Sui", name = "Sui" },
@@ -76,7 +76,7 @@ dependencies = [
 
 [[move.package]]
 id = "suilend"
-source = { git = "https://github.com/solendprotocol/suilend.git", rev = "expose-test-only-fns", subdir = "contracts/suilend" }
+source = { git = "https://github.com/solendprotocol/suilend.git", rev = "devel", subdir = "contracts/suilend" }
 
 dependencies = [
   { id = "Pyth", name = "Pyth" },
@@ -89,3 +89,11 @@ dependencies = [
 compiler-version = "1.40.1"
 edition = "2024.beta"
 flavor = "sui"
+
+[env]
+
+[env.mainnet]
+chain-id = "35834a8a"
+original-published-id = "0xe167bfdc4b8410e4af76079a37412590ace95064b2d17f1f3b7fed2009a59843"
+latest-published-id = "0x772b3d9c5d170f8225a231fa4f0366eef608117099191d316482139c2bc223fc"
+published-version = "2"

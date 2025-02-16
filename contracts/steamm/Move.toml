@@ -3,10 +3,11 @@ name = "steamm"
 edition = "2024.beta" # edition = "legacy" to use legacy (pre-2024) Move
 # license = ""           # e.g., "MIT", "GPL", "Apache 2.0"
 # authors = ["..."]      # e.g., ["Joe Smith (joesmith@noemail.com)", "John Snow (johnsnow@noemail.com)"]
+published-at = "0x15dadedd5337d081697ec44b9ad337491f8361308b69af9067bedb7fb823e115"
 
 [dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/mainnet" }
-suilend = { git = "https://github.com/solendprotocol/suilend.git", subdir = "contracts/suilend", rev = "expose-test-only-fns" }
+suilend = { git = "https://github.com/solendprotocol/suilend.git", subdir = "contracts/suilend", rev = "devel" }
 
 # For remote import, use the `{ git = "...", subdir = "...", rev = "..." }`.
 # Revision can be a branch, a tag, and a commit hash.
@@ -20,8 +21,7 @@ suilend = { git = "https://github.com/solendprotocol/suilend.git", subdir = "con
 # Override = { local = "../conflicting/version", override = true }
 
 [addresses]
-steamm = "0x0"
-suilend = "0xf95b06141ed4a174f239417323bde3f209b972f5930d8521ea38a52aff3a6ddf"
+steamm = "0x93006b08eb8743c87b2c1f206e02c34d9f6c337318e0bf111666a78f0196609a"
 
 # Named addresses will be accessible in Move as `@name`. They're also exported:
 # for example, `std = "0x1"` is exported by the Standard Library.
