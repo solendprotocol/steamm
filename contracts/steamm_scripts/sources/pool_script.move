@@ -1,5 +1,7 @@
 #[allow(lint(self_transfer))]
-module steamm::script_v1;
+module steamm_scripts::pool_script;
+
+use steamm_scripts::script_events::emit_event;
 
 use sui::coin::{Self, Coin};
 use sui::clock::Clock;
@@ -7,8 +9,13 @@ use steamm::bank::Bank;
 use steamm::quote;
 use steamm::pool::Pool;
 use steamm::cpmm::CpQuoter;
-use suilend::lending_market::{LendingMarket};
 use steamm::quote::{SwapQuote, DepositQuote, RedeemQuote};
+use suilend::lending_market::{LendingMarket};
+
+public struct MultiRouteSwapQuote has store, copy, drop {
+    amount_in: u64,
+    amount_out: u64,
+}
 
 public fun deposit_liquidity<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: drop>(
     pool: &mut Pool<BTokenA, BTokenB, Quoter, LpType>,
@@ -43,7 +50,8 @@ public fun deposit_liquidity<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: d
         coin_b.join(coin_b_);
     };
     
-    destroy_or_transfer(btoken_a, btoken_b, ctx);
+    destroy_or_transfer(btoken_a, ctx);
+    destroy_or_transfer(btoken_b, ctx);
 
     lp_coin
 }
@@ -66,7 +74,8 @@ public fun redeem_liquidity<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: dr
     let coin_a = bank_a.burn_btokens(lending_market, &mut btoken_a, btoken_a_amount, clock, ctx);
     let coin_b = bank_b.burn_btokens(lending_market, &mut btoken_b, btoken_b_amount, clock, ctx);
 
-    destroy_or_transfer(btoken_a, btoken_b, ctx);
+    destroy_or_transfer(btoken_a, ctx);
+    destroy_or_transfer(btoken_b, ctx);
 
     (coin_a, coin_b)
 }
@@ -110,7 +119,8 @@ public fun cpmm_swap<P, A, B, BTokenA, BTokenB, LpType: drop>(
         coin_b.join(coin_b_);
     };
 
-    destroy_or_transfer(btoken_a, btoken_b, ctx);
+    destroy_or_transfer(btoken_a, ctx);
+    destroy_or_transfer(btoken_b, ctx);
 }
 
 public fun quote_cpmm_swap<P, A, B, BTokenA, BTokenB, LpType: drop>(
@@ -126,26 +136,26 @@ public fun quote_cpmm_swap<P, A, B, BTokenA, BTokenB, LpType: drop>(
     bank_b.compound_interest_if_any(lending_market, clock);
 
     let amount_in_ = if (a2b) {
-        bank_a.to_btokens(lending_market, amount_in, clock).floor()
+        bank_a.to_btokens(lending_market, amount_in, clock)
     } else {
-        bank_b.to_btokens(lending_market, amount_in, clock).floor()
+        bank_b.to_btokens(lending_market, amount_in, clock)
     };
 
     let btoken_quote = pool.cpmm_quote_swap(amount_in_, a2b);
 
     let (amount_in, amount_out, protocol_fees, pool_fees) = if (a2b) {
         (
-            bank_a.from_btokens(lending_market, btoken_quote.amount_in(), clock).floor(),
-            bank_b.from_btokens(lending_market, btoken_quote.amount_out(), clock).floor(),
-            bank_b.from_btokens(lending_market, btoken_quote.output_fees().protocol_fees(), clock).floor(),
-            bank_b.from_btokens(lending_market, btoken_quote.output_fees().pool_fees(), clock).floor(),
+            bank_a.from_btokens(lending_market, btoken_quote.amount_in(), clock),
+            bank_b.from_btokens(lending_market, btoken_quote.amount_out(), clock),
+            bank_b.from_btokens(lending_market, btoken_quote.output_fees().protocol_fees(), clock),
+            bank_b.from_btokens(lending_market, btoken_quote.output_fees().pool_fees(), clock),
         )
     } else {
         (
-            bank_b.from_btokens(lending_market, btoken_quote.amount_in(), clock).floor(),
-            bank_a.from_btokens(lending_market, btoken_quote.amount_out(), clock).floor(),
-            bank_a.from_btokens(lending_market, btoken_quote.output_fees().protocol_fees(), clock).floor(),
-            bank_a.from_btokens(lending_market, btoken_quote.output_fees().pool_fees(), clock).floor(),
+            bank_b.from_btokens(lending_market, btoken_quote.amount_in(), clock),
+            bank_a.from_btokens(lending_market, btoken_quote.amount_out(), clock),
+            bank_a.from_btokens(lending_market, btoken_quote.output_fees().protocol_fees(), clock),
+            bank_a.from_btokens(lending_market, btoken_quote.output_fees().pool_fees(), clock),
         )
     };
 
@@ -156,6 +166,8 @@ public fun quote_cpmm_swap<P, A, B, BTokenA, BTokenB, LpType: drop>(
         pool_fees,
         a2b,
     );
+
+    emit_event(quote);
 
     quote
 }
@@ -172,17 +184,19 @@ public fun quote_deposit<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: drop>
     bank_a.compound_interest_if_any(lending_market, clock);
     bank_b.compound_interest_if_any(lending_market, clock);
 
-    let btoken_amount_a = bank_a.to_btokens(lending_market, max_a, clock).floor();
-    let btoken_amount_b = bank_b.to_btokens(lending_market, max_b, clock).floor();
+    let btoken_amount_a = bank_a.to_btokens(lending_market, max_a, clock);
+    let btoken_amount_b = bank_b.to_btokens(lending_market, max_b, clock);
 
     let btoken_quote = pool.quote_deposit(btoken_amount_a, btoken_amount_b);
 
     let quote = quote::deposit_quote(
         btoken_quote.initial_deposit(),
-        bank_a.from_btokens(lending_market, btoken_quote.deposit_a(), clock).floor(),
-        bank_b.from_btokens(lending_market, btoken_quote.deposit_b(), clock).floor(),
+        bank_a.from_btokens(lending_market, btoken_quote.deposit_a(), clock),
+        bank_b.from_btokens(lending_market, btoken_quote.deposit_b(), clock),
         btoken_quote.mint_lp(),
     );
+
+    emit_event(quote);
 
     quote
 }
@@ -198,28 +212,54 @@ public fun quote_redeem<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: drop>(
     let btoken_quote = pool.quote_redeem(lp_tokens);
 
     let quote = quote::redeem_quote(
-        bank_a.from_btokens(lending_market, btoken_quote.withdraw_a(), clock).floor(),
-        bank_b.from_btokens(lending_market, btoken_quote.withdraw_b(), clock).floor(),
+        bank_a.from_btokens(lending_market, btoken_quote.withdraw_a(), clock),
+        bank_b.from_btokens(lending_market, btoken_quote.withdraw_b(), clock),
         btoken_quote.burn_lp()
     );
+
+    emit_event(quote);
 
     quote
 }
 
-fun destroy_or_transfer<BTokenA, BTokenB>(
-    btoken_a: Coin<BTokenA>,
-    btoken_b: Coin<BTokenB>,
+public fun to_multi_swap_route<P, X, Y, BTokenX, BTokenY>(
+    bank_x: &mut Bank<P, X, BTokenX>,
+    bank_y: &mut Bank<P, Y, BTokenY>,
+    lending_market: &mut LendingMarket<P>,
+    x2y: bool,
+    amount_in: u64,
+    amount_out: u64,
+    clock: &Clock,
+): MultiRouteSwapQuote {
+    bank_x.compound_interest_if_any(lending_market, clock);
+    bank_y.compound_interest_if_any(lending_market, clock);
+
+    let (amount_in, amount_out) = if (x2y) {
+        (
+            bank_x.from_btokens(lending_market, amount_in, clock),
+            bank_y.from_btokens(lending_market, amount_out, clock),
+        )
+    } else {
+        (
+            bank_y.from_btokens(lending_market, amount_in, clock),
+            bank_x.from_btokens(lending_market, amount_out, clock),
+        )
+    };
+
+    let quote = MultiRouteSwapQuote { amount_in, amount_out };
+
+    emit_event(quote);
+
+    quote
+}
+
+public fun destroy_or_transfer<T>(
+    token: Coin<T>,
     ctx: &TxContext,
 ) {
-    if (btoken_a.value() > 0) {
-        transfer::public_transfer(btoken_a, ctx.sender());
+    if (token.value() > 0) {
+        transfer::public_transfer(token, ctx.sender());
     } else {
-        btoken_a.destroy_zero();
-    };
-    
-    if (btoken_b.value() > 0) {
-        transfer::public_transfer(btoken_b, ctx.sender());
-    } else {
-        btoken_b.destroy_zero();
+        token.destroy_zero();
     };
 }

@@ -1,7 +1,7 @@
 #[test_only]
-module steamm::script_tests;
+module steamm_scripts::script_tests;
 
-use steamm::script_v1;
+use steamm_scripts::pool_script;
 use suilend::test_sui::TEST_SUI;
 use suilend::test_usdc::TEST_USDC;
 use steamm::global_admin;
@@ -48,7 +48,7 @@ fun script_deposit() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(500_000, scenario.ctx());
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(500_000, scenario.ctx());
     
-    let quote = script_v1::quote_deposit(
+    let quote = pool_script::quote_deposit(
         &pool,
         &bank_a,
         &bank_b,
@@ -58,7 +58,7 @@ fun script_deposit() {
         &clock,
     );
 
-    let lp_token = script_v1::deposit_liquidity(
+    let lp_token = pool_script::deposit_liquidity(
         &mut pool,
         &mut bank_a,
         &mut bank_b,
@@ -126,7 +126,7 @@ fun script_redeem() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(500_000, scenario.ctx());
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(500_000, scenario.ctx());
 
-    let lp_token = script_v1::deposit_liquidity(
+    let lp_token = pool_script::deposit_liquidity(
         &mut pool,
         &mut bank_a,
         &mut bank_b,
@@ -142,7 +142,7 @@ fun script_redeem() {
     destroy(coin_a);
     destroy(coin_b);
 
-    let quote = script_v1::quote_redeem(
+    let quote = pool_script::quote_redeem(
         &pool,
         &bank_a,
         &bank_b,
@@ -151,7 +151,7 @@ fun script_redeem() {
         &clock
     );
 
-    let (coin_a, coin_b) = script_v1::redeem_liquidity(
+    let (coin_a, coin_b) = pool_script::redeem_liquidity(
         &mut pool,
         &mut bank_a,
         &mut bank_b,
@@ -217,7 +217,7 @@ fun script_swap() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(500_000, scenario.ctx());
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(500_000, scenario.ctx());
 
-    let lp_token = script_v1::deposit_liquidity(
+    let lp_token = pool_script::deposit_liquidity(
         &mut pool,
         &mut bank_a,
         &mut bank_b,
@@ -233,7 +233,7 @@ fun script_swap() {
     destroy(coin_a);
     destroy(coin_b);
 
-    let quote = script_v1::quote_cpmm_swap(
+    let quote = pool_script::quote_cpmm_swap(
         &pool,
         &bank_a,
         &bank_b,
@@ -246,7 +246,7 @@ fun script_swap() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(10_000, scenario.ctx());
     let mut coin_b = coin::zero<TEST_SUI>(scenario.ctx());
 
-    script_v1::cpmm_swap(
+    pool_script::cpmm_swap(
         &mut pool,
         &mut bank_a,
         &mut bank_b,
