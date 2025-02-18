@@ -1,5 +1,6 @@
 module steamm::bank_tests;
 
+use std::option::some;
 use steamm::b_test_usdc::B_TEST_USDC;
 use steamm::bank::{Self, Bank};
 use steamm::bank_math;
@@ -244,9 +245,12 @@ fun test_bank_rebalance_deploy() {
     bank.deposit_for_testing(100 * 1_000_000);
 
     assert_eq(bank.funds_available().value(), 100 * 1_000_000);
-    assert_eq(bank.funds_deployed(&lending_market, &clock).floor(), 0);
-    assert_eq(bank.total_funds(&lending_market, &clock).floor(), 100 * 1_000_000);
-    assert_eq(bank.effective_utilisation_bps(&lending_market, &clock), 0);
+    let ctoken_ratio = bank.ctoken_ratio_unsafe(&lending_market, &clock);
+    let funds_deployed = bank.funds_deployed(some(ctoken_ratio)).floor();
+
+    assert_eq(funds_deployed, 0);
+    assert_eq(bank.total_funds(some(ctoken_ratio)).floor(), 100 * 1_000_000);
+    assert_eq(bank.effective_utilisation_bps(funds_deployed), 0);
 
     bank.rebalance(
         &mut lending_market,
@@ -254,10 +258,13 @@ fun test_bank_rebalance_deploy() {
         ctx(&mut scenario),
     );
 
+    let ctoken_ratio = bank.ctoken_ratio_unsafe(&lending_market, &clock);
+    let funds_deployed = bank.funds_deployed(some(ctoken_ratio)).floor();
+
     assert_eq(bank.funds_available().value(), 50 * 1_000_000);
-    assert_eq(bank.funds_deployed(&lending_market, &clock).floor(), 50 * 1_000_000);
-    assert_eq(bank.total_funds(&lending_market, &clock).floor(), 100 * 1_000_000);
-    assert_eq(bank.effective_utilisation_bps(&lending_market, &clock), 5_000);
+    assert_eq(funds_deployed, 50 * 1_000_000);
+    assert_eq(bank.total_funds(some(ctoken_ratio)).floor(), 100 * 1_000_000);
+    assert_eq(bank.effective_utilisation_bps(funds_deployed), 5_000);
 
     destroy(clock);
     destroy(bank);
@@ -298,10 +305,13 @@ fun test_bank_rebalance_recall() {
         ctx(&mut scenario),
     );
 
+    let ctoken_ratio = bank.ctoken_ratio_unsafe(&lending_market, &clock);
+    let funds_deployed = bank.funds_deployed(some(ctoken_ratio)).floor();
+
     assert_eq(bank.funds_available().value(), 50 * 1_000_000);
-    assert_eq(bank.funds_deployed(&lending_market, &clock).floor(), 50 * 1_000_000);
-    assert_eq(bank.total_funds(&lending_market, &clock).floor(), 100 * 1_000_000);
-    assert_eq(bank.effective_utilisation_bps(&lending_market, &clock), 5_000);
+    assert_eq(funds_deployed, 50 * 1_000_000);
+    assert_eq(bank.total_funds(some(ctoken_ratio)).floor(), 100 * 1_000_000);
+    assert_eq(bank.effective_utilisation_bps(funds_deployed), 5_000);
 
     bank.set_utilisation_bps_for_testing(0, 0);
     bank.rebalance(
@@ -310,10 +320,13 @@ fun test_bank_rebalance_recall() {
         ctx(&mut scenario),
     );
 
+    let ctoken_ratio = bank.ctoken_ratio_unsafe(&lending_market, &clock);
+    let funds_deployed = bank.funds_deployed(some(ctoken_ratio)).floor();
+
     assert_eq(bank.funds_available().value(), 100 * 1_000_000);
-    assert_eq(bank.funds_deployed(&lending_market, &clock).floor(), 0);
-    assert_eq(bank.total_funds(&lending_market, &clock).floor(), 100 * 1_000_000);
-    assert_eq(bank.effective_utilisation_bps(&lending_market, &clock), 0);
+    assert_eq(funds_deployed, 0);
+    assert_eq(bank.total_funds(some(ctoken_ratio)).floor(), 100 * 1_000_000);
+    assert_eq(bank.effective_utilisation_bps(funds_deployed), 0);
 
     destroy(clock);
     destroy(bank);
@@ -354,9 +367,13 @@ fun test_bank_prepare_bank_for_pending_withdraw() {
         ctx(&mut scenario),
     );
     assert!(bank.funds_available().value() == 50 * 1_000_000, 0);
-    assert_eq(bank.funds_deployed(&lending_market, &clock).floor(), 50 * 1_000_000);
-    assert_eq(bank.total_funds(&lending_market, &clock).floor(), 100 * 1_000_000);
-    assert_eq(bank.effective_utilisation_bps(&lending_market, &clock), 5_000);
+
+    let ctoken_ratio = bank.ctoken_ratio_unsafe(&lending_market, &clock);
+    let funds_deployed = bank.funds_deployed(some(ctoken_ratio)).floor();
+
+    assert_eq(funds_deployed, 50 * 1_000_000);
+    assert_eq(bank.total_funds(some(ctoken_ratio)).floor(), 100 * 1_000_000);
+    assert_eq(bank.effective_utilisation_bps(funds_deployed), 5_000);
 
     bank.prepare_for_pending_withdraw(
         &mut lending_market,
@@ -366,10 +383,13 @@ fun test_bank_prepare_bank_for_pending_withdraw() {
     );
     let usdc = bank.withdraw_for_testing(20 * 1_000_000);
 
+    let ctoken_ratio = bank.ctoken_ratio_unsafe(&lending_market, &clock);
+    let funds_deployed = bank.funds_deployed(some(ctoken_ratio)).floor();
+
     assert!(bank.funds_available().value() == 40 * 1_000_000, 0);
-    assert_eq(bank.funds_deployed(&lending_market, &clock).floor(), 40 * 1_000_000);
-    assert_eq(bank.total_funds(&lending_market, &clock).floor(), 80 * 1_000_000);
-    assert_eq(bank.effective_utilisation_bps(&lending_market, &clock), 5_000);
+    assert_eq(funds_deployed, 40 * 1_000_000);
+    assert_eq(bank.total_funds(some(ctoken_ratio)).floor(), 80 * 1_000_000);
+    assert_eq(bank.effective_utilisation_bps(funds_deployed), 5_000);
 
     destroy(clock);
     destroy(bank);
@@ -404,12 +424,12 @@ fun test_bank_withdraw_except_minimum_liquidity() {
     );
 
     let mut coin = coin::mint_for_testing<TEST_USDC>(500_000, ctx(&mut scenario));
-    let mut btoken = bank.mint_btokens(&mut lending_market, &mut coin, 500_000, &clock, ctx(&mut scenario));
+    let mut btoken = bank.mint_btoken(&lending_market, &mut coin, 500_000, &clock, ctx(&mut scenario));
     destroy(coin);
 
     let btoken_value = btoken.value();
-    let coin = bank.burn_btokens(
-        &mut lending_market,
+    let coin = bank.burn_btoken(
+        &lending_market,
         &mut btoken,
         btoken_value,
         &clock,

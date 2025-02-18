@@ -1,7 +1,9 @@
 #[allow(lint(self_transfer))]
-module steamm_scripts::pool_script;
+module steamm_scripts::pool_script_v2;
 
 use steamm_scripts::script_events::emit_event;
+use steamm_scripts::pool_script::{destroy_or_transfer, multi_swap_route, MultiRouteSwapQuote};
+
 
 use sui::coin::{Self, Coin};
 use sui::clock::Clock;
@@ -12,16 +14,11 @@ use steamm::cpmm::CpQuoter;
 use steamm::quote::{SwapQuote, DepositQuote, RedeemQuote};
 use suilend::lending_market::{LendingMarket};
 
-public struct MultiRouteSwapQuote has store, copy, drop {
-    amount_in: u64,
-    amount_out: u64,
-}
-
 public fun deposit_liquidity<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: drop>(
     pool: &mut Pool<BTokenA, BTokenB, Quoter, LpType>,
     bank_a: &mut Bank<P, A, BTokenA>,
     bank_b: &mut Bank<P, B, BTokenB>,
-    lending_market: &mut LendingMarket<P>,
+    lending_market: &LendingMarket<P>,
     coin_a: &mut Coin<A>,
     coin_b: &mut Coin<B>,
     max_a: u64,
@@ -29,8 +26,8 @@ public fun deposit_liquidity<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: d
     clock: &Clock,
     ctx: &mut TxContext,
 ): Coin<LpType> {
-    let mut btoken_a = bank_a.mint_btokens(lending_market, coin_a, max_a, clock, ctx);
-    let mut btoken_b = bank_b.mint_btokens(lending_market, coin_b, max_b, clock, ctx);
+    let mut btoken_a = bank_a.mint_btoken(lending_market, coin_a, max_a, clock, ctx);
+    let mut btoken_b = bank_b.mint_btoken(lending_market, coin_b, max_b, clock, ctx);
 
     let max_ba = btoken_a.value();
     let max_bb = btoken_b.value();
@@ -42,11 +39,11 @@ public fun deposit_liquidity<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: d
     let remaining_value_bb = btoken_b.value();
 
     if (remaining_value_ba > 0) {
-        let coin_a_ = bank_a.burn_btokens(lending_market, &mut btoken_a, remaining_value_ba, clock, ctx);
+        let coin_a_ = bank_a.burn_btoken(lending_market, &mut btoken_a, remaining_value_ba, clock, ctx);
         coin_a.join(coin_a_);
     };
     if (remaining_value_bb > 0) {
-        let coin_b_ = bank_b.burn_btokens(lending_market, &mut btoken_b, remaining_value_bb, clock, ctx);
+        let coin_b_ = bank_b.burn_btoken(lending_market, &mut btoken_b, remaining_value_bb, clock, ctx);
         coin_b.join(coin_b_);
     };
     
@@ -60,7 +57,7 @@ public fun redeem_liquidity<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: dr
     pool: &mut Pool<BTokenA, BTokenB, Quoter, LpType>,
     bank_a: &mut Bank<P, A, BTokenA>,
     bank_b: &mut Bank<P, B, BTokenB>,
-    lending_market: &mut LendingMarket<P>,
+    lending_market: &LendingMarket<P>,
     lp_tokens: Coin<LpType>,
     min_a: u64,
     min_b: u64,
@@ -71,8 +68,8 @@ public fun redeem_liquidity<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: dr
 
     let (btoken_a_amount, btoken_b_amount) = (btoken_a.value(), btoken_b.value());
 
-    let coin_a = bank_a.burn_btokens(lending_market, &mut btoken_a, btoken_a_amount, clock, ctx);
-    let coin_b = bank_b.burn_btokens(lending_market, &mut btoken_b, btoken_b_amount, clock, ctx);
+    let coin_a = bank_a.burn_btoken(lending_market, &mut btoken_a, btoken_a_amount, clock, ctx);
+    let coin_b = bank_b.burn_btoken(lending_market, &mut btoken_b, btoken_b_amount, clock, ctx);
 
     destroy_or_transfer(btoken_a, ctx);
     destroy_or_transfer(btoken_b, ctx);
@@ -225,15 +222,12 @@ public fun quote_redeem<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: drop>(
 public fun to_multi_swap_route<P, X, Y, BTokenX, BTokenY>(
     bank_x: &mut Bank<P, X, BTokenX>,
     bank_y: &mut Bank<P, Y, BTokenY>,
-    lending_market: &mut LendingMarket<P>,
+    lending_market: &LendingMarket<P>,
     x2y: bool,
     amount_in: u64,
     amount_out: u64,
     clock: &Clock,
 ): MultiRouteSwapQuote {
-    bank_x.compound_interest_if_any(lending_market, clock);
-    bank_y.compound_interest_if_any(lending_market, clock);
-
     let (amount_in, amount_out) = if (x2y) {
         (
             bank_x.from_btokens(lending_market, amount_in, clock),
@@ -246,28 +240,9 @@ public fun to_multi_swap_route<P, X, Y, BTokenX, BTokenY>(
         )
     };
 
-    let quote = MultiRouteSwapQuote { amount_in, amount_out };
+    let quote = multi_swap_route(amount_in, amount_out);
 
     emit_event(quote);
 
     quote
 }
-
-public fun destroy_or_transfer<T>(
-    token: Coin<T>,
-    ctx: &TxContext,
-) {
-    if (token.value() > 0) {
-        transfer::public_transfer(token, ctx.sender());
-    } else {
-        token.destroy_zero();
-    };
-}
-
-public(package) fun multi_swap_route(
-    amount_in: u64,
-    amount_out: u64,
-): MultiRouteSwapQuote {
-    MultiRouteSwapQuote { amount_in, amount_out }
-}
-

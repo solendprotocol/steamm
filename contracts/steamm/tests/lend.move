@@ -1,7 +1,7 @@
 #[test_only]
 module steamm::lend_tests;
 
-use std::option::some;
+use std::option::{some, none};
 use std::type_name;
 use steamm::dummy_quoter::{swap as dummy_swap};
 use steamm::global_admin;
@@ -66,14 +66,16 @@ fun test_simple_deposit_with_lending_a() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(500_000, ctx);
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(500_000, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(&mut lending_market, &mut coin_a, 500_000, &clock, ctx);
-    let mut btoken_b = bank_b.mint_btokens(&mut lending_market, &mut coin_b, 500_000, &clock, ctx);
+    let mut btoken_a = bank_a.mint_btoken(&lending_market, &mut coin_a, 500_000, &clock, ctx);
+    let mut btoken_b = bank_b.mint_btoken(&lending_market, &mut coin_b, 500_000, &clock, ctx);
 
     destroy(coin_a);
     destroy(coin_b);
 
     // Test bank effects after minting btokens
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 0); // 500_000 * 0%
+    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 0); // 500_000 * 0%
     assert_eq(bank_a.funds_available().value(), 500_000); // 500_000 * 100%
     assert_eq(bank_b.funds_available().value(), 500_000); // 500_000 * 100%
 
@@ -113,7 +115,8 @@ fun test_simple_deposit_with_lending_a() {
         ctx,
     );
 
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 400_000); // 500_000 * 80%
+    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 400_000); // 500_000 * 80%
     assert_eq(bank_a.funds_available().value(), 100_000); // 500_000 * 20%
     assert_eq(bank_b.funds_available().value(), 500_000);
 
@@ -169,8 +172,8 @@ fun test_swap_with_lending_without_touching_lending_market() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(500_000, ctx);
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(500_000, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(&mut lending_market, &mut coin_a, 500_000, &clock, ctx);
-    let mut btoken_b = bank_b.mint_btokens(&mut lending_market, &mut coin_b, 500_000, &clock, ctx);
+    let mut btoken_a = bank_a.mint_btoken(&lending_market, &mut coin_a, 500_000, &clock, ctx);
+    let mut btoken_b = bank_b.mint_btoken(&lending_market, &mut coin_b, 500_000, &clock, ctx);
 
     destroy(coin_a);
     destroy(coin_b);
@@ -198,10 +201,12 @@ fun test_swap_with_lending_without_touching_lending_market() {
     assert_eq(reserve_b, 500_000);
 
     // No rebalance happened
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 0);
+    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 0);
     assert_eq(bank_a.funds_available().value(), 500_000);
 
-    assert_eq(bank_b.funds_deployed(&lending_market, &clock).floor(), 0);
+    // let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_b.funds_deployed(none()).floor(), 0);
     assert_eq(bank_b.funds_available().value(), 500_000);
 
     destroy(btoken_a);
@@ -210,12 +215,13 @@ fun test_swap_with_lending_without_touching_lending_market() {
     // Swap
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(50_000, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(&mut lending_market, &mut coin_a, 50_000, &clock, ctx);
+    let mut btoken_a = bank_a.mint_btoken(&lending_market, &mut coin_a, 50_000, &clock, ctx);
     let mut btoken_b = coin::zero(ctx);
 
     destroy(coin_a);
 
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 0);
+    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 0);
     assert_eq(bank_a.funds_available().value(), 550_000);
 
     pool.cpmm_swap(
@@ -232,7 +238,8 @@ fun test_swap_with_lending_without_touching_lending_market() {
     assert_eq(reserve_a, 550_000);
     assert_eq(reserve_b, 454_910);
 
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 0);
+    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 0);
     assert_eq(bank_a.funds_available().value(), 550_000);
     assert_eq(bank_b.funds_available().value(), 500_000);
 
@@ -298,16 +305,19 @@ fun test_simple_deposit_with_lending_ab() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(500_000, ctx);
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(500_000, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(&mut lending_market, &mut coin_a, 500_000, &clock, ctx);
-    let mut btoken_b = bank_b.mint_btokens(&mut lending_market, &mut coin_b, 500_000, &clock, ctx);
+    let mut btoken_a = bank_a.mint_btoken(&lending_market, &mut coin_a, 500_000, &clock, ctx);
+    let mut btoken_b = bank_b.mint_btoken(&lending_market, &mut coin_b, 500_000, &clock, ctx);
 
     destroy(coin_a);
     destroy(coin_b);
 
     // Test bank effects after minting btokens
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 0); // 500_000 * 0%
+    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 0); // 500_000 * 0%
     assert_eq(bank_a.funds_available().value(), 500_000); // 500_000 * 100%
-    assert_eq(bank_b.funds_deployed(&lending_market, &clock).floor(), 0); // 500_000 * 0%
+    
+    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 0); // 500_000 * 0%
     assert_eq(bank_b.funds_available().value(), 500_000); // 500_000 * 100%
 
     let (lp_coins, _) = pool.deposit_liquidity(
@@ -346,9 +356,9 @@ fun test_simple_deposit_with_lending_ab() {
         ctx,
     );
 
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 400_000); // 500_000 * 80%
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 400_000); // 500_000 * 80%
     assert_eq(bank_a.funds_available().value(), 100_000); // 500_000 * 20%
-    assert_eq(bank_b.funds_deployed(&lending_market, &clock).floor(), 400_000); // 500_000 * 80%
+    assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 400_000); // 500_000 * 80%
     assert_eq(bank_b.funds_available().value(), 100_000); // 500_000 * 20%
 
     destroy(btoken_a);
@@ -410,16 +420,18 @@ fun test_swap_with_lending_within_utilization_range() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(500_000, ctx);
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(500_000, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(&mut lending_market, &mut coin_a, 500_000, &clock, ctx);
-    let mut btoken_b = bank_b.mint_btokens(&mut lending_market, &mut coin_b, 500_000, &clock, ctx);
+    let mut btoken_a = bank_a.mint_btoken(&lending_market, &mut coin_a, 500_000, &clock, ctx);
+    let mut btoken_b = bank_b.mint_btoken(&lending_market, &mut coin_b, 500_000, &clock, ctx);
 
     destroy(coin_a);
     destroy(coin_b);
 
     // Test bank effects after minting btokens
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 0); // 500_000 * 0%
+    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 0); // 500_000 * 0%
     assert_eq(bank_a.funds_available().value(), 500_000); // 500_000 * 100%
-    assert_eq(bank_b.funds_deployed(&lending_market, &clock).floor(), 0); // 500_000 * 0%
+    let ctoken_ratio = bank_b.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 0); // 500_000 * 0%
     assert_eq(bank_b.funds_available().value(), 500_000); // 500_000 * 100%
 
     let (lp_coins, _) = pool.deposit_liquidity(
@@ -458,10 +470,10 @@ fun test_swap_with_lending_within_utilization_range() {
         ctx,
     );
 
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 400_000); // 500_000 * 80%
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 400_000); // 500_000 * 80%
     assert_eq(bank_a.funds_available().value(), 100_000); // 500_000 * 20%
 
-    assert_eq(bank_b.funds_deployed(&lending_market, &clock).floor(), 400_000); // 500_000 * 80%
+    assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 400_000); // 500_000 * 80%
     assert_eq(bank_b.funds_available().value(), 100_000); // 500_000 * 20%
 
     destroy(btoken_a);
@@ -470,15 +482,15 @@ fun test_swap_with_lending_within_utilization_range() {
     // Swap
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(50_000, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(&mut lending_market, &mut coin_a, 50_000, &clock, ctx);
+    let mut btoken_a = bank_a.mint_btoken(&lending_market, &mut coin_a, 50_000, &clock, ctx);
     let mut btoken_b = coin::zero(ctx);
 
     destroy(coin_a);
 
     // Test bank effects after minting btokens
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 400_000); // No change
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 400_000); // No change
     assert_eq(bank_a.funds_available().value(), 100_000 + 50_000);
-    assert_eq(bank_b.funds_deployed(&lending_market, &clock).floor(), 400_000); // No change
+    assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 400_000); // No change
     assert_eq(bank_b.funds_available().value(), 100_000); // No change
 
     let swap_result = pool.cpmm_swap(
@@ -502,8 +514,8 @@ fun test_swap_with_lending_within_utilization_range() {
 
     // Burn btoken
     let btoken_b_value = btoken_b.value();
-    let coin_b = bank_b.burn_btokens(
-        &mut lending_market,
+    let coin_b = bank_b.burn_btoken(
+        &lending_market,
         &mut btoken_b,
         btoken_b_value,
         &clock,
@@ -517,10 +529,10 @@ fun test_swap_with_lending_within_utilization_range() {
     assert!(!bank_a.needs_rebalance(&lending_market, &clock).needs_rebalance_());
     assert!(!bank_b.needs_rebalance(&lending_market, &clock).needs_rebalance_());
 
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 400_000);
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 400_000);
     assert_eq(bank_a.funds_available().value(), 150_000);
 
-    assert_eq(bank_b.funds_deployed(&lending_market, &clock).floor(), 400_000);
+    assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 400_000);
     assert_eq(bank_b.funds_available().value(), 100_000 - coin_b.value());
 
     // Confirm that rebalance is no-op
@@ -539,10 +551,10 @@ fun test_swap_with_lending_within_utilization_range() {
     assert!(!bank_a.needs_rebalance(&lending_market, &clock).needs_rebalance_());
     assert!(!bank_b.needs_rebalance(&lending_market, &clock).needs_rebalance_());
 
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 400_000);
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 400_000);
     assert_eq(bank_a.funds_available().value(), 150_000);
 
-    assert_eq(bank_b.funds_deployed(&lending_market, &clock).floor(), 400_000);
+    assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 400_000);
     assert_eq(bank_b.funds_available().value(), 100_000 - coin_b.value());
 
     destroy(btoken_a);
@@ -604,16 +616,19 @@ fun test_swap_with_lending_beyond_utilization_range() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(500_000, ctx);
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(500_000, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(&mut lending_market, &mut coin_a, 500_000, &clock, ctx);
-    let mut btoken_b = bank_b.mint_btokens(&mut lending_market, &mut coin_b, 500_000, &clock, ctx);
+    let mut btoken_a = bank_a.mint_btoken(&lending_market, &mut coin_a, 500_000, &clock, ctx);
+    let mut btoken_b = bank_b.mint_btoken(&lending_market, &mut coin_b, 500_000, &clock, ctx);
 
     destroy(coin_a);
     destroy(coin_b);
 
     // Test bank effects after minting btokens
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 0); // 500_000 * 0%
+    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 0); // 500_000 * 0%
     assert_eq(bank_a.funds_available().value(), 500_000); // 500_000 * 100%
-    assert_eq(bank_b.funds_deployed(&lending_market, &clock).floor(), 0); // 500_000 * 0%
+
+    let ctoken_ratio = bank_b.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 0); // 500_000 * 0%
     assert_eq(bank_b.funds_available().value(), 500_000); // 500_000 * 100%
 
     let (lp_coins, _) = pool.deposit_liquidity(
@@ -651,10 +666,10 @@ fun test_swap_with_lending_beyond_utilization_range() {
         ctx,
     );
 
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 400_000); // 500_000 * 80%
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 400_000); // 500_000 * 80%
     assert_eq(bank_a.funds_available().value(), 100_000); // 500_000 * 20%
 
-    assert_eq(bank_b.funds_deployed(&lending_market, &clock).floor(), 400_000); // 500_000 * 80%
+    assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 400_000); // 500_000 * 80%
     assert_eq(bank_b.funds_available().value(), 100_000); // 500_000 * 20%
 
     destroy(btoken_a);
@@ -663,15 +678,15 @@ fun test_swap_with_lending_beyond_utilization_range() {
     // Swap
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(200_000, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(&mut lending_market, &mut coin_a, 200_000, &clock, ctx);
+    let mut btoken_a = bank_a.mint_btoken(&lending_market, &mut coin_a, 200_000, &clock, ctx);
     let mut btoken_b = coin::zero(ctx);
 
     destroy(coin_a);
 
     // Test bank effects after minting btokens
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 400_000); // No change
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 400_000); // No change
     assert_eq(bank_a.funds_available().value(), 100_000 + 200_000);
-    assert_eq(bank_b.funds_deployed(&lending_market, &clock).floor(), 400_000); // No change
+    assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 400_000); // No change
     assert_eq(bank_b.funds_available().value(), 100_000); // No change
 
     let swap_result = pool.cpmm_swap(
@@ -698,10 +713,10 @@ fun test_swap_with_lending_beyond_utilization_range() {
     assert!(bank_a.needs_rebalance(&lending_market, &clock).needs_rebalance_(), 1);
     assert!(bank_b.needs_rebalance_after_outflow(&lending_market, btoken_b.value(), &clock), 2);
 
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 400_000);
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 400_000);
     assert_eq(bank_a.funds_available().value(), 300_000);
 
-    assert_eq(bank_b.funds_deployed(&lending_market, &clock).floor(), 400000);
+    assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 400000);
     assert_eq(bank_b.funds_available().value(), 100000);
 
     // Burn btoken
@@ -730,10 +745,10 @@ fun test_swap_with_lending_beyond_utilization_range() {
         ctx,
     );
 
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 560_000);
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 560_000);
     assert_eq(bank_a.funds_available().value(), 140_000);
 
-    assert_eq(bank_b.funds_deployed(&lending_market, &clock).floor(), 286_857); // 286,857.6
+    assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 286_857); // 286,857.6
     assert_eq(bank_b.funds_available().value(), 71_715); // 71,714.4
 
     destroy(btoken_a);
@@ -787,8 +802,8 @@ fun test_deposit_with_lending_all_scenarios() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(100_000, ctx);
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(100_000, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(&mut lending_market, &mut coin_a, 100_000, &clock, ctx);
-    let mut btoken_b = bank_b.mint_btokens(&mut lending_market, &mut coin_b, 100_000, &clock, ctx);
+    let mut btoken_a = bank_a.mint_btoken(&lending_market, &mut coin_a, 100_000, &clock, ctx);
+    let mut btoken_b = bank_b.mint_btoken(&lending_market, &mut coin_b, 100_000, &clock, ctx);
 
     destroy(coin_a);
     destroy(coin_b);
@@ -810,7 +825,8 @@ fun test_deposit_with_lending_all_scenarios() {
     assert_eq(pool.trading_data().pool_fees_a(), 0);
     assert_eq(pool.trading_data().pool_fees_b(), 0);
 
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 0);
+    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 0);
     assert_eq(bank_a.funds_available().value(), 100_000);
     assert_eq(bank_b.funds_available().value(), 100_000);
 
@@ -826,11 +842,13 @@ fun test_deposit_with_lending_all_scenarios() {
         ctx,
     );
 
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 80_000); // 100_000 * 80%
+    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let funds_deployed_a = bank_a.funds_deployed(some(ctoken_ratio)).floor();
+    assert_eq(funds_deployed_a, 80_000); // 100_000 * 80%
     assert_eq(bank_a.funds_available().value(), 20_000); // 500_000 * 20%
     assert_eq(bank_b.funds_available().value(), 100_000);
 
-    assert_eq(bank_a.effective_utilisation_bps(&lending_market, &clock), 8000); // 80% target liquidity
+    assert_eq(bank_a.effective_utilisation_bps(funds_deployed_a), 8000); // 80% target liquidity
 
     destroy(btoken_a);
     destroy(btoken_b);
@@ -840,8 +858,8 @@ fun test_deposit_with_lending_all_scenarios() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(5_000, ctx);
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(5_000, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(&mut lending_market, &mut coin_a, 5_000, &clock, ctx);
-    let mut btoken_b = bank_b.mint_btokens(&mut lending_market, &mut coin_b, 5_000, &clock, ctx);
+    let mut btoken_a = bank_a.mint_btoken(&lending_market, &mut coin_a, 5_000, &clock, ctx);
+    let mut btoken_b = bank_b.mint_btoken(&lending_market, &mut coin_b, 5_000, &clock, ctx);
 
     destroy(coin_a);
     destroy(coin_b);
@@ -864,16 +882,19 @@ fun test_deposit_with_lending_all_scenarios() {
     // No need to rebalancing
     assert!(!bank_a.needs_rebalance(&lending_market, &clock).needs_rebalance_());
 
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 80_000); // 100_000 * 80%
+    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let funds_deployed_a = bank_a.funds_deployed(some(ctoken_ratio)).floor();
+
+    assert_eq(funds_deployed_a, 80_000); // 100_000 * 80%
     assert_eq(bank_a.funds_available().value(), 25_000); // 100_000 * 20% + 5_000
     assert_eq(bank_b.funds_available().value(), 105_000);
 
     assert!(
-        bank_a.effective_utilisation_bps(&lending_market, &clock) < bank_a.target_utilisation_bps(),
+        bank_a.effective_utilisation_bps(funds_deployed_a) < bank_a.target_utilisation_bps(),
         0,
     );
     assert!(
-        bank_a.effective_utilisation_bps(&lending_market, &clock) > bank_a.target_utilisation_bps() -  bank_a.utilisation_buffer_bps(),
+        bank_a.effective_utilisation_bps(funds_deployed_a) > bank_a.target_utilisation_bps() -  bank_a.utilisation_buffer_bps(),
         0,
     );
 
@@ -885,15 +906,15 @@ fun test_deposit_with_lending_all_scenarios() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(5_000_000, ctx);
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(5_000_000, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(
-        &mut lending_market,
+    let mut btoken_a = bank_a.mint_btoken(
+        &lending_market,
         &mut coin_a,
         5_000_000,
         &clock,
         ctx,
     );
-    let mut btoken_b = bank_b.mint_btokens(
-        &mut lending_market,
+    let mut btoken_b = bank_b.mint_btoken(
+        &lending_market,
         &mut coin_b,
         5_000_000,
         &clock,
@@ -926,11 +947,14 @@ fun test_deposit_with_lending_all_scenarios() {
     assert_eq(reserve_b, 5_105_000);
     assert_eq(lp_coins.value(), 5_000_000); // newly minted lp tokens
 
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 4_084_000); // 5_105_000 * 80%
+    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let funds_deployed_a = bank_a.funds_deployed(some(ctoken_ratio)).floor();
+
+    assert_eq(funds_deployed_a, 4_084_000); // 5_105_000 * 80%
     assert_eq(bank_a.funds_available().value(), 1_021_000); // 5_125_000 * 20%
     assert_eq(bank_b.funds_available().value(), 5_105_000);
 
-    assert_eq(bank_a.effective_utilisation_bps(&lending_market, &clock), 8000); // 80% target liquidity
+    assert_eq(bank_a.effective_utilisation_bps(funds_deployed_a), 8000); // 80% target liquidity
 
     destroy(btoken_a);
     destroy(btoken_b);
@@ -984,15 +1008,15 @@ fun test_deposit_with_lending_proptest() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(100_000_000_00_000, ctx);
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(100_000_000_00_000, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(
-        &mut lending_market,
+    let mut btoken_a = bank_a.mint_btoken(
+        &lending_market,
         &mut coin_a,
         100_000_000_00_000,
         &clock,
         ctx,
     );
-    let mut btoken_b = bank_b.mint_btokens(
-        &mut lending_market,
+    let mut btoken_b = bank_b.mint_btoken(
+        &lending_market,
         &mut coin_b,
         100_000_000_00_000,
         &clock,
@@ -1038,15 +1062,15 @@ fun test_deposit_with_lending_proptest() {
         let mut coin_a = coin::mint_for_testing<TEST_USDC>(amount_in, ctx);
         let mut coin_b = coin::mint_for_testing<TEST_SUI>(amount_in, ctx);
 
-        let mut btoken_a = bank_a.mint_btokens(
-            &mut lending_market,
+        let mut btoken_a = bank_a.mint_btoken(
+            &lending_market,
             &mut coin_a,
             amount_in,
             &clock,
             ctx,
         );
-        let mut btoken_b = bank_b.mint_btokens(
-            &mut lending_market,
+        let mut btoken_b = bank_b.mint_btoken(
+            &lending_market,
             &mut coin_b,
             amount_in,
             &clock,
@@ -1076,8 +1100,11 @@ fun test_deposit_with_lending_proptest() {
             ctx,
         );
 
+        let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+        let funds_deployed_a = bank_a.funds_deployed(some(ctoken_ratio)).floor();
+
         assert!(
-            bank_a.effective_utilisation_bps(&lending_market, &clock).max(8000) - bank_a.effective_utilisation_bps(&lending_market, &clock).min(8000) <= 1,
+            bank_a.effective_utilisation_bps(funds_deployed_a).max(8000) - bank_a.effective_utilisation_bps(funds_deployed_a).min(8000) <= 1,
         ); // 80% target liquidity (with 0.001% deviation from rounding err)
 
         destroy(btoken_a);
@@ -1135,8 +1162,8 @@ fun test_lend_redeem_with_lending_within_utilization() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(100_000, ctx);
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(100_000, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(&mut lending_market, &mut coin_a, 100_000, &clock, ctx);
-    let mut btoken_b = bank_b.mint_btokens(&mut lending_market, &mut coin_b, 100_000, &clock, ctx);
+    let mut btoken_a = bank_a.mint_btoken(&lending_market, &mut coin_a, 100_000, &clock, ctx);
+    let mut btoken_b = bank_b.mint_btoken(&lending_market, &mut coin_b, 100_000, &clock, ctx);
 
     destroy(coin_a);
     destroy(coin_b);
@@ -1169,11 +1196,14 @@ fun test_lend_redeem_with_lending_within_utilization() {
     assert_eq(pool.trading_data().pool_fees_a(), 0);
     assert_eq(pool.trading_data().pool_fees_b(), 0);
 
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 80_000); // 100_000 * 80%
+    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let funds_deployed_a = bank_a.funds_deployed(some(ctoken_ratio)).floor();
+
+    assert_eq(funds_deployed_a, 80_000); // 100_000 * 80%
     assert_eq(bank_a.funds_available().value(), 20_000); // 100_000 * 20%
     assert_eq(bank_b.funds_available().value(), 100_000);
 
-    assert_eq(bank_a.effective_utilisation_bps(&lending_market, &clock), 8000); // 80% target liquidity
+    assert_eq(bank_a.effective_utilisation_bps(funds_deployed_a), 8000); // 80% target liquidity
 
     destroy(btoken_a);
     destroy(btoken_b);
@@ -1187,16 +1217,16 @@ fun test_lend_redeem_with_lending_within_utilization() {
     );
 
     let btoken_a_value = btoken_a.value();
-    let coin_a = bank_a.burn_btokens(
-        &mut lending_market,
+    let coin_a = bank_a.burn_btoken(
+        &lending_market,
         &mut btoken_a,
         btoken_a_value,
         &clock,
         ctx,
     );
     let btoken_b_value = btoken_b.value();
-    let coin_b = bank_b.burn_btokens(
-        &mut lending_market,
+    let coin_b = bank_b.burn_btoken(
+        &lending_market,
         &mut btoken_b,
         btoken_b_value,
         &clock,
@@ -1217,16 +1247,19 @@ fun test_lend_redeem_with_lending_within_utilization() {
     assert_eq(reserve_b, 100_000 - 100);
     assert_eq(lp_coins.value(), 100_000 - 100 - 1000); // extra 1000 is minimum_liquidity
 
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 80_000); // amount lent does not change
+    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let funds_deployed_a = bank_a.funds_deployed(some(ctoken_ratio)).floor();
+
+    assert_eq(funds_deployed_a, 80_000); // amount lent does not change
     assert_eq(bank_a.funds_available().value(), 19_900); // 100_000 * 20% - 100
     assert_eq(bank_b.funds_available().value(), 100_000 - 100);
 
     assert!(
-        bank_a.effective_utilisation_bps(&lending_market, &clock) > bank_a.target_utilisation_bps(),
+        bank_a.effective_utilisation_bps(funds_deployed_a) > bank_a.target_utilisation_bps(),
         0,
     );
     assert!(
-        bank_a.effective_utilisation_bps(&lending_market, &clock) < bank_a.target_utilisation_bps() + bank_a.utilisation_buffer_bps(),
+        bank_a.effective_utilisation_bps(funds_deployed_a) < bank_a.target_utilisation_bps() + bank_a.utilisation_buffer_bps(),
         0,
     );
 
@@ -1288,8 +1321,8 @@ fun test_lend_amm_swap_small_swap_scenario_no_rebalance() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(100_000, ctx);
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(100_000, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(&mut lending_market, &mut coin_a, 100_000, &clock, ctx);
-    let mut btoken_b = bank_b.mint_btokens(&mut lending_market, &mut coin_b, 100_000, &clock, ctx);
+    let mut btoken_a = bank_a.mint_btoken(&lending_market, &mut coin_a, 100_000, &clock, ctx);
+    let mut btoken_b = bank_b.mint_btoken(&lending_market, &mut coin_b, 100_000, &clock, ctx);
 
     destroy(coin_a);
     destroy(coin_b);
@@ -1321,7 +1354,7 @@ fun test_lend_amm_swap_small_swap_scenario_no_rebalance() {
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(10, ctx);
 
     let mut btoken_a = coin::zero(ctx);
-    let mut btoken_b = bank_b.mint_btokens(&mut lending_market, &mut coin_b, 10, &clock, ctx);
+    let mut btoken_b = bank_b.mint_btoken(&lending_market, &mut coin_b, 10, &clock, ctx);
 
     destroy(coin_b);
 
@@ -1349,18 +1382,20 @@ fun test_lend_amm_swap_small_swap_scenario_no_rebalance() {
     assert!(!bank_a.needs_rebalance_after_outflow(&lending_market, btoken_a.value(), &clock), 2);
     assert!(!bank_b.needs_rebalance(&lending_market, &clock).needs_rebalance_(), 1);
 
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 80_000);
+    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 80_000);
     assert_eq(bank_a.funds_available().value(), 20_000);
 
-    assert_eq(bank_b.funds_deployed(&lending_market, &clock).floor(), 80_000);
+    let ctoken_ratio = bank_b.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 80_000);
     assert_eq(bank_b.funds_available().value(), 20_000 + 10);
 
     // Burn btoken
     assert_eq(btoken_b.value(), 0);
 
     let btoken_a_value = btoken_a.value();
-    let coin_a = bank_a.burn_btokens(
-        &mut lending_market,
+    let coin_a = bank_a.burn_btoken(
+        &lending_market,
         &mut btoken_a,
         btoken_a_value,
         &clock,
@@ -1385,10 +1420,10 @@ fun test_lend_amm_swap_small_swap_scenario_no_rebalance() {
     );
 
     // Assert rebalancing result - no-op
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 80_000);
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 80_000);
     assert_eq(bank_a.funds_available().value(), 20_000 - 10);
 
-    assert_eq(bank_b.funds_deployed(&lending_market, &clock).floor(), 80_000);
+    assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 80_000);
     assert_eq(bank_b.funds_available().value(), 20_000 + 10);
 
     destroy(coin_a);
@@ -1448,8 +1483,8 @@ fun test_lend_amm_swap_medium_swap_scenario() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(100_000, ctx);
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(100_000, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(&mut lending_market, &mut coin_a, 100_000, &clock, ctx);
-    let mut btoken_b = bank_b.mint_btokens(&mut lending_market, &mut coin_b, 100_000, &clock, ctx);
+    let mut btoken_a = bank_a.mint_btoken(&lending_market, &mut coin_a, 100_000, &clock, ctx);
+    let mut btoken_b = bank_b.mint_btoken(&lending_market, &mut coin_b, 100_000, &clock, ctx);
 
     let (lp_coins, _) = pool.deposit_liquidity(
         &mut btoken_a,
@@ -1480,7 +1515,7 @@ fun test_lend_amm_swap_medium_swap_scenario() {
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(20_000, ctx);
 
     let mut btoken_a = coin::zero(ctx);
-    let mut btoken_b = bank_b.mint_btokens(&mut lending_market, &mut coin_b, 20_000, &clock, ctx);
+    let mut btoken_b = bank_b.mint_btoken(&lending_market, &mut coin_b, 20_000, &clock, ctx);
 
     destroy(coin_b);
 
@@ -1508,10 +1543,12 @@ fun test_lend_amm_swap_medium_swap_scenario() {
     assert!(bank_a.needs_rebalance_after_outflow(&lending_market, btoken_a.value(), &clock), 2);
     assert!(bank_b.needs_rebalance(&lending_market, &clock).needs_rebalance_(), 1);
 
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 80_000);
+    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 80_000);
     assert_eq(bank_a.funds_available().value(), 20_000);
 
-    assert_eq(bank_b.funds_deployed(&lending_market, &clock).floor(), 80_000);
+    let ctoken_ratio = bank_b.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 80_000);
     assert_eq(bank_b.funds_available().value(), 20_000 + 20_000);
 
     // Burn btoken
@@ -1543,10 +1580,12 @@ fun test_lend_amm_swap_medium_swap_scenario() {
     );
 
     // Assert rebalancing result
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 64_000);
+    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 64_000);
     assert_eq(bank_a.funds_available().value(), 16_000);
 
-    assert_eq(bank_b.funds_deployed(&lending_market, &clock).floor(), 96_000);
+    let ctoken_ratio = bank_b.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 96_000);
     assert_eq(bank_b.funds_available().value(), 24_000);
 
     destroy(coin_a);
@@ -1606,8 +1645,8 @@ fun test_lend_amm_swap_large_swap_scenario() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(100_000, ctx);
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(100_000, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(&mut lending_market, &mut coin_a, 100_000, &clock, ctx);
-    let mut btoken_b = bank_b.mint_btokens(&mut lending_market, &mut coin_b, 100_000, &clock, ctx);
+    let mut btoken_a = bank_a.mint_btoken(&lending_market, &mut coin_a, 100_000, &clock, ctx);
+    let mut btoken_b = bank_b.mint_btoken(&lending_market, &mut coin_b, 100_000, &clock, ctx);
 
     destroy(coin_a);
     destroy(coin_b);
@@ -1639,7 +1678,7 @@ fun test_lend_amm_swap_large_swap_scenario() {
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(30_000, ctx);
 
     let mut btoken_a = coin::zero(ctx);
-    let mut btoken_b = bank_b.mint_btokens(&mut lending_market, &mut coin_b, 30_000, &clock, ctx);
+    let mut btoken_b = bank_b.mint_btoken(&lending_market, &mut coin_b, 30_000, &clock, ctx);
 
     destroy(coin_b);
 
@@ -1667,10 +1706,12 @@ fun test_lend_amm_swap_large_swap_scenario() {
     assert!(bank_a.needs_rebalance_after_outflow(&lending_market, btoken_a.value(), &clock), 2);
     assert!(bank_b.needs_rebalance(&lending_market, &clock).needs_rebalance_(), 1);
 
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 80_000);
+    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 80_000);
     assert_eq(bank_a.funds_available().value(), 20_000);
 
-    assert_eq(bank_b.funds_deployed(&lending_market, &clock).floor(), 80_000);
+    let ctoken_ratio = bank_b.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 80_000);
     assert_eq(bank_b.funds_available().value(), 20_000 + 30_000);
 
     // Burn btoken
@@ -1702,10 +1743,12 @@ fun test_lend_amm_swap_large_swap_scenario() {
     );
 
     // Assert rebalancing result
-    assert_eq(bank_a.funds_deployed(&lending_market, &clock).floor(), 56_000);
+    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 56_000);
     assert_eq(bank_a.funds_available().value(), 14_000);
 
-    assert_eq(bank_b.funds_deployed(&lending_market, &clock).floor(), 104_000);
+    let ctoken_ratio = bank_b.ctoken_ratio_unsafe(&lending_market, &clock);
+    assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 104_000);
     assert_eq(bank_b.funds_available().value(), 26_000);
 
     destroy(coin_a);
@@ -1761,9 +1804,11 @@ public fun test_no_op_below_min_deploy_amount() {
         ctx(&mut scenario),
     );
 
+    let ctoken_ratio = bank_sui.ctoken_ratio_unsafe(&lending_market, &clock);
+    let funds_deployed = bank_sui.funds_deployed(some(ctoken_ratio)).floor();
+
     let effective_utilisation_bps_before = bank_sui.effective_utilisation_bps(
-        &lending_market,
-        &clock,
+        funds_deployed
     );
 
     bank_sui.rebalance(
@@ -1772,9 +1817,11 @@ public fun test_no_op_below_min_deploy_amount() {
         ctx(&mut scenario),
     );
 
+    let ctoken_ratio = bank_sui.ctoken_ratio_unsafe(&lending_market, &clock);
+    let funds_deployed = bank_sui.funds_deployed(some(ctoken_ratio)).floor();
+
     let effective_utilisation_bps_after = bank_sui.effective_utilisation_bps(
-        &lending_market,
-        &clock,
+        funds_deployed
     );
 
     assert!(effective_utilisation_bps_before == effective_utilisation_bps_after, 0);
@@ -1826,15 +1873,15 @@ public fun test_interest_distribution_one_lp() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(liquidity_amount, ctx);
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(liquidity_amount, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(
-        &mut lending_market,
+    let mut btoken_a = bank_a.mint_btoken(
+        &lending_market,
         &mut coin_a,
         liquidity_amount,
         &clock,
         ctx,
     );
-    let mut btoken_b = bank_b.mint_btokens(
-        &mut lending_market,
+    let mut btoken_b = bank_b.mint_btoken(
+        &lending_market,
         &mut coin_b,
         liquidity_amount,
         &clock,
@@ -1965,8 +2012,8 @@ public fun test_interest_distribution_one_lp() {
     );
 
     let btoken_a_value = btoken_a.value();
-    let coin_a = bank_a.burn_btokens(
-        &mut lending_market,
+    let coin_a = bank_a.burn_btoken(
+        &lending_market,
         &mut btoken_a,
         btoken_a_value,
         &clock,
@@ -2042,15 +2089,15 @@ public fun test_interest_distribution_multiple_lps() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(liquidity_amount, ctx);
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(liquidity_amount, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(
-        &mut lending_market,
+    let mut btoken_a = bank_a.mint_btoken(
+        &lending_market,
         &mut coin_a,
         liquidity_amount,
         &clock,
         ctx,
     );
-    let mut btoken_b = bank_b.mint_btokens(
-        &mut lending_market,
+    let mut btoken_b = bank_b.mint_btoken(
+        &lending_market,
         &mut coin_b,
         liquidity_amount,
         &clock,
@@ -2075,15 +2122,15 @@ public fun test_interest_distribution_multiple_lps() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(liquidity_amount, ctx);
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(liquidity_amount, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(
-        &mut lending_market,
+    let mut btoken_a = bank_a.mint_btoken(
+        &lending_market,
         &mut coin_a,
         liquidity_amount,
         &clock,
         ctx,
     );
-    let mut btoken_b = bank_b.mint_btokens(
-        &mut lending_market,
+    let mut btoken_b = bank_b.mint_btoken(
+        &lending_market,
         &mut coin_b,
         liquidity_amount,
         &clock,
@@ -2224,8 +2271,8 @@ public fun test_interest_distribution_multiple_lps() {
     let btoken_b1_value = btoken_b1.value();
     let btoken_a2_value = btoken_a2.value();
     let btoken_b2_value = btoken_b2.value();
-    let coin_a1 = bank_a.burn_btokens(
-        &mut lending_market,
+    let coin_a1 = bank_a.burn_btoken(
+        &lending_market,
         &mut btoken_a1,
         btoken_a1_value,
         &clock,
@@ -2238,8 +2285,8 @@ public fun test_interest_distribution_multiple_lps() {
         &clock,
         ctx,
     );
-    let coin_a2 = bank_a.burn_btokens(
-        &mut lending_market,
+    let coin_a2 = bank_a.burn_btoken(
+        &lending_market,
         &mut btoken_a2,
         btoken_a2_value,
         &clock,
@@ -2312,14 +2359,14 @@ fun test_minimum_bank_tokens() {
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(100_000, ctx);
     let mut coin_b = coin::mint_for_testing<TEST_SUI>(100_000, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(&mut lending_market, &mut coin_a, 100_000, &clock, ctx);
-    let mut btoken_b = bank_b.mint_btokens(&mut lending_market, &mut coin_b, 100_000, &clock, ctx);
+    let mut btoken_a = bank_a.mint_btoken(&lending_market, &mut coin_a, 100_000, &clock, ctx);
+    let mut btoken_b = bank_b.mint_btoken(&lending_market, &mut coin_b, 100_000, &clock, ctx);
 
     destroy(coin_a);
     destroy(coin_b);
 
-    let coin_a = bank_a.burn_btokens(&mut lending_market, &mut btoken_a, 100_000, &clock, ctx);
-    let coin_b = bank_b.burn_btokens(&mut lending_market, &mut btoken_b, 99_999, &clock, ctx);
+    let coin_a = bank_a.burn_btoken(&lending_market, &mut btoken_a, 100_000, &clock, ctx);
+    let coin_b = bank_b.burn_btoken(&lending_market, &mut btoken_b, 99_999, &clock, ctx);
 
     assert_eq(coin_a.value(), 99_000);
     assert_eq(coin_b.value(), 99_000);
@@ -2352,7 +2399,7 @@ fun test_supply_below_minimum_bank_tokens() {
         pool,
         mut bank_a,
         mut bank_b,
-        mut lending_market,
+        lending_market,
         lend_cap,
         prices,
         bag,
@@ -2368,11 +2415,11 @@ fun test_supply_below_minimum_bank_tokens() {
     // Deposit funds in bank
     let mut coin_a = coin::mint_for_testing<TEST_USDC>(100, ctx);
 
-    let mut btoken_a = bank_a.mint_btokens(&mut lending_market, &mut coin_a, 100, &clock, ctx);
+    let mut btoken_a = bank_a.mint_btoken(&lending_market, &mut coin_a, 100, &clock, ctx);
 
     destroy(coin_a);
 
-    let coin_a = bank_a.burn_btokens(&mut lending_market, &mut btoken_a, 1, &clock, ctx);
+    let coin_a = bank_a.burn_btoken(&lending_market, &mut btoken_a, 1, &clock, ctx);
 
     destroy(btoken_a);
     destroy(coin_a);

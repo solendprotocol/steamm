@@ -45,8 +45,9 @@ const ELendingAlreadyActive: u64 = 5;
 const ECTokenRatioTooLow: u64 = 6;
 // Lending must be initialized first
 const ELendingNotActive: u64 = 7;
-// Interest must be compounded before operation
-const ECompoundedInterestNotUpdated: u64 = 8;
+// Failed to burn btokens - not enough funds available in the bank
+// call `burn_tokens` instead of `burn_btoken`
+const EUnableToFulfillWithdraw: u64 = 8;
 // Bank has insufficient funds for withdrawal
 const EInsufficientBankFunds: u64 = 9;
 // Input coin balance too low for requested operation
@@ -205,6 +206,50 @@ public fun mint_btoken<P, T, BToken>(
 
     bank.funds_available.join(coin_input.into_balance());
     coin::from_balance(bank.btoken_supply.increase_supply(new_btokens), ctx)
+}
+
+public fun burn_btoken<P, T, BToken>(
+    bank: &mut Bank<P, T, BToken>,
+    lending_market: &LendingMarket<P>,
+    btokens: &mut Coin<BToken>,
+    mut btoken_amount: u64,
+    clock: &Clock,
+    ctx: &mut TxContext,
+): Coin<T> {
+    bank.version.assert_version_and_upgrade(CURRENT_VERSION);
+
+    if (btoken_amount == 0) {
+        return coin::zero(ctx)
+    };
+    
+    assert!(btokens.value() != 0, EEmptyBToken);
+    assert!(btokens.value() >= btoken_amount, EInvalidBtokenBalance);
+
+    let remaining_tokens = bank.btoken_supply.supply_value() - btoken_amount;
+    if (remaining_tokens < MINIMUM_LIQUIDITY) {
+        let delta = MINIMUM_LIQUIDITY - remaining_tokens;
+        btoken_amount = btoken_amount - delta
+    };
+
+    assert!(btoken_amount > 0, ENoBTokensToBurn);
+
+    let btoken_input = btokens.split(btoken_amount, ctx);
+    let tokens_to_withdraw = bank.from_btokens(lending_market, btoken_amount, clock);
+
+    bank.btoken_supply.decrease_supply(btoken_input.into_balance());
+
+    assert!(tokens_to_withdraw > 0, ENoTokensToWithdraw);
+    assert!(bank.funds_available.value() > tokens_to_withdraw, EUnableToFulfillWithdraw);
+
+    emit_event(BurnBTokenEvent {
+        user: ctx.sender(),
+        bank_id: object::id(bank),
+        lending_market_id: object::id(lending_market),
+        withdrawn_amount: tokens_to_withdraw,
+        burned_amount: btoken_amount,
+    });
+
+    coin::from_balance(bank.funds_available.split(tokens_to_withdraw), ctx)
 }
 
 /// Mints bank tokens (BTokens) in exchange for deposited coins. The amount of BTokens minted
@@ -425,10 +470,12 @@ public fun to_btokens<P, T, BToken>(
     amount: u64,
     clock: &Clock,
 ): u64 {
-    let ctoken_ratio = bank.ctoken_ratio_unsafe(lending_market, clock);
-    let (total_funds, btoken_supply) = bank.btoken_ratio(some(ctoken_ratio));
-    // Divides by btoken ratio
-    decimal::from(amount).mul(btoken_supply).div(total_funds).floor()
+    if (bank.lending.is_some()) {
+        let ctoken_ratio = bank.ctoken_ratio_unsafe(lending_market, clock);
+        let (total_funds, btoken_supply) = bank.btoken_ratio(some(ctoken_ratio));
+        // Divides by btoken ratio
+        decimal::from(amount).mul(btoken_supply).div(total_funds).floor()
+    } else { amount }
 }
 
 public fun from_btokens<P, T, BToken>(
@@ -437,10 +484,12 @@ public fun from_btokens<P, T, BToken>(
     btoken_amount: u64,
     clock: &Clock,
 ): u64 {
-    let ctoken_ratio = bank.ctoken_ratio_unsafe(lending_market, clock);
-    let (total_funds, btoken_supply) = bank.btoken_ratio(some(ctoken_ratio));
-    // Multiplies by btoken ratio
-    decimal::from(btoken_amount).mul(total_funds).div(btoken_supply).floor()
+    if (bank.lending.is_some()) {
+        let ctoken_ratio = bank.ctoken_ratio_unsafe(lending_market, clock);
+        let (total_funds, btoken_supply) = bank.btoken_ratio(some(ctoken_ratio));
+        // Multiplies by btoken ratio
+        decimal::from(btoken_amount).mul(total_funds).div(btoken_supply).floor()
+    } else { btoken_amount }
 }
 
 // ====== Admin Functions =====
@@ -687,7 +736,7 @@ fun recall<P, T, BToken>(
     });
 }
 
-fun ctoken_ratio_unsafe<P, T, BToken>(
+public(package) fun ctoken_ratio_unsafe<P, T, BToken>(
     bank: &Bank<P, T, BToken>,
     lending_market: &LendingMarket<P>,
     clock: &Clock,
