@@ -1,15 +1,14 @@
-/// Oracle AMM Hook implementation
+/// Oracle AMM Quoter implementation
 module steamm::omm {
-    use sui::coin::Coin;
+    use sui::coin::{Coin, CoinMetadata, TreasuryCap};
     use sui::clock::{Self, Clock};
     use steamm::{
         global_admin::GlobalAdmin,
         registry::{Registry},
         math::safe_mul_div_up,
         quote::SwapQuote,
-        bank::BToken,
         cpmm,
-        pool::{Self, Pool, PoolCap, SwapResult, Intent},
+        pool::{Self, Pool, SwapResult},
         version::{Self, Version},
     };
     use suilend::{
@@ -47,7 +46,7 @@ module steamm::omm {
 
     /// Oracle AMM specific state. We do not store the invariant,
     /// instead we compute it at runtime.
-    public struct OracleQuoter<phantom W> has store {
+    public struct OracleQuoter has store {
         version: Version,
         // Object containing the price information of `A`
         price_info_a: PriceInfo,
@@ -119,8 +118,7 @@ module steamm::omm {
     ///
     /// This function will panic if `swap_fee_bps` is greater than or equal to
     /// `SWAP_FEE_DENOMINATOR`
-    public fun new<A, B, W: drop, P>(
-        _witness: W,
+    public fun new<A, B, LpType: drop>(
         registry: &mut Registry,
         swap_fee_bps: u64,
         price_feed_a: &PriceInfoObject,
@@ -130,14 +128,18 @@ module steamm::omm {
         fee_control_bps: u64,
         reduction_factor_bps: u64,
         max_vol_accumulated_bps: u64,
+        meta_a: &CoinMetadata<A>,
+        meta_b: &CoinMetadata<B>,
+        meta_lp: &mut CoinMetadata<LpType>,
+        lp_treasury: TreasuryCap<LpType>,
         clock: &Clock,
         ctx: &mut TxContext,
-    ): (Pool<A, B, OracleQuoter<W>, P>, PoolCap<A, B, OracleQuoter<W>, P>) {
+    ): Pool<A, B, OracleQuoter, LpType> {
         let price_info_a = from_price_feed(price_feed_a, clock);
         let price_info_b = from_price_feed(price_feed_b, clock);
         let reference_price = new_instant_price_oracle_(&price_info_a, &price_info_b);
         
-        let inner = OracleQuoter<W> {
+        let quoter = OracleQuoter {
             version: version::new(CURRENT_VERSION),
             price_info_a,
             price_info_b,
@@ -154,65 +156,60 @@ module steamm::omm {
             fee_control: decimal::from(fee_control_bps).div(decimal::from(BPS)),
         };
 
-        let (pool, pool_cap) = pool::new<A, B, OracleQuoter<W>, P>(
+        let pool = pool::new<A, B, OracleQuoter, LpType>(
             registry,
             swap_fee_bps,
-            inner,
+            quoter,
+            meta_a,
+            meta_b,
+            meta_lp,
+            lp_treasury,
             ctx,
         );
 
-        (pool, pool_cap)
+        pool
     }
     
-    public fun intent_swap<A, B, W: drop, P>(
-        self: &mut Pool<A, B, OracleQuoter<W>, P>,
-        amount_in: u64,
+    public fun swap<A, B, LpType: drop>(
+        pool: &mut Pool<A, B, OracleQuoter, LpType>,
+        coin_a: &mut Coin<A>,
+        coin_b: &mut Coin<B>,
         a2b: bool,
+        amount_in: u64,
+        min_amount_out: u64,
         clock: &Clock,
-    ): Intent<A, B, OracleQuoter<W>, P> {
-        self.inner_mut().version.assert_version_and_upgrade(CURRENT_VERSION);
+        ctx: &mut TxContext,
+    ): SwapResult {
+        pool.quoter_mut().version.assert_version_and_upgrade(CURRENT_VERSION);
 
         let (quote, reference_price, reference_vol, vol_accumulator, last_update_ms) = quote_swap_impl(
-            self, amount_in, a2b, clock.timestamp_ms()
+            pool, amount_in, a2b, clock.timestamp_ms()
         );
         
         // Update parameters
-        self.inner_mut().ema.accumulator = vol_accumulator;
-        self.inner_mut().reference_price = reference_price;
-        self.inner_mut().ema.reference_val = reference_vol;
-        self.inner_mut().last_update_ms = last_update_ms;
+        pool.quoter_mut().ema.accumulator = vol_accumulator;
+        pool.quoter_mut().reference_price = reference_price;
+        pool.quoter_mut().ema.reference_val = reference_vol;
+        pool.quoter_mut().last_update_ms = last_update_ms;
 
-        quote.as_intent(self)
-    }
+        let k0 = cpmm::k_external(pool, 0);
 
-    public fun execute_swap<A, B, W: drop, P>(
-        self: &mut Pool<A, B, OracleQuoter<W>, P>,
-        intent: Intent<A, B, OracleQuoter<W>, P>,
-        coin_a: &mut Coin<BToken<P, A>>,
-        coin_b: &mut Coin<BToken<P, B>>,
-        min_amount_out: u64,
-        ctx: &mut TxContext,
-    ): SwapResult {
-        self.inner_mut().version.assert_version_and_upgrade(CURRENT_VERSION);
-
-        let k0 = cpmm::k(self, 0);
-
-        let response = self.swap(
+        let response = pool.swap(
             coin_a,
             coin_b,
-            intent,
+            quote,
             min_amount_out,
             ctx,
         );
 
         // Recompute invariant
-        cpmm::check_invariance(self, k0, 0);
-
+        cpmm::check_invariance(pool, k0, 0);
+        
         response
     }
 
-    public(package) fun quote_swap_impl<A, B, W: drop, P>(
-        self: &Pool<A, B, OracleQuoter<W>, P>,
+    public(package) fun quote_swap_impl<A, B, LpType: drop>(
+        self: &Pool<A, B, OracleQuoter, LpType>,
         amount_in: u64,
         a2b: bool,
         current_ms: u64,
@@ -240,15 +237,15 @@ module steamm::omm {
     /// - Reference volatility
     /// - Accumulated volatility
     /// - Time of last reference update (in ms)
-    fun quote_swap_<A, B, W: drop, P>(
-        self: &Pool<A, B, OracleQuoter<W>, P>,
+    fun quote_swap_<A, B, LpType: drop>(
+        self: &Pool<A, B, OracleQuoter, LpType>,
         amount_in: u64,
         a2b: bool,
         // The current timestamp in milliseconds.
         current_ms: u64,
     ): (SwapQuote, Decimal, Decimal, Decimal, u64) {
         self.quoter().assert_price_is_fresh_(current_ms);
-        let (reserve_a, reserve_b) = self.btoken_amounts();
+        let (reserve_a, reserve_b) = self.balance_amounts();
 
         // Update price and vol reference depending on timespan ellapsed
         let (reference_price, reference_vol, last_update_ms) = get_updated_references(self, current_ms);
@@ -293,8 +290,8 @@ module steamm::omm {
         vol_accumulator.pow(2).mul(fee_control).div(decimal::from(100))
     }
     
-    public fun quote_swap<A, B, W: drop, P>(
-        self: &Pool<A, B, OracleQuoter<W>, P>,
+    public fun quote_swap<A, B, LpType: drop>(
+        self: &Pool<A, B, OracleQuoter, LpType>,
         amount_in: u64,
         a2b: bool,
         clock: &Clock,
@@ -304,11 +301,11 @@ module steamm::omm {
         quote
     }
 
-    public fun new_instant_price_internal<A, B, W: drop, P>(
-        self: &Pool<A, B, OracleQuoter<W>, P>,
+    public fun new_instant_price_internal<A, B, LpType: drop>(
+        self: &Pool<A, B, OracleQuoter, LpType>,
         quote: &SwapQuote
     ): Decimal {
-        let (reserve_a, reserve_b) = self.btoken_amounts();
+        let (reserve_a, reserve_b) = self.balance_amounts();
 
         let (a, b) = if (quote.a2b()) {
             (
@@ -325,16 +322,16 @@ module steamm::omm {
         decimal::from(a).div(decimal::from(b))
     }
     
-    public fun instant_price_internal<A, B, W: drop, P>(
-        self: &Pool<A, B, OracleQuoter<W>, P>,
+    public fun instant_price_internal<A, B, LpType: drop>(
+        self: &Pool<A, B, OracleQuoter, LpType>,
     ): Decimal {
-        let (reserve_a, reserve_b) = self.btoken_amounts();
+        let (reserve_a, reserve_b) = self.balance_amounts();
 
         decimal::from(reserve_a).div(decimal::from(reserve_b))
     }
     
-    public fun new_instant_price_oracle<A, B, W: drop, P>(
-        self: &Pool<A, B, OracleQuoter<W>, P>
+    public fun new_instant_price_oracle<A, B, LpType: drop>(
+        self: &Pool<A, B, OracleQuoter, LpType>
     ): Decimal {
         new_instant_price_oracle_(
             &self.quoter().price_info_a,
@@ -357,50 +354,37 @@ module steamm::omm {
 
     /// Cache the price from pyth onto the state object. this needs to be done
     /// before swapping
-    public fun refresh_reserve_prices<A, B, W: drop, P>(
-        self: &mut Pool<A, B, OracleQuoter<W>, P>,
+    public fun refresh_reserve_prices<A, B, LpType: drop>(
+        self: &mut Pool<A, B, OracleQuoter, LpType>,
         price_feed_a: &PriceInfoObject,
         price_feed_b: &PriceInfoObject,
         clock: &Clock,
     ) {
-        self.inner_mut().version.assert_version_and_upgrade(CURRENT_VERSION);
+        self.quoter_mut().version.assert_version_and_upgrade(CURRENT_VERSION);
 
-        self.inner_mut().price_info_a.update_price(price_feed_a, clock);
-        self.inner_mut().price_info_b.update_price(price_feed_b, clock);
+        self.quoter_mut().price_info_a.update_price(price_feed_a, clock);
+        self.quoter_mut().price_info_b.update_price(price_feed_b, clock);
     }
 
     // ===== Versioning =====
     
-    entry fun migrate<A, B, W, P>(
-        self: &mut Pool<A, B, OracleQuoter<W>, P>,
-        _cap: &PoolCap<A, B, OracleQuoter<W>, P>,
-    ) {
-        migrate_(self);
-    }
-    
-    entry fun migrate_as_global_admin<A, B, W, P>(
-        self: &mut Pool<A, B, OracleQuoter<W>, P>,
+    entry fun migrate<A, B, LpType: drop>(
+        self: &mut Pool<A, B, OracleQuoter, LpType>,
         _admin: &GlobalAdmin,
     ) {
-        migrate_(self);
-    }
-
-    fun migrate_<A, B, W, P>(
-        self: &mut Pool<A, B, OracleQuoter<W>, P>,
-    ) {
-        self.inner_mut().version.migrate_(CURRENT_VERSION);
+        self.quoter_mut().version.migrate_(CURRENT_VERSION);
     }
 
     // ===== Getter Functions =====
 
-    public fun price_info_a<W: drop>(self: &OracleQuoter<W>): &PriceInfo { &self.price_info_a }
-    public fun price_info_b<W: drop>(self: &OracleQuoter<W>): &PriceInfo { &self.price_info_b }
-    public fun reference_price<W: drop>(self: &OracleQuoter<W>): Decimal { self.reference_price }
-    public fun last_update_ms<W: drop>(self: &OracleQuoter<W>): u64 { self.last_update_ms }
-    public fun filter_period<W: drop>(self: &OracleQuoter<W>): u64 { self.filter_period }
-    public fun decay_period<W: drop>(self: &OracleQuoter<W>): u64 { self.decay_period }
-    public fun fee_control<W: drop>(self: &OracleQuoter<W>): Decimal { self.fee_control }
-    public fun ema<W: drop>(self: &OracleQuoter<W>): &Ema { &self.ema }
+    public fun price_info_a(self: &OracleQuoter): &PriceInfo { &self.price_info_a }
+    public fun price_info_b(self: &OracleQuoter): &PriceInfo { &self.price_info_b }
+    public fun reference_price(self: &OracleQuoter): Decimal { self.reference_price }
+    public fun last_update_ms(self: &OracleQuoter): u64 { self.last_update_ms }
+    public fun filter_period(self: &OracleQuoter): u64 { self.filter_period }
+    public fun decay_period(self: &OracleQuoter): u64 { self.decay_period }
+    public fun fee_control(self: &OracleQuoter): Decimal { self.fee_control }
+    public fun ema(self: &OracleQuoter): &Ema { &self.ema }
     public fun reference_val(self: &Ema): Decimal { self.reference_val }
     public fun accumulator(self: &Ema): Decimal { self.accumulator }
     public fun reduction_factor(self: &Ema): Decimal { self.reduction_factor }
@@ -409,15 +393,15 @@ module steamm::omm {
     // ===== Assert Functions =====
 
     // make sure we are using the latest published price on sui
-    public fun assert_price_is_fresh<W: drop>(
-        self: &OracleQuoter<W>,
+    public fun assert_price_is_fresh(
+        self: &OracleQuoter,
         clock: &Clock,
     ) {
         assert_price_is_fresh_(self, clock.timestamp_ms());
     }
     
-    fun assert_price_is_fresh_<W: drop>(
-        self: &OracleQuoter<W>,
+    fun assert_price_is_fresh_(
+        self: &OracleQuoter,
         current_ms: u64,
     ) {
         let cur_time_s = current_ms / 1000;
@@ -456,8 +440,8 @@ module steamm::omm {
     /// - Reference price
     /// - Reference volatilite
     /// - Last update in miliseconds
-    fun get_updated_references<A, B, W: drop, P>(
-        self: &Pool<A, B, OracleQuoter<W>, P>,
+    fun get_updated_references<A, B, LpType: drop>(
+        self: &Pool<A, B, OracleQuoter, LpType>,
         current_ms: u64,
     ): (Decimal, Decimal, u64) {
         let state = self.quoter();
@@ -494,8 +478,8 @@ module steamm::omm {
     ///
     /// # Returns
     /// - The updated volatility accumulator value
-    fun new_volatility_accumulator<W: drop>(
-        self: &OracleQuoter<W>,
+    fun new_volatility_accumulator(
+        self: &OracleQuoter,
         reference_price: Decimal,
         reference_vol: Decimal,
         new_price_internal: Decimal,
@@ -586,8 +570,8 @@ module steamm::omm {
 
 
     #[test_only]
-    public(package) fun quote_swap_for_testing<A, B, W: drop, P>(
-        self: &Pool<A, B, OracleQuoter<W>, P>,
+    public(package) fun quote_swap_for_testing<A, B, LpType: drop>(
+        self: &Pool<A, B, OracleQuoter, LpType>,
         amount_in: u64,
         a2b: bool,
         current_ms: u64,
@@ -602,26 +586,26 @@ module steamm::omm {
     }
     
     #[test_only]
-    public(package) fun set_oracle_price_as_hypothetical_internal_reserves<A, B, W: drop, P>(
-        self: &mut Pool<A, B, OracleQuoter<W>, P>,
+    public(package) fun set_oracle_price_as_hypothetical_internal_reserves<A, B, LpType: drop>(
+        self: &mut Pool<A, B, OracleQuoter, LpType>,
         reserve_a: u64,
         reserve_b: u64,
         clock: &Clock,
     ) {
-        self.inner_mut().price_info_a.price = decimal::from(reserve_a);
-        self.inner_mut().price_info_a.smoothed_price = decimal::from(reserve_a);
-        self.inner_mut().price_info_b.price = decimal::from(reserve_b);
-        self.inner_mut().price_info_b.smoothed_price = decimal::from(reserve_b);
-        self.inner_mut().price_info_b.price_last_update_timestamp_s = clock.timestamp_ms() / 1_000;
-        self.inner_mut().price_info_a.price_last_update_timestamp_s = clock.timestamp_ms() / 1_000;
+        self.quoter_mut().price_info_a.price = decimal::from(reserve_a);
+        self.quoter_mut().price_info_a.smoothed_price = decimal::from(reserve_a);
+        self.quoter_mut().price_info_b.price = decimal::from(reserve_b);
+        self.quoter_mut().price_info_b.smoothed_price = decimal::from(reserve_b);
+        self.quoter_mut().price_info_b.price_last_update_timestamp_s = clock.timestamp_ms() / 1_000;
+        self.quoter_mut().price_info_a.price_last_update_timestamp_s = clock.timestamp_ms() / 1_000;
     }
     
     #[test_only]
-    public(package) fun set_oracle_price_as_internal_for_testing<A, B, W: drop, P>(
-        self: &mut Pool<A, B, OracleQuoter<W>, P>,
+    public(package) fun set_oracle_price_as_internal_for_testing<A, B, LpType: drop>(
+        self: &mut Pool<A, B, OracleQuoter, LpType>,
         clock: &Clock,
     ) {
-        let (reserve_a, reserve_b) = self.btoken_amounts();
+        let (reserve_a, reserve_b) = self.balance_amounts();
         set_oracle_price_as_hypothetical_internal_reserves(self, reserve_a, reserve_b, clock)
     }
     
