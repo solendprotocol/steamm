@@ -2,7 +2,7 @@
 module steamm::bank;
 
 use std::ascii;
-use std::option::none;
+use std::option::{none, some};
 use std::string;
 use std::type_name::{get, TypeName};
 use steamm::bank_math;
@@ -63,6 +63,7 @@ const ENoBTokensToBurn: u64 = 14;
 const ENoTokensToWithdraw: u64 = 15;
 // First deposit must be greater than minimum liquidity
 const EInitialDepositBelowMinimumLiquidity: u64 = 16;
+const ENoCTokenRatioProvided: u64 = 17;
 
 // ===== Structs =====
 
@@ -170,6 +171,40 @@ public fun init_lending<P, T, BToken>(
             reserve_array_index,
             obligation_cap,
         })
+}
+
+public fun mint_btoken<P, T, BToken>(
+    bank: &mut Bank<P, T, BToken>,
+    lending_market: &LendingMarket<P>,
+    coin_t: &mut Coin<T>,
+    coin_amount: u64,
+    clock: &Clock,
+    ctx: &mut TxContext,
+): Coin<BToken> {
+    bank.version.assert_version_and_upgrade(CURRENT_VERSION);
+    
+    if (bank.btoken_supply.supply_value() == 0) {
+        assert!(coin_amount > MINIMUM_LIQUIDITY, EInitialDepositBelowMinimumLiquidity);
+    } else {
+        assert!(coin_amount > 0, EEmptyCoinAmount);
+
+    };
+    
+    assert!(coin_t.value() >= coin_amount, EInsufficientCoinBalance);
+
+    let coin_input = coin_t.split(coin_amount, ctx);
+    let new_btokens = bank.to_btokens(lending_market, coin_amount, clock);
+
+    emit_event(MintBTokenEvent {
+        user: ctx.sender(),
+        bank_id: object::id(bank),
+        lending_market_id: object::id(lending_market),
+        deposited_amount: coin_amount,
+        minted_amount: new_btokens,
+    });
+
+    bank.funds_available.join(coin_input.into_balance());
+    coin::from_balance(bank.btoken_supply.increase_supply(new_btokens), ctx)
 }
 
 /// Mints bank tokens (BTokens) in exchange for deposited coins. The amount of BTokens minted
@@ -332,7 +367,9 @@ public fun rebalance<P, T, BToken>(
         return
     };
 
-    let funds_deployed = bank.funds_deployed(lending_market, clock).floor();
+    let ctoken_ratio = bank.ctoken_ratio_unsafe(lending_market, clock);
+    let funds_deployed = bank.funds_deployed(some(ctoken_ratio)).floor();
+
     let effective_utilisation_bps = bank_math::compute_utilisation_bps(
         bank.funds_available.value(),
         funds_deployed,
@@ -365,6 +402,7 @@ public fun rebalance<P, T, BToken>(
         bank.recall(
             lending_market,
             amount_to_recall,
+            ctoken_ratio,
             clock,
             ctx,
         );
@@ -387,7 +425,8 @@ public fun to_btokens<P, T, BToken>(
     amount: u64,
     clock: &Clock,
 ): u64 {
-    let (total_funds, btoken_supply) = bank.btoken_ratio(lending_market, clock);
+    let ctoken_ratio = bank.ctoken_ratio_unsafe(lending_market, clock);
+    let (total_funds, btoken_supply) = bank.btoken_ratio(some(ctoken_ratio));
     // Divides by btoken ratio
     decimal::from(amount).mul(btoken_supply).div(total_funds).floor()
 }
@@ -398,7 +437,8 @@ public fun from_btokens<P, T, BToken>(
     btoken_amount: u64,
     clock: &Clock,
 ): u64 {
-    let (total_funds, btoken_supply) = bank.btoken_ratio(lending_market, clock);
+    let ctoken_ratio = bank.ctoken_ratio_unsafe(lending_market, clock);
+    let (total_funds, btoken_supply) = bank.btoken_ratio(some(ctoken_ratio));
     // Multiplies by btoken ratio
     decimal::from(btoken_amount).mul(total_funds).div(btoken_supply).floor()
 }
@@ -487,13 +527,15 @@ public(package) fun prepare_for_pending_withdraw<P, T, BToken>(
         return
     };
 
+    let ctoken_ratio = bank.ctoken_ratio_unsafe(lending_market, clock);
+
     let amount_to_recall = {
         let lending = bank.lending.borrow();
 
         bank_math::compute_recall_for_pending_withdraw(
             bank.funds_available.value(),
             withdraw_amount,
-            bank.funds_deployed(lending_market, clock).floor(),
+            bank.funds_deployed(some(ctoken_ratio)).floor(),
             lending.target_utilisation_bps as u64,
             lending.utilisation_buffer_bps as u64,
         )
@@ -502,6 +544,7 @@ public(package) fun prepare_for_pending_withdraw<P, T, BToken>(
     bank.recall(
         lending_market,
         amount_to_recall,
+        ctoken_ratio,
         clock,
         ctx,
     )
@@ -518,10 +561,9 @@ public(package) fun assert_btoken_type<T, BToken>() {
 
 public(package) fun total_funds<P, T, BToken>(
     bank: &Bank<P, T, BToken>,
-    lending_market: &LendingMarket<P>,
-    clock: &Clock,
+    ctoken_ratio: Option<Decimal>
 ): Decimal {
-    let funds_deployed = bank.funds_deployed(lending_market, clock);
+    let funds_deployed = bank.funds_deployed(ctoken_ratio);
     let total_funds = funds_deployed.add(decimal::from(bank.funds_available.value()));
 
     total_funds
@@ -529,22 +571,12 @@ public(package) fun total_funds<P, T, BToken>(
 
 public(package) fun funds_deployed<P, T, BToken>(
     bank: &Bank<P, T, BToken>,
-    lending_market: &LendingMarket<P>,
-    clock: &Clock,
+    ctoken_ratio: Option<Decimal>
 ): Decimal {
     // FundsDeployed =  cTokens * Total Supply of Funds / cToken Supply
     if (bank.lending.is_some()) {
-        let reserve = vector::borrow(lending_market.reserves(), bank.reserve_array_index());
-        let interest_last_update_timestamp_s = reserve.interest_last_update_timestamp_s();
-
-        assert!(
-            interest_last_update_timestamp_s == clock.timestamp_ms() / 1000,
-            ECompoundedInterestNotUpdated,
-        );
-
-        let ctoken_ratio = reserve.ctoken_ratio();
-
-        decimal::from(bank.lending.borrow().ctokens).mul(ctoken_ratio)
+        assert!(ctoken_ratio.is_some(), ENoCTokenRatioProvided);
+        decimal::from(bank.lending.borrow().ctokens).mul(*ctoken_ratio.borrow())
     } else {
         decimal::from(0)
     }
@@ -599,6 +631,7 @@ fun recall<P, T, BToken>(
     bank: &mut Bank<P, T, BToken>,
     lending_market: &mut LendingMarket<P>,
     amount_to_recall: u64,
+    ctoken_ratio: Decimal,
     clock: &Clock,
     ctx: &mut TxContext,
 ) {
@@ -608,8 +641,9 @@ fun recall<P, T, BToken>(
         return
     };
 
+    // TODO: refactor - this can lead to error if bank.min_token_block_size > available amount to recall
     let amount_to_recall = amount_to_recall.max(bank.min_token_block_size);
-    let ctoken_amount = bank.ctoken_amount(lending_market, amount_to_recall);
+    let ctoken_amount = ctoken_amount(amount_to_recall, ctoken_ratio);
 
     let ctokens: Coin<CToken<P, T>> = lending_market.withdraw_ctokens(
         lending.reserve_array_index,
@@ -635,14 +669,13 @@ fun recall<P, T, BToken>(
     lending.ctokens = lending.ctokens - ctoken_amount;
 
     bank.funds_available.join(coin_recalled.into_balance());
+    let ctoken_ratio_after = bank.ctoken_ratio_unsafe(lending_market, clock);
 
-    let reserves = lending_market.reserves();
-    let reserve = reserves.borrow(lending.reserve_array_index);
-    let ctoken_ratio = reserve.ctoken_ratio();
-
+    // TODO: maybe remove? seems redundant
     // Note: the amount of funds deployed is different from the previous assertion
+    let lending = bank.lending.borrow();
     assert!(
-        decimal::from(lending.ctokens).mul(ctoken_ratio).floor() >= bank.funds_deployed(lending_market, clock).floor(),
+        decimal::from(lending.ctokens).mul(ctoken_ratio_after).floor() >= bank.funds_deployed(some(ctoken_ratio_after)).floor(),
         ECTokenRatioTooLow,
     );
 
@@ -654,32 +687,35 @@ fun recall<P, T, BToken>(
     });
 }
 
-// Given how much tokens we want to withdraw from the lending market,
-// how many ctokens do we need to burn
-fun ctoken_amount<P, T, BToken>(
+fun ctoken_ratio_unsafe<P, T, BToken>(
     bank: &Bank<P, T, BToken>,
     lending_market: &LendingMarket<P>,
-    amount: u64,
+    clock: &Clock,
 ): Decimal {
     let reserves = lending_market.reserves();
-    let lending = bank.lending.borrow();
-    let reserve = reserves.borrow(lending.reserve_array_index);
-    let ctoken_ratio = reserve.ctoken_ratio();
+    let reserve = reserves.borrow(bank.lending.borrow().reserve_array_index);
+    reserve.ctoken_ratio_updated(clock)
+}
 
+// Given how much tokens we want to withdraw from the lending market,
+// how many ctokens do we need to burn
+fun ctoken_amount(
+    amount: u64,
+    ctoken_ratio: Decimal,
+): Decimal {
     decimal::from(amount).div(ctoken_ratio)
 }
 
 fun btoken_ratio<P, T, BToken>(
     bank: &Bank<P, T, BToken>,
-    lending_market: &LendingMarket<P>,
-    clock: &Clock,
+    ctoken_ratio: Option<Decimal>
 ): (Decimal, Decimal) {
     // this branch is only used once -- when the bank is
     // first initialized and has zero deposits
     if (bank.btoken_supply.supply_value() == 0) {
         (decimal::from(1), decimal::from(1))
     } else {
-        (total_funds(bank, lending_market, clock), decimal::from(bank.btoken_supply.supply_value()))
+        (bank.total_funds(ctoken_ratio), decimal::from(bank.btoken_supply.supply_value()))
     }
 }
 
@@ -718,8 +754,11 @@ public fun needs_rebalance<P, T, BToken>(
     if (bank.lending.is_none()) {
         return NeedsRebalance { needs_rebalance: false }
     };
+    
+    let ctoken_ratio = bank.ctoken_ratio_unsafe(lending_market, clock);
+    let funds_deployed = bank.funds_deployed(some(ctoken_ratio)).floor();
 
-    let effective_utilisation_bps = bank.effective_utilisation_bps(lending_market, clock);
+    let effective_utilisation_bps = bank.effective_utilisation_bps(funds_deployed);
     let target_utilisation_bps = bank.target_utilisation_bps_unchecked();
     let buffer_bps = bank.utilisation_buffer_bps_unchecked();
 
@@ -734,12 +773,11 @@ public fun lending<P, T, BToken>(bank: &Bank<P, T, BToken>): &Option<Lending<P>>
 
 public(package) fun effective_utilisation_bps<P, T, BToken>(
     bank: &Bank<P, T, BToken>,
-    lending_market: &LendingMarket<P>,
-    clock: &Clock,
+    funds_deployed: u64
 ): u64 {
     bank_math::compute_utilisation_bps(
         bank.funds_available.value(),
-        bank.funds_deployed(lending_market, clock).floor(),
+        funds_deployed,
     )
 }
 
@@ -887,7 +925,8 @@ public fun needs_rebalance_after_inflow<P, T, BToken>(
         return false
     };
 
-    let funds_deployed = bank.funds_deployed(lending_market, clock).floor();
+    let ctoken_ratio = bank.ctoken_ratio_unsafe(lending_market, clock);
+    let funds_deployed = bank.funds_deployed(some(ctoken_ratio)).floor();
 
     let effective_utilisation_bps = bank_math::compute_utilisation_bps(
         bank.funds_available.value() + amount,
@@ -912,7 +951,8 @@ public fun needs_rebalance_after_outflow<P, T, BToken>(
         return false
     };
 
-    let funds_deployed = bank.funds_deployed(lending_market, clock).floor();
+    let ctoken_ratio = bank.ctoken_ratio_unsafe(lending_market, clock);
+    let funds_deployed = bank.funds_deployed(some(ctoken_ratio)).floor();
     let amount = bank.from_btokens(lending_market, btoken_amount, clock);
 
     if (amount > bank.funds_available.value()) {
