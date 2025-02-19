@@ -174,6 +174,29 @@ public fun init_lending<P, T, BToken>(
         })
 }
 
+/// Mints bTokens in exchange for deposited coins. The amount of BTokens minted
+/// is calculated based on the current exchange rate between coins and BTokens, which takes into
+/// account accumulated interest.
+///
+/// # Arguments
+///
+/// * `bank` - The bank to mint BTokens from
+/// * `lending_market` - The lending market where the bank is registered
+/// * `coin_input` - The coin to split funds from
+/// * `coin_amount` - Amount of coins to deposit
+/// * `clock` - Clock for timing
+/// * `ctx` - Transaction context
+///
+/// # Returns
+///
+/// * `Coin<BToken>` - The newly minted BTokens
+///
+/// # Panics
+///
+/// * If the bank version is not current
+/// * If attempting first deposit below minimum liquidity
+/// * If the coin amount is zero for non-first deposit
+/// * If the coin input has insufficient balance
 public fun mint_btoken<P, T, BToken>(
     bank: &mut Bank<P, T, BToken>,
     lending_market: &LendingMarket<P>,
@@ -206,6 +229,28 @@ public fun mint_btoken<P, T, BToken>(
     coin::from_balance(bank.btoken_supply.increase_supply(new_btokens), ctx)
 }
 
+/// Burns bTokens to withdraw the underlying tokens from the bank.
+/// The amount of underlying tokens received depends on the current exchange rate
+/// between BTokens and underlying tokens.
+///
+/// # Arguments
+///
+/// * `bank` - The bank to withdraw from
+/// * `lending_market` - The lending market where the bank is registered
+/// * `btoken` - The BTokens to burn
+/// * `clock` - Clock for timing
+/// * `ctx` - Transaction context
+///
+/// # Returns
+///
+/// * `Coin<T>` - The withdrawn underlying tokens
+///
+/// # Panics
+///
+/// * If the bank version is not current
+/// * If the BToken amount is zero
+/// * If there are insufficient funds in the bank
+/// * If no tokens are available to withdraw after minimum liquidity check
 public fun burn_btoken<P, T, BToken>(
     bank: &mut Bank<P, T, BToken>,
     lending_market: &LendingMarket<P>,
