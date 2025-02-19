@@ -89,6 +89,15 @@ public struct Lending<phantom P> has store {
     obligation_cap: ObligationOwnerCap<P>,
 }
 
+/// A hot potato struct representing an outstanding flash mint that must be repaid.
+/// This struct must be consumed by calling replay_flash_mint before the transaction completes,
+/// otherwise the transaction will fail. This ensures flash mints are always repaid within
+/// the same transaction.
+public struct FlashMintReceipt<phantom P, phantom T, phantom BToken> {
+    input_amount: u64,
+    minted_amount: u64,
+}
+
 // ====== Public Functions =====
 
 /// Creates a new bank and shares it as a shared object on-chain.
@@ -175,11 +184,29 @@ public fun init_lending<P, T, BToken>(
         })
 }
 
-public struct FlashMintReceipt<phantom P, phantom T, phantom BToken> {
-    input_amount: u64,
-    minted_amount: u64,
-}
-
+/// Creates a flash mint BTokens without requiring immediate deposit of underlying tokens.
+/// The minted BTokens must be paired with a flash mint receipt and repaid
+/// with the underlying tokens later.
+/// 
+/// Given that deposits and swaps are subject to slippage, this logic has the benefit that
+/// it allows the user to mint BTokens and return the leftover BToken amounts in the repay phase.
+/// The alternative would require the user to burn back the change, which is more computationally
+/// expensive.
+///
+/// # Arguments
+/// * `bank` - The bank to mint BTokens from
+/// * `lending_market` - The lending market associated with the bank
+/// * `input_amount` - Amount of underlying tokens that will be deposited when replaying
+/// * `clock` - Clock for timing
+/// * `ctx` - Transaction context
+///
+/// # Returns
+/// * `(Coin<BToken>, FlashMintReceipt)` - The newly minted BTokens and a receipt for replaying the mint
+///
+/// # Panics
+/// * If the bank version is not current
+/// * If this is the first deposit and amount is below minimum liquidity
+/// * If the input amount is zero for non-first deposits
 public fun flash_mint_btoken<P, T, BToken>(
     bank: &mut Bank<P, T, BToken>,
     lending_market: &LendingMarket<P>,
@@ -203,6 +230,19 @@ public fun flash_mint_btoken<P, T, BToken>(
     )
 }
 
+/// Completes a flash mint flow by depositing the underlying tokens and recording the mint event.
+/// Must be called with a valid FlashMintReceipt that was obtained from flash_mint_btoken.
+///
+/// # Arguments
+/// * `bank` - The bank where the flash mint was created
+/// * `lending_market` - The lending market associated with the bank
+/// * `coin_input` - The underlying tokens to deposit
+/// * `btoken_change` - Optional BTokens to return if not all minted tokens were used
+/// * `receipt` - The receipt from the flash mint transaction
+/// * `ctx` - Transaction context
+///
+/// # Panics
+/// * If the bank version is not current
 public fun replay_flash_mint<P, T, BToken>(
     bank: &mut Bank<P, T, BToken>,
     lending_market: &LendingMarket<P>,
@@ -263,58 +303,7 @@ public fun mint_btoken<P, T, BToken>(
     );
 
     btoken
-    // bank.version.assert_version_and_upgrade(CURRENT_VERSION);
-    // let coin_amount = coin_input.value();
-    
-    // if (bank.btoken_supply.supply_value() == 0) {
-    //     assert!(coin_amount > MINIMUM_LIQUIDITY, EInitialDepositBelowMinimumLiquidity);
-    // } else {
-    //     assert!(coin_amount > 0, EEmptyCoinAmount);
-    // };
-
-    // let new_btokens = bank.to_btokens(lending_market, coin_amount, clock);
-
-    // emit_event(MintBTokenEvent {
-    //     user: ctx.sender(),
-    //     bank_id: object::id(bank),
-    //     lending_market_id: object::id(lending_market),
-    //     deposited_amount: coin_amount,
-    //     minted_amount: new_btokens,
-    // });
-
-    // bank.funds_available.join(coin_input.into_balance());
-    // coin::from_balance(bank.btoken_supply.increase_supply(new_btokens), ctx)
 }
-
-// public fun mint_btoken<P, T, BToken>(
-//     bank: &mut Bank<P, T, BToken>,
-//     lending_market: &LendingMarket<P>,
-//     coin_input: Coin<T>,
-//     clock: &Clock,
-//     ctx: &mut TxContext,
-// ): Coin<BToken> {
-//     bank.version.assert_version_and_upgrade(CURRENT_VERSION);
-//     let coin_amount = coin_input.value();
-    
-//     if (bank.btoken_supply.supply_value() == 0) {
-//         assert!(coin_amount > MINIMUM_LIQUIDITY, EInitialDepositBelowMinimumLiquidity);
-//     } else {
-//         assert!(coin_amount > 0, EEmptyCoinAmount);
-//     };
-
-//     let new_btokens = bank.to_btokens(lending_market, coin_amount, clock);
-
-//     emit_event(MintBTokenEvent {
-//         user: ctx.sender(),
-//         bank_id: object::id(bank),
-//         lending_market_id: object::id(lending_market),
-//         deposited_amount: coin_amount,
-//         minted_amount: new_btokens,
-//     });
-
-//     bank.funds_available.join(coin_input.into_balance());
-//     coin::from_balance(bank.btoken_supply.increase_supply(new_btokens), ctx)
-// }
 
 public fun burn_btoken<P, T, BToken>(
     bank: &mut Bank<P, T, BToken>,
