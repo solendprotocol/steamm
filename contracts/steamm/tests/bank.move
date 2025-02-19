@@ -423,8 +423,9 @@ fun test_bank_withdraw_except_minimum_liquidity() {
         ctx(&mut scenario),
     );
 
-    let coin = coin::mint_for_testing<TEST_USDC>(500_000, ctx(&mut scenario));
-    let btoken = bank.mint_btoken(&lending_market, coin, &clock, ctx(&mut scenario));
+    let mut coin = coin::mint_for_testing<TEST_USDC>(500_000, ctx(&mut scenario));
+    let btoken = bank.mint_btoken(&lending_market, &mut coin, 500_000, &clock, ctx(&mut scenario));
+    destroy(coin);
 
     let coin = bank.burn_btoken(
         &lending_market,

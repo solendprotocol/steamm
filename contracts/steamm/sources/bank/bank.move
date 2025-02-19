@@ -5,6 +5,7 @@ use std::ascii;
 use std::option::{none, some};
 use std::string;
 use std::type_name::{get, TypeName};
+use steamm::math::safe_mul_div;
 use steamm::bank_math;
 use steamm::registry::Registry;
 use steamm::events::emit_event;
@@ -174,35 +175,146 @@ public fun init_lending<P, T, BToken>(
         })
 }
 
-public fun mint_btoken<P, T, BToken>(
+public struct FlashMintReceipt<phantom P, phantom T, phantom BToken> {
+    input_amount: u64,
+    minted_amount: u64,
+}
+
+public fun flash_mint_btoken<P, T, BToken>(
     bank: &mut Bank<P, T, BToken>,
     lending_market: &LendingMarket<P>,
-    coin_input: Coin<T>,
+    input_amount: u64,
     clock: &Clock,
     ctx: &mut TxContext,
-): Coin<BToken> {
+): (Coin<BToken>, FlashMintReceipt<P, T, BToken>) {
     bank.version.assert_version_and_upgrade(CURRENT_VERSION);
-    let coin_amount = coin_input.value();
-    
+
     if (bank.btoken_supply.supply_value() == 0) {
-        assert!(coin_amount > MINIMUM_LIQUIDITY, EInitialDepositBelowMinimumLiquidity);
+        assert!(input_amount > MINIMUM_LIQUIDITY, EInitialDepositBelowMinimumLiquidity);
     } else {
-        assert!(coin_amount > 0, EEmptyCoinAmount);
+        assert!(input_amount > 0, EEmptyCoinAmount);
     };
 
-    let new_btokens = bank.to_btokens(lending_market, coin_amount, clock);
+    let new_btokens = bank.to_btokens(lending_market, input_amount, clock);
+
+    (
+        coin::from_balance(bank.btoken_supply.increase_supply(new_btokens), ctx),
+        FlashMintReceipt { input_amount, minted_amount: new_btokens }
+    )
+}
+
+public fun replay_flash_mint<P, T, BToken>(
+    bank: &mut Bank<P, T, BToken>,
+    lending_market: &LendingMarket<P>,
+    coin_input: &mut Coin<T>,
+    btoken_change: Option<Coin<BToken>>,
+    receipt: FlashMintReceipt<P, T, BToken>,
+    ctx: &mut TxContext,
+) {
+    bank.version.assert_version_and_upgrade(CURRENT_VERSION);
+
+    let FlashMintReceipt { input_amount, minted_amount } = receipt;
+    
+    // Recover btoken change
+    let change = if (btoken_change.is_some()) {
+        let btoken = btoken_change.destroy_some();
+        let change = btoken.value();
+        bank.btoken_supply.decrease_supply(btoken.into_balance());
+        change
+    } else {
+        btoken_change.destroy_none();
+        0
+    };
+
+    let input_amount_after_change = safe_mul_div(input_amount, minted_amount - change, minted_amount);
 
     emit_event(MintBTokenEvent {
         user: ctx.sender(),
         bank_id: object::id(bank),
         lending_market_id: object::id(lending_market),
-        deposited_amount: coin_amount,
-        minted_amount: new_btokens,
+        deposited_amount: input_amount_after_change,
+        minted_amount: minted_amount - change,
     });
 
-    bank.funds_available.join(coin_input.into_balance());
-    coin::from_balance(bank.btoken_supply.increase_supply(new_btokens), ctx)
+    bank.funds_available.join(coin_input.balance_mut().split(input_amount_after_change));
 }
+
+public fun mint_btoken<P, T, BToken>(
+    bank: &mut Bank<P, T, BToken>,
+    lending_market: &LendingMarket<P>,
+    coin_input: &mut Coin<T>,
+    coin_amount: u64,
+    clock: &Clock,
+    ctx: &mut TxContext,
+): Coin<BToken> {
+    let (btoken, receipt) = bank.flash_mint_btoken(
+        lending_market,
+        coin_amount,
+        clock,
+        ctx,
+    );
+
+    bank.replay_flash_mint(
+        lending_market,
+        coin_input,
+        none(),
+        receipt,
+        ctx,
+    );
+
+    btoken
+    // bank.version.assert_version_and_upgrade(CURRENT_VERSION);
+    // let coin_amount = coin_input.value();
+    
+    // if (bank.btoken_supply.supply_value() == 0) {
+    //     assert!(coin_amount > MINIMUM_LIQUIDITY, EInitialDepositBelowMinimumLiquidity);
+    // } else {
+    //     assert!(coin_amount > 0, EEmptyCoinAmount);
+    // };
+
+    // let new_btokens = bank.to_btokens(lending_market, coin_amount, clock);
+
+    // emit_event(MintBTokenEvent {
+    //     user: ctx.sender(),
+    //     bank_id: object::id(bank),
+    //     lending_market_id: object::id(lending_market),
+    //     deposited_amount: coin_amount,
+    //     minted_amount: new_btokens,
+    // });
+
+    // bank.funds_available.join(coin_input.into_balance());
+    // coin::from_balance(bank.btoken_supply.increase_supply(new_btokens), ctx)
+}
+
+// public fun mint_btoken<P, T, BToken>(
+//     bank: &mut Bank<P, T, BToken>,
+//     lending_market: &LendingMarket<P>,
+//     coin_input: Coin<T>,
+//     clock: &Clock,
+//     ctx: &mut TxContext,
+// ): Coin<BToken> {
+//     bank.version.assert_version_and_upgrade(CURRENT_VERSION);
+//     let coin_amount = coin_input.value();
+    
+//     if (bank.btoken_supply.supply_value() == 0) {
+//         assert!(coin_amount > MINIMUM_LIQUIDITY, EInitialDepositBelowMinimumLiquidity);
+//     } else {
+//         assert!(coin_amount > 0, EEmptyCoinAmount);
+//     };
+
+//     let new_btokens = bank.to_btokens(lending_market, coin_amount, clock);
+
+//     emit_event(MintBTokenEvent {
+//         user: ctx.sender(),
+//         bank_id: object::id(bank),
+//         lending_market_id: object::id(lending_market),
+//         deposited_amount: coin_amount,
+//         minted_amount: new_btokens,
+//     });
+
+//     bank.funds_available.join(coin_input.into_balance());
+//     coin::from_balance(bank.btoken_supply.increase_supply(new_btokens), ctx)
+// }
 
 public fun burn_btoken<P, T, BToken>(
     bank: &mut Bank<P, T, BToken>,
