@@ -177,23 +177,19 @@ public fun init_lending<P, T, BToken>(
 public fun mint_btoken<P, T, BToken>(
     bank: &mut Bank<P, T, BToken>,
     lending_market: &LendingMarket<P>,
-    coin_t: &mut Coin<T>,
-    coin_amount: u64,
+    coin_input: Coin<T>,
     clock: &Clock,
     ctx: &mut TxContext,
 ): Coin<BToken> {
     bank.version.assert_version_and_upgrade(CURRENT_VERSION);
+    let coin_amount = coin_input.value();
     
     if (bank.btoken_supply.supply_value() == 0) {
         assert!(coin_amount > MINIMUM_LIQUIDITY, EInitialDepositBelowMinimumLiquidity);
     } else {
         assert!(coin_amount > 0, EEmptyCoinAmount);
-
     };
-    
-    assert!(coin_t.value() >= coin_amount, EInsufficientCoinBalance);
 
-    let coin_input = coin_t.split(coin_amount, ctx);
     let new_btokens = bank.to_btokens(lending_market, coin_amount, clock);
 
     emit_event(MintBTokenEvent {
@@ -211,19 +207,17 @@ public fun mint_btoken<P, T, BToken>(
 public fun burn_btoken<P, T, BToken>(
     bank: &mut Bank<P, T, BToken>,
     lending_market: &LendingMarket<P>,
-    btokens: &mut Coin<BToken>,
-    mut btoken_amount: u64,
+    btoken: Coin<BToken>,
     clock: &Clock,
     ctx: &mut TxContext,
 ): Coin<T> {
     bank.version.assert_version_and_upgrade(CURRENT_VERSION);
+    let mut btoken_amount = btoken.value();
 
     if (btoken_amount == 0) {
+        btoken.destroy_zero();
         return coin::zero(ctx)
     };
-    
-    assert!(btokens.value() != 0, EEmptyBToken);
-    assert!(btokens.value() >= btoken_amount, EInvalidBtokenBalance);
 
     let remaining_tokens = bank.btoken_supply.supply_value() - btoken_amount;
     if (remaining_tokens < MINIMUM_LIQUIDITY) {
@@ -231,12 +225,9 @@ public fun burn_btoken<P, T, BToken>(
         btoken_amount = btoken_amount - delta
     };
 
-    assert!(btoken_amount > 0, ENoBTokensToBurn);
-
-    let btoken_input = btokens.split(btoken_amount, ctx);
     let tokens_to_withdraw = bank.from_btokens(lending_market, btoken_amount, clock);
 
-    bank.btoken_supply.decrease_supply(btoken_input.into_balance());
+    bank.btoken_supply.decrease_supply(btoken.into_balance());
 
     assert!(tokens_to_withdraw > 0, ENoTokensToWithdraw);
     assert!(bank.funds_available.value() > tokens_to_withdraw, EUnableToFulfillWithdraw);
