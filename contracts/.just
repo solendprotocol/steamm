@@ -21,6 +21,7 @@ _check_sui:
 # Builds all things Sui
 build: _check_sui
     sui move build -p steamm
+    sui move build -p steamm_scripts
 
 # Tests all things Sui
 test: _check_sui
