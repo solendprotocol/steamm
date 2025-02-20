@@ -48,23 +48,19 @@ const ELendingNotActive: u64 = 7;
 // Failed to burn btokens - not enough funds available in the bank
 // call `burn_tokens` instead of `burn_btoken`
 const EUnableToFulfillWithdraw: u64 = 8;
-// Bank has insufficient funds for withdrawal
-const EInsufficientBankFunds: u64 = 9;
 // Input coin balance too low for requested operation
-const EInsufficientCoinBalance: u64 = 10;
+const EInsufficientCoinBalance: u64 = 9;
 // Cannot deposit zero coins
-const EEmptyCoinAmount: u64 = 11;
+const EEmptyCoinAmount: u64 = 10;
 // Cannot burn empty bToken
-const EEmptyBToken: u64 = 12;
+const EEmptyBToken: u64 = 11;
 // bToken balance less than amount to burn
-const EInvalidBtokenBalance: u64 = 13;
-// No bTokens available to burn after minimum liquidity check
-const ENoBTokensToBurn: u64 = 14;
+const EInvalidBtokenBalance: u64 = 12;
 // No tokens available to withdraw after calculations
-const ENoTokensToWithdraw: u64 = 15;
+const ENoTokensToWithdraw: u64 = 13;
 // First deposit must be greater than minimum liquidity
-const EInitialDepositBelowMinimumLiquidity: u64 = 16;
-const ENoCTokenRatioProvided: u64 = 17;
+const EInitialDepositBelowMinimumLiquidity: u64 = 14;
+const ENoCTokenRatioProvided: u64 = 15;
 
 // ===== Structs =====
 
@@ -259,35 +255,25 @@ public fun burn_btoken<P, T, BToken>(
     ctx: &mut TxContext,
 ): Coin<T> {
     bank.version.assert_version_and_upgrade(CURRENT_VERSION);
-    let mut btoken_amount = btoken.value();
+    let btoken_amount = btoken.value();
 
     if (btoken_amount == 0) {
         btoken.destroy_zero();
         return coin::zero(ctx)
     };
 
-    let remaining_tokens = bank.btoken_supply.supply_value() - btoken_amount;
-    if (remaining_tokens < MINIMUM_LIQUIDITY) {
-        let delta = MINIMUM_LIQUIDITY - remaining_tokens;
-        btoken_amount = btoken_amount - delta
-    };
-
-    let tokens_to_withdraw = bank.from_btokens(lending_market, btoken_amount, clock);
-
-    bank.btoken_supply.decrease_supply(btoken.into_balance());
+    let tokens_to_withdraw = burn_btokens_(bank, lending_market, btoken, clock);
 
     assert!(tokens_to_withdraw > 0, ENoTokensToWithdraw);
     assert!(bank.funds_available.value() > tokens_to_withdraw, EUnableToFulfillWithdraw);
 
-    emit_event(BurnBTokenEvent {
-        user: ctx.sender(),
-        bank_id: object::id(bank),
-        lending_market_id: object::id(lending_market),
-        withdrawn_amount: tokens_to_withdraw,
-        burned_amount: btoken_amount,
-    });
-
-    coin::from_balance(bank.funds_available.split(tokens_to_withdraw), ctx)
+    withdraw_balance_after_burn(
+        bank,
+        lending_market,
+        tokens_to_withdraw,
+        btoken_amount,
+        ctx
+    )
 }
 
 /// Mints bank tokens (BTokens) in exchange for deposited coins. The amount of BTokens minted
@@ -320,31 +306,10 @@ public fun mint_btokens<P, T, BToken>(
     clock: &Clock,
     ctx: &mut TxContext,
 ): Coin<BToken> {
-    bank.version.assert_version_and_upgrade(CURRENT_VERSION);
-    
-    if (bank.btoken_supply.supply_value() == 0) {
-        assert!(coin_amount > MINIMUM_LIQUIDITY, EInitialDepositBelowMinimumLiquidity);
-    } else {
-        assert!(coin_amount > 0, EEmptyCoinAmount);
-
-    };
-    
-    assert!(coin_t.value() >= coin_amount, EInsufficientCoinBalance);
+    // Version check called downstream
     bank.compound_interest_if_any(lending_market, clock);
-
-    let coin_input = coin_t.split(coin_amount, ctx);
-    let new_btokens = bank.to_btokens(lending_market, coin_amount, clock);
-
-    emit_event(MintBTokenEvent {
-        user: ctx.sender(),
-        bank_id: object::id(bank),
-        lending_market_id: object::id(lending_market),
-        deposited_amount: coin_amount,
-        minted_amount: new_btokens,
-    });
-
-    bank.funds_available.join(coin_input.into_balance());
-    coin::from_balance(bank.btoken_supply.increase_supply(new_btokens), ctx)
+    
+    mint_btoken(bank, lending_market, coin_t, coin_amount, clock, ctx)
 }
 
 /// Burns bank tokens (BTokens) to withdraw the underlying tokens from the bank.
@@ -366,6 +331,7 @@ public fun mint_btokens<P, T, BToken>(
 /// * If the bank version is not current
 /// * If there are insufficient funds in the bank to fulfill the withdrawal
 /// * If the withdrawal amount exceeds the bank's available balance
+#[allow(unused_let_mut)]
 public fun burn_btokens<P, T, BToken>(
     bank: &mut Bank<P, T, BToken>,
     lending_market: &mut LendingMarket<P>,
@@ -376,47 +342,58 @@ public fun burn_btokens<P, T, BToken>(
 ): Coin<T> {
     bank.version.assert_version_and_upgrade(CURRENT_VERSION);
     bank.compound_interest_if_any(lending_market, clock);
-
-    if (btoken_amount == 0) {
-        return coin::zero(ctx)
-    };
-    
-    assert!(btokens.value() != 0, EEmptyBToken);
     assert!(btokens.value() >= btoken_amount, EInvalidBtokenBalance);
+    assert!(btoken_amount != 0, EEmptyBToken);
 
-    let remaining_tokens = bank.btoken_supply.supply_value() - btoken_amount;
-    if (remaining_tokens < MINIMUM_LIQUIDITY) {
-        let delta = MINIMUM_LIQUIDITY - remaining_tokens;
-        btoken_amount = btoken_amount - delta
-    };
+    let tokens_to_withdraw = burn_btokens_(bank, lending_market, btokens.split(btoken_amount, ctx), clock);
 
-    assert!(btoken_amount > 0, ENoBTokensToBurn);
-
-    let btoken_input = btokens.split(btoken_amount, ctx);
-    let mut tokens_to_withdraw = bank.from_btokens(lending_market, btoken_amount, clock);
-
-    bank.btoken_supply.decrease_supply(btoken_input.into_balance());
-
+    assert!(tokens_to_withdraw > 0, ENoTokensToWithdraw);
     if (bank.funds_available.value() < tokens_to_withdraw) {
         // TODO: consider adding a slack to the tokens_to_withdraw to handle rounding errs
         bank.prepare_for_pending_withdraw(lending_market, tokens_to_withdraw, clock, ctx);
     };
 
-    // In the edge case where the bank utilisation is at 100%, the amount withdrawn from
-    // suilend might be off by 1 due to rounding, in such case, the amount available
-    // will be lower than the amount requested
-    let max_available = bank.funds_available.value();
-    assert!(max_available + 1 >= tokens_to_withdraw, EInsufficientBankFunds);
+    withdraw_balance_after_burn(
+        bank,
+        lending_market,
+        tokens_to_withdraw,
+        btoken_amount,
+        ctx
+    )
+}
 
-    tokens_to_withdraw = tokens_to_withdraw.min(max_available);
-    assert!(tokens_to_withdraw > 0, ENoTokensToWithdraw);
+fun burn_btokens_<P, T, BToken>(
+    bank: &mut Bank<P, T, BToken>,
+    lending_market: &LendingMarket<P>,
+    btoken: Coin<BToken>,
+    clock: &Clock,
+): u64 {
+    let mut withdrawable_btoken_amount = btoken.value();
 
+    let remaining_tokens = bank.btoken_supply.supply_value() - withdrawable_btoken_amount;
+    if (remaining_tokens < MINIMUM_LIQUIDITY) {
+        let delta = MINIMUM_LIQUIDITY - remaining_tokens;
+        withdrawable_btoken_amount = withdrawable_btoken_amount - delta
+    };
+
+    let tokens_to_withdraw = bank.from_btokens(lending_market, withdrawable_btoken_amount, clock);
+    bank.btoken_supply.decrease_supply(btoken.into_balance());
+    tokens_to_withdraw
+}
+
+fun withdraw_balance_after_burn<P, T, BToken>(
+    bank: &mut Bank<P, T, BToken>,
+    lending_market: &LendingMarket<P>,
+    tokens_to_withdraw: u64,
+    burned_amount: u64,
+    ctx: &mut TxContext,
+): Coin<T> {
     emit_event(BurnBTokenEvent {
         user: ctx.sender(),
         bank_id: object::id(bank),
         lending_market_id: object::id(lending_market),
         withdrawn_amount: tokens_to_withdraw,
-        burned_amount: btoken_amount,
+        burned_amount,
     });
 
     coin::from_balance(bank.funds_available.split(tokens_to_withdraw), ctx)
