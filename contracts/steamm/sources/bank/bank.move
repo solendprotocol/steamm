@@ -362,43 +362,6 @@ public fun burn_btokens<P, T, BToken>(
     )
 }
 
-fun burn_btokens_<P, T, BToken>(
-    bank: &mut Bank<P, T, BToken>,
-    lending_market: &LendingMarket<P>,
-    btoken: Coin<BToken>,
-    clock: &Clock,
-): u64 {
-    let mut withdrawable_btoken_amount = btoken.value();
-
-    let remaining_tokens = bank.btoken_supply.supply_value() - withdrawable_btoken_amount;
-    if (remaining_tokens < MINIMUM_LIQUIDITY) {
-        let delta = MINIMUM_LIQUIDITY - remaining_tokens;
-        withdrawable_btoken_amount = withdrawable_btoken_amount - delta
-    };
-
-    let tokens_to_withdraw = bank.from_btokens(lending_market, withdrawable_btoken_amount, clock);
-    bank.btoken_supply.decrease_supply(btoken.into_balance());
-    tokens_to_withdraw
-}
-
-fun withdraw_balance_after_burn<P, T, BToken>(
-    bank: &mut Bank<P, T, BToken>,
-    lending_market: &LendingMarket<P>,
-    tokens_to_withdraw: u64,
-    burned_amount: u64,
-    ctx: &mut TxContext,
-): Coin<T> {
-    emit_event(BurnBTokenEvent {
-        user: ctx.sender(),
-        bank_id: object::id(bank),
-        lending_market_id: object::id(lending_market),
-        withdrawn_amount: tokens_to_withdraw,
-        burned_amount,
-    });
-
-    coin::from_balance(bank.funds_available.split(tokens_to_withdraw), ctx)
-}
-
 /// Rebalances the bank's funds between available balance and deployed funds in the lending market
 /// to maintain the target utilization rate within the specified buffer range.
 ///
@@ -781,6 +744,43 @@ fun btoken_ratio<P, T, BToken>(
     } else {
         (bank.total_funds(ctoken_ratio), decimal::from(bank.btoken_supply.supply_value()))
     }
+}
+
+fun burn_btokens_<P, T, BToken>(
+    bank: &mut Bank<P, T, BToken>,
+    lending_market: &LendingMarket<P>,
+    btoken: Coin<BToken>,
+    clock: &Clock,
+): u64 {
+    let mut withdrawable_btoken_amount = btoken.value();
+
+    let remaining_tokens = bank.btoken_supply.supply_value() - withdrawable_btoken_amount;
+    if (remaining_tokens < MINIMUM_LIQUIDITY) {
+        let delta = MINIMUM_LIQUIDITY - remaining_tokens;
+        withdrawable_btoken_amount = withdrawable_btoken_amount - delta
+    };
+
+    let tokens_to_withdraw = bank.from_btokens(lending_market, withdrawable_btoken_amount, clock);
+    bank.btoken_supply.decrease_supply(btoken.into_balance());
+    tokens_to_withdraw
+}
+
+fun withdraw_balance_after_burn<P, T, BToken>(
+    bank: &mut Bank<P, T, BToken>,
+    lending_market: &LendingMarket<P>,
+    tokens_to_withdraw: u64,
+    burned_amount: u64,
+    ctx: &mut TxContext,
+): Coin<T> {
+    emit_event(BurnBTokenEvent {
+        user: ctx.sender(),
+        bank_id: object::id(bank),
+        lending_market_id: object::id(lending_market),
+        withdrawn_amount: tokens_to_withdraw,
+        burned_amount,
+    });
+
+    coin::from_balance(bank.funds_available.split(tokens_to_withdraw), ctx)
 }
 
 fun update_btoken_metadata<T, BToken: drop>(
