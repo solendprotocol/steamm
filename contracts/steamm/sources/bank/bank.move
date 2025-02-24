@@ -202,8 +202,6 @@ public fun mint_btokens<P, T, BToken>(
     clock: &Clock,
     ctx: &mut TxContext,
 ): Coin<BToken> {
-    bank.compound_interest_if_any(lending_market, clock);
-    
     mint_btoken(bank, lending_market, coin_t, coin_amount, clock, ctx)
 }
 
