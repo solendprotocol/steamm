@@ -73,7 +73,7 @@ fun test_simple_deposit_with_lending_a() {
     destroy(coin_b);
 
     // Test bank effects after minting btokens
-    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
 
     assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 0); // 500_000 * 0%
     assert_eq(bank_a.funds_available().value(), 500_000); // 500_000 * 100%
@@ -115,7 +115,7 @@ fun test_simple_deposit_with_lending_a() {
         ctx,
     );
 
-    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 400_000); // 500_000 * 80%
     assert_eq(bank_a.funds_available().value(), 100_000); // 500_000 * 20%
     assert_eq(bank_b.funds_available().value(), 500_000);
@@ -201,11 +201,11 @@ fun test_swap_with_lending_without_touching_lending_market() {
     assert_eq(reserve_b, 500_000);
 
     // No rebalance happened
-    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 0);
     assert_eq(bank_a.funds_available().value(), 500_000);
 
-    // let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    // let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_b.funds_deployed(none()).floor(), 0);
     assert_eq(bank_b.funds_available().value(), 500_000);
 
@@ -220,7 +220,7 @@ fun test_swap_with_lending_without_touching_lending_market() {
 
     destroy(coin_a);
 
-    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 0);
     assert_eq(bank_a.funds_available().value(), 550_000);
 
@@ -238,7 +238,7 @@ fun test_swap_with_lending_without_touching_lending_market() {
     assert_eq(reserve_a, 550_000);
     assert_eq(reserve_b, 454_910);
 
-    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 0);
     assert_eq(bank_a.funds_available().value(), 550_000);
     assert_eq(bank_b.funds_available().value(), 500_000);
@@ -312,11 +312,11 @@ fun test_simple_deposit_with_lending_ab() {
     destroy(coin_b);
 
     // Test bank effects after minting btokens
-    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 0); // 500_000 * 0%
     assert_eq(bank_a.funds_available().value(), 500_000); // 500_000 * 100%
     
-    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 0); // 500_000 * 0%
     assert_eq(bank_b.funds_available().value(), 500_000); // 500_000 * 100%
 
@@ -427,10 +427,10 @@ fun test_swap_with_lending_within_utilization_range() {
     destroy(coin_b);
 
     // Test bank effects after minting btokens
-    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 0); // 500_000 * 0%
     assert_eq(bank_a.funds_available().value(), 500_000); // 500_000 * 100%
-    let ctoken_ratio = bank_b.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_b.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 0); // 500_000 * 0%
     assert_eq(bank_b.funds_available().value(), 500_000); // 500_000 * 100%
 
@@ -623,11 +623,11 @@ fun test_swap_with_lending_beyond_utilization_range() {
     destroy(coin_b);
 
     // Test bank effects after minting btokens
-    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 0); // 500_000 * 0%
     assert_eq(bank_a.funds_available().value(), 500_000); // 500_000 * 100%
 
-    let ctoken_ratio = bank_b.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_b.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 0); // 500_000 * 0%
     assert_eq(bank_b.funds_available().value(), 500_000); // 500_000 * 100%
 
@@ -825,7 +825,7 @@ fun test_deposit_with_lending_all_scenarios() {
     assert_eq(pool.trading_data().pool_fees_a(), 0);
     assert_eq(pool.trading_data().pool_fees_b(), 0);
 
-    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 0);
     assert_eq(bank_a.funds_available().value(), 100_000);
     assert_eq(bank_b.funds_available().value(), 100_000);
@@ -842,7 +842,7 @@ fun test_deposit_with_lending_all_scenarios() {
         ctx,
     );
 
-    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
     let funds_deployed_a = bank_a.funds_deployed(some(ctoken_ratio)).floor();
     assert_eq(funds_deployed_a, 80_000); // 100_000 * 80%
     assert_eq(bank_a.funds_available().value(), 20_000); // 500_000 * 20%
@@ -882,7 +882,7 @@ fun test_deposit_with_lending_all_scenarios() {
     // No need to rebalancing
     assert!(!bank_a.needs_rebalance(&lending_market, &clock).needs_rebalance_());
 
-    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
     let funds_deployed_a = bank_a.funds_deployed(some(ctoken_ratio)).floor();
 
     assert_eq(funds_deployed_a, 80_000); // 100_000 * 80%
@@ -947,7 +947,7 @@ fun test_deposit_with_lending_all_scenarios() {
     assert_eq(reserve_b, 5_105_000);
     assert_eq(lp_coins.value(), 5_000_000); // newly minted lp tokens
 
-    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
     let funds_deployed_a = bank_a.funds_deployed(some(ctoken_ratio)).floor();
 
     assert_eq(funds_deployed_a, 4_084_000); // 5_105_000 * 80%
@@ -1100,7 +1100,7 @@ fun test_deposit_with_lending_proptest() {
             ctx,
         );
 
-        let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+        let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
         let funds_deployed_a = bank_a.funds_deployed(some(ctoken_ratio)).floor();
 
         assert!(
@@ -1196,7 +1196,7 @@ fun test_lend_redeem_with_lending_within_utilization() {
     assert_eq(pool.trading_data().pool_fees_a(), 0);
     assert_eq(pool.trading_data().pool_fees_b(), 0);
 
-    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
     let funds_deployed_a = bank_a.funds_deployed(some(ctoken_ratio)).floor();
 
     assert_eq(funds_deployed_a, 80_000); // 100_000 * 80%
@@ -1247,7 +1247,7 @@ fun test_lend_redeem_with_lending_within_utilization() {
     assert_eq(reserve_b, 100_000 - 100);
     assert_eq(lp_coins.value(), 100_000 - 100 - 1000); // extra 1000 is minimum_liquidity
 
-    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
     let funds_deployed_a = bank_a.funds_deployed(some(ctoken_ratio)).floor();
 
     assert_eq(funds_deployed_a, 80_000); // amount lent does not change
@@ -1382,11 +1382,11 @@ fun test_lend_amm_swap_small_swap_scenario_no_rebalance() {
     assert!(!bank_a.needs_rebalance_after_outflow(&lending_market, btoken_a.value(), &clock), 2);
     assert!(!bank_b.needs_rebalance(&lending_market, &clock).needs_rebalance_(), 1);
 
-    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 80_000);
     assert_eq(bank_a.funds_available().value(), 20_000);
 
-    let ctoken_ratio = bank_b.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_b.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 80_000);
     assert_eq(bank_b.funds_available().value(), 20_000 + 10);
 
@@ -1543,11 +1543,11 @@ fun test_lend_amm_swap_medium_swap_scenario() {
     assert!(bank_a.needs_rebalance_after_outflow(&lending_market, btoken_a.value(), &clock), 2);
     assert!(bank_b.needs_rebalance(&lending_market, &clock).needs_rebalance_(), 1);
 
-    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 80_000);
     assert_eq(bank_a.funds_available().value(), 20_000);
 
-    let ctoken_ratio = bank_b.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_b.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 80_000);
     assert_eq(bank_b.funds_available().value(), 20_000 + 20_000);
 
@@ -1580,11 +1580,11 @@ fun test_lend_amm_swap_medium_swap_scenario() {
     );
 
     // Assert rebalancing result
-    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 64_000);
     assert_eq(bank_a.funds_available().value(), 16_000);
 
-    let ctoken_ratio = bank_b.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_b.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 96_000);
     assert_eq(bank_b.funds_available().value(), 24_000);
 
@@ -1706,11 +1706,11 @@ fun test_lend_amm_swap_large_swap_scenario() {
     assert!(bank_a.needs_rebalance_after_outflow(&lending_market, btoken_a.value(), &clock), 2);
     assert!(bank_b.needs_rebalance(&lending_market, &clock).needs_rebalance_(), 1);
 
-    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 80_000);
     assert_eq(bank_a.funds_available().value(), 20_000);
 
-    let ctoken_ratio = bank_b.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_b.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 80_000);
     assert_eq(bank_b.funds_available().value(), 20_000 + 30_000);
 
@@ -1743,11 +1743,11 @@ fun test_lend_amm_swap_large_swap_scenario() {
     );
 
     // Assert rebalancing result
-    let ctoken_ratio = bank_a.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_a.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_a.funds_deployed(some(ctoken_ratio)).floor(), 56_000);
     assert_eq(bank_a.funds_available().value(), 14_000);
 
-    let ctoken_ratio = bank_b.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_b.ctoken_ratio(&lending_market, &clock);
     assert_eq(bank_b.funds_deployed(some(ctoken_ratio)).floor(), 104_000);
     assert_eq(bank_b.funds_available().value(), 26_000);
 
@@ -1804,7 +1804,7 @@ public fun test_no_op_below_min_deploy_amount() {
         ctx(&mut scenario),
     );
 
-    let ctoken_ratio = bank_sui.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_sui.ctoken_ratio(&lending_market, &clock);
     let funds_deployed = bank_sui.funds_deployed(some(ctoken_ratio)).floor();
 
     let effective_utilisation_bps_before = bank_sui.effective_utilisation_bps(
@@ -1817,7 +1817,7 @@ public fun test_no_op_below_min_deploy_amount() {
         ctx(&mut scenario),
     );
 
-    let ctoken_ratio = bank_sui.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank_sui.ctoken_ratio(&lending_market, &clock);
     let funds_deployed = bank_sui.funds_deployed(some(ctoken_ratio)).floor();
 
     let effective_utilisation_bps_after = bank_sui.effective_utilisation_bps(
