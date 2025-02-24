@@ -202,7 +202,6 @@ public fun mint_btokens<P, T, BToken>(
     clock: &Clock,
     ctx: &mut TxContext,
 ): Coin<BToken> {
-    // Version check called downstream
     bank.compound_interest_if_any(lending_market, clock);
     
     mint_btoken(bank, lending_market, coin_t, coin_amount, clock, ctx)
@@ -309,7 +308,7 @@ public fun burn_btokens<P, T, BToken>(
 public fun mint_btoken<P, T, BToken>(
     bank: &mut Bank<P, T, BToken>,
     lending_market: &LendingMarket<P>,
-    coin_input: &mut Coin<T>,
+    coin_t: &mut Coin<T>,
     coin_amount: u64,
     clock: &Clock,
     ctx: &mut TxContext,
@@ -322,8 +321,8 @@ public fun mint_btoken<P, T, BToken>(
         assert!(coin_amount > 0, EEmptyCoinAmount);
     };
 
-    assert!(coin_input.value() >= coin_amount, EInsufficientCoinBalance);
-    let coin_input = coin_input.split(coin_amount, ctx);
+    assert!(coin_t.value() >= coin_amount, EInsufficientCoinBalance);
+    let coin_input = coin_t.split(coin_amount, ctx);
     let new_btokens = bank.to_btokens(lending_market, coin_amount, clock);
 
     emit_event(MintBTokenEvent {
