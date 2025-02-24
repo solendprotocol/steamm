@@ -244,7 +244,7 @@ fun test_bank_rebalance_deploy() {
 
     bank.deposit_for_testing(100 * 1_000_000);
 
-    let ctoken_ratio = bank.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank.ctoken_ratio(&lending_market, &clock);
     let funds_deployed = bank.funds_deployed(some(ctoken_ratio)).floor();
 
     assert_eq(bank.funds_available().value(), 100 * 1_000_000);
@@ -258,7 +258,7 @@ fun test_bank_rebalance_deploy() {
         ctx(&mut scenario),
     );
 
-    let ctoken_ratio = bank.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank.ctoken_ratio(&lending_market, &clock);
     let funds_deployed = bank.funds_deployed(some(ctoken_ratio)).floor();
 
     assert_eq(bank.funds_available().value(), 50 * 1_000_000);
@@ -305,7 +305,7 @@ fun test_bank_rebalance_recall() {
         ctx(&mut scenario),
     );
 
-    let ctoken_ratio = bank.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank.ctoken_ratio(&lending_market, &clock);
     let funds_deployed = bank.funds_deployed(some(ctoken_ratio)).floor();
 
     assert_eq(bank.funds_available().value(), 50 * 1_000_000);
@@ -320,7 +320,7 @@ fun test_bank_rebalance_recall() {
         ctx(&mut scenario),
     );
 
-    let ctoken_ratio = bank.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank.ctoken_ratio(&lending_market, &clock);
     let funds_deployed = bank.funds_deployed(some(ctoken_ratio)).floor();
 
     assert_eq(bank.funds_available().value(), 100 * 1_000_000);
@@ -367,7 +367,7 @@ fun test_bank_prepare_bank_for_pending_withdraw() {
         ctx(&mut scenario),
     );
     assert!(bank.funds_available().value() == 50 * 1_000_000, 0);
-    let ctoken_ratio = bank.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank.ctoken_ratio(&lending_market, &clock);
     let funds_deployed = bank.funds_deployed(some(ctoken_ratio)).floor();
     assert_eq(funds_deployed, 50 * 1_000_000);
     assert_eq(bank.total_funds(some(ctoken_ratio)).floor(), 100 * 1_000_000);
@@ -381,7 +381,7 @@ fun test_bank_prepare_bank_for_pending_withdraw() {
     );
     let usdc = bank.withdraw_for_testing(20 * 1_000_000);
 
-    let ctoken_ratio = bank.ctoken_ratio_unsafe(&lending_market, &clock);
+    let ctoken_ratio = bank.ctoken_ratio(&lending_market, &clock);
     let funds_deployed = bank.funds_deployed(some(ctoken_ratio)).floor();
 
     assert!(bank.funds_available().value() == 40 * 1_000_000, 0);

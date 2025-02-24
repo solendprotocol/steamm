@@ -366,7 +366,7 @@ public fun rebalance<P, T, BToken>(
         return
     };
 
-    let ctoken_ratio = bank.ctoken_ratio_unsafe(lending_market, clock);
+    let ctoken_ratio = bank.ctoken_ratio(lending_market, clock);
     let funds_deployed = bank.funds_deployed(some(ctoken_ratio)).floor();
     let effective_utilisation_bps = bank_math::compute_utilisation_bps(
         bank.funds_available.value(),
@@ -423,7 +423,7 @@ public fun to_btokens<P, T, BToken>(
     clock: &Clock,
 ): u64 {
     if (bank.lending.is_some()) {
-        let ctoken_ratio = bank.ctoken_ratio_unsafe(lending_market, clock);
+        let ctoken_ratio = bank.ctoken_ratio(lending_market, clock);
         let (total_funds, btoken_supply) = bank.btoken_ratio(some(ctoken_ratio));
         // Divides by btoken ratio
         decimal::from(amount).mul(btoken_supply).div(total_funds).floor()
@@ -437,7 +437,7 @@ public fun from_btokens<P, T, BToken>(
     clock: &Clock,
 ): u64 {
     if (bank.lending.is_some()) {
-        let ctoken_ratio = bank.ctoken_ratio_unsafe(lending_market, clock);
+        let ctoken_ratio = bank.ctoken_ratio(lending_market, clock);
         let (total_funds, btoken_supply) = bank.btoken_ratio(some(ctoken_ratio));
         // Multiplies by btoken ratio
         decimal::from(btoken_amount).mul(total_funds).div(btoken_supply).floor()
@@ -527,7 +527,7 @@ public(package) fun prepare_for_pending_withdraw<P, T, BToken>(
     if (bank.lending.is_none()) {
         return
     };
-    let ctoken_ratio = bank.ctoken_ratio_unsafe(lending_market, clock);
+    let ctoken_ratio = bank.ctoken_ratio(lending_market, clock);
 
     let amount_to_recall = {
         let lending = bank.lending.borrow();
@@ -667,11 +667,13 @@ fun recall<P, T, BToken>(
 
     bank.funds_available.join(coin_recalled.into_balance());
 
-    let ctoken_ratio_after = bank.ctoken_ratio_unsafe(lending_market, clock);
+    let reserves = lending_market.reserves();
+    let reserve = reserves.borrow(lending.reserve_array_index);
+    let ctoken_ratio = reserve.ctoken_ratio();
 
     // Note: the amount of funds deployed is different from the previous assertion
     assert!(
-        decimal::from(bank.lending.borrow().ctokens).mul(ctoken_ratio_after).floor() >= bank.funds_deployed(some(ctoken_ratio_after)).floor(),
+        decimal::from(lending.ctokens).mul(ctoken_ratio).floor() >= bank.funds_deployed(some(ctoken_ratio)).floor(),
         ECTokenRatioTooLow,
     );
 
@@ -683,14 +685,14 @@ fun recall<P, T, BToken>(
     });
 }
 
-public(package) fun ctoken_ratio_unsafe<P, T, BToken>(
+public(package) fun ctoken_ratio<P, T, BToken>(
     bank: &Bank<P, T, BToken>,
     lending_market: &LendingMarket<P>,
     clock: &Clock,
 ): Decimal {
     let reserves = lending_market.reserves();
     let reserve = reserves.borrow(bank.lending.borrow().reserve_array_index);
-    reserve.ctoken_ratio_updated(clock)
+    reserve.simulated_ctoken_ratio(clock)
 }
 
 // Given how much tokens we want to withdraw from the lending market,
@@ -757,7 +759,7 @@ public fun needs_rebalance<P, T, BToken>(
         return NeedsRebalance { needs_rebalance: false }
     };
 
-    let ctoken_ratio = bank.ctoken_ratio_unsafe(lending_market, clock);
+    let ctoken_ratio = bank.ctoken_ratio(lending_market, clock);
     let funds_deployed = bank.funds_deployed(some(ctoken_ratio)).floor();
 
     let effective_utilisation_bps = bank.effective_utilisation_bps(funds_deployed);
@@ -927,7 +929,7 @@ public fun needs_rebalance_after_inflow<P, T, BToken>(
         return false
     };
 
-    let funds_deployed = bank.funds_deployed(some(bank.ctoken_ratio_unsafe(lending_market, clock))).floor();
+    let funds_deployed = bank.funds_deployed(some(bank.ctoken_ratio(lending_market, clock))).floor();
 
     let effective_utilisation_bps = bank_math::compute_utilisation_bps(
         bank.funds_available.value() + amount,
@@ -952,7 +954,7 @@ public fun needs_rebalance_after_outflow<P, T, BToken>(
         return false
     };
 
-    let funds_deployed = bank.funds_deployed(some(bank.ctoken_ratio_unsafe(lending_market, clock))).floor();
+    let funds_deployed = bank.funds_deployed(some(bank.ctoken_ratio(lending_market, clock))).floor();
     let amount = bank.from_btokens(lending_market, btoken_amount, clock);
 
     if (amount > bank.funds_available.value()) {
