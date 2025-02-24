@@ -633,11 +633,13 @@ fun recall<P, T, BToken>(
 
     bank.funds_available.join(coin_recalled.into_balance());
 
-    let ctoken_ratio_after = bank.ctoken_ratio(lending_market, clock);
+    let reserves = lending_market.reserves();
+    let reserve = reserves.borrow(lending.reserve_array_index);
+    let ctoken_ratio = reserve.ctoken_ratio();
 
     // Note: the amount of funds deployed is different from the previous assertion
     assert!(
-        decimal::from(bank.lending.borrow().ctokens).mul(ctoken_ratio_after).floor() >= bank.funds_deployed(some(ctoken_ratio_after)).floor(),
+        decimal::from(lending.ctokens).mul(ctoken_ratio).floor() >= bank.funds_deployed(some(ctoken_ratio)).floor(),
         ECTokenRatioTooLow,
     );
 
