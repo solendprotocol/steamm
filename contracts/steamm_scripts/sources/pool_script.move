@@ -37,7 +37,6 @@ public fun deposit_liquidity<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: d
     let max_ba = btoken_a.value();
     let max_bb = btoken_b.value();
 
-
     let (lp_coin, _) = pool.deposit_liquidity(&mut btoken_a, &mut btoken_b, max_ba, max_bb, ctx);
 
     let remaining_value_ba = btoken_a.value();
@@ -69,7 +68,13 @@ public fun redeem_liquidity<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: dr
     clock: &Clock,
     ctx: &mut TxContext,
 ): (Coin<A>, Coin<B>) {
-    let (mut btoken_a, mut btoken_b, _) = pool.redeem_liquidity(lp_tokens, min_a, min_b, ctx);
+    bank_a.compound_interest_if_any(lending_market, clock);
+    bank_b.compound_interest_if_any(lending_market, clock);
+
+    let min_ba = bank_a.to_btokens(lending_market, min_a, clock);
+    let min_bb = bank_b.to_btokens(lending_market, min_b, clock);
+
+    let (mut btoken_a, mut btoken_b, _) = pool.redeem_liquidity(lp_tokens, min_ba, min_bb, ctx);
 
     let (btoken_a_amount, btoken_b_amount) = (btoken_a.value(), btoken_b.value());
 
