@@ -224,16 +224,15 @@ public fun mint_btokens<P, T, BToken>(
 /// * If the bank version is not current
 /// * If there are insufficient funds in the bank to fulfill the withdrawal
 /// * If the withdrawal amount exceeds the bank's available balance
-public fun burn_btokens<P, T, BToken>(
+public fun burn_btoken<P, T, BToken>(
     bank: &mut Bank<P, T, BToken>,
-    lending_market: &mut LendingMarket<P>,
+    lending_market: &LendingMarket<P>,
     btokens: &mut Coin<BToken>,
     mut btoken_amount: u64,
     clock: &Clock,
     ctx: &mut TxContext,
 ): Coin<T> {
     bank.version.assert_version_and_upgrade(CURRENT_VERSION);
-    bank.compound_interest_if_any(lending_market, clock);
 
     if (btoken_amount == 0) {
         return coin::zero(ctx)
@@ -255,10 +254,7 @@ public fun burn_btokens<P, T, BToken>(
 
     bank.btoken_supply.decrease_supply(btoken_input.into_balance());
 
-    if (bank.funds_available.value() < tokens_to_withdraw) {
-        // TODO: consider adding a slack to the tokens_to_withdraw to handle rounding errs
-        bank.prepare_for_pending_withdraw(lending_market, tokens_to_withdraw, clock, ctx);
-    };
+    assert!(bank.funds_available.value() >= tokens_to_withdraw, EInsufficientBankFunds);
 
     // In the edge case where the bank utilisation is at 100%, the amount withdrawn from
     // suilend might be off by 1 due to rounding, in such case, the amount available
@@ -278,6 +274,26 @@ public fun burn_btokens<P, T, BToken>(
     });
 
     coin::from_balance(bank.funds_available.split(tokens_to_withdraw), ctx)
+}
+
+public fun burn_btokens<P, T, BToken>(
+    bank: &mut Bank<P, T, BToken>,
+    lending_market: &mut LendingMarket<P>,
+    btokens: &mut Coin<BToken>,
+    btoken_amount: u64,
+    clock: &Clock,
+    ctx: &mut TxContext,
+): Coin<T> {
+    bank.version.assert_version_and_upgrade(CURRENT_VERSION);
+    bank.compound_interest_if_any(lending_market, clock);
+
+    let tokens_to_withdraw = bank.from_btokens(lending_market, btoken_amount, clock);
+    if (bank.funds_available.value() < tokens_to_withdraw) {
+        // TODO: consider adding a slack to the tokens_to_withdraw to handle rounding errs
+        bank.prepare_for_pending_withdraw(lending_market, tokens_to_withdraw, clock, ctx);
+    };
+
+    bank.burn_btoken(lending_market, btokens, btoken_amount, clock, ctx)
 }
 
 /// Mints bTokens in exchange for deposited coins. The amount of BTokens minted
