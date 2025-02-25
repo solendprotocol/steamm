@@ -1,7 +1,7 @@
 [package]
 name = "steamm_scripts"
 edition = "2024.beta"
-published-at = "0xcded95d884efbd02d4824611ef4fa75e60d1c6d89b1cdbaaff431266fc23e81d"
+published-at = "0x043ca0fb6dd5a60f20513d76aa49cb007b4554083ef8a5765b15e01ce1642036"
 # license = ""           # e.g., "MIT", "GPL", "Apache 2.0"
 # authors = ["..."]      # e.g., ["Joe Smith (joesmith@noemail.com)", "John Snow (johnsnow@noemail.com)"]
 
