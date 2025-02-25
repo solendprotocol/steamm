@@ -202,31 +202,7 @@ public fun mint_btokens<P, T, BToken>(
     clock: &Clock,
     ctx: &mut TxContext,
 ): Coin<BToken> {
-    bank.version.assert_version_and_upgrade(CURRENT_VERSION);
-    
-    if (bank.btoken_supply.supply_value() == 0) {
-        assert!(coin_amount > MINIMUM_LIQUIDITY, EInitialDepositBelowMinimumLiquidity);
-    } else {
-        assert!(coin_amount > 0, EEmptyCoinAmount);
-
-    };
-    
-    assert!(coin_t.value() >= coin_amount, EInsufficientCoinBalance);
-    bank.compound_interest_if_any(lending_market, clock);
-
-    let coin_input = coin_t.split(coin_amount, ctx);
-    let new_btokens = bank.to_btokens(lending_market, coin_amount, clock);
-
-    emit_event(MintBTokenEvent {
-        user: ctx.sender(),
-        bank_id: object::id(bank),
-        lending_market_id: object::id(lending_market),
-        deposited_amount: coin_amount,
-        minted_amount: new_btokens,
-    });
-
-    bank.funds_available.join(coin_input.into_balance());
-    coin::from_balance(bank.btoken_supply.increase_supply(new_btokens), ctx)
+    mint_btoken(bank, lending_market, coin_t, coin_amount, clock, ctx)
 }
 
 /// Burns bank tokens (BTokens) to withdraw the underlying tokens from the bank.
@@ -302,6 +278,61 @@ public fun burn_btokens<P, T, BToken>(
     });
 
     coin::from_balance(bank.funds_available.split(tokens_to_withdraw), ctx)
+}
+
+/// Mints bTokens in exchange for deposited coins. The amount of BTokens minted
+/// is calculated based on the current exchange rate between coins and BTokens, which takes into
+/// account accumulated interest.
+///
+/// # Arguments
+///
+/// * `bank` - The bank to mint BTokens from
+/// * `lending_market` - The lending market where the bank is registered
+/// * `coin_input` - The coin to split funds from
+/// * `coin_amount` - Amount of coins to deposit
+/// * `clock` - Clock for timing
+/// * `ctx` - Transaction context
+///
+/// # Returns
+///
+/// * `Coin<BToken>` - The newly minted BTokens
+///
+/// # Panics
+///
+/// * If the bank version is not current
+/// * If attempting first deposit below minimum liquidity
+/// * If the coin amount is zero for non-first deposit
+/// * If the coin input has insufficient balance
+public fun mint_btoken<P, T, BToken>(
+    bank: &mut Bank<P, T, BToken>,
+    lending_market: &LendingMarket<P>,
+    coin_t: &mut Coin<T>,
+    coin_amount: u64,
+    clock: &Clock,
+    ctx: &mut TxContext,
+): Coin<BToken> {
+    bank.version.assert_version_and_upgrade(CURRENT_VERSION);
+    
+    if (bank.btoken_supply.supply_value() == 0) {
+        assert!(coin_amount > MINIMUM_LIQUIDITY, EInitialDepositBelowMinimumLiquidity);
+    } else {
+        assert!(coin_amount > 0, EEmptyCoinAmount);
+    };
+
+    assert!(coin_t.value() >= coin_amount, EInsufficientCoinBalance);
+    let coin_input = coin_t.split(coin_amount, ctx);
+    let new_btokens = bank.to_btokens(lending_market, coin_amount, clock);
+
+    emit_event(MintBTokenEvent {
+        user: ctx.sender(),
+        bank_id: object::id(bank),
+        lending_market_id: object::id(lending_market),
+        deposited_amount: coin_amount,
+        minted_amount: new_btokens,
+    });
+
+    bank.funds_available.join(coin_input.into_balance());
+    coin::from_balance(bank.btoken_supply.increase_supply(new_btokens), ctx)
 }
 
 /// Rebalances the bank's funds between available balance and deployed funds in the lending market
