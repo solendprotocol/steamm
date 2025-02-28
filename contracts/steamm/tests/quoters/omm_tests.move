@@ -60,13 +60,13 @@ module steamm::omm_tests {
             scenario.ctx(),
         );
 
-        let oracle_index_a = oracle_registry.add_pyth_oracle(
+        oracle_registry.add_pyth_oracle(
             &admin_cap,
             mock_pyth::get_price_obj<TEST_USDC>(&price_state),
             scenario.ctx(),
         );
 
-        let oracle_index_b = oracle_registry.add_pyth_oracle(
+        oracle_registry.add_pyth_oracle(
             &admin_cap,
             mock_pyth::get_price_obj<TEST_SUI>(&price_state),
             scenario.ctx(),
@@ -89,8 +89,8 @@ module steamm::omm_tests {
             &mut meta_lp_usdc_sui,
             treasury_cap_lp,
             &oracle_registry,
-            oracle_index_a,
-            oracle_index_b,
+            0,
+            1,
             fee_bps,
             scenario.ctx(),
         );

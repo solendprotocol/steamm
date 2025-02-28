@@ -18,6 +18,8 @@ module steamm::omm {
 
     // ===== Errors =====
     const EInvalidBankType: u64 = 0;
+    const EInvalidOracleIndex: u64 = 1;
+    const EInvalidOracleRegistry: u64 = 2;
 
     /// Oracle AMM specific state. We do not store the invariant,
     /// instead we compute it at runtime.
@@ -95,6 +97,11 @@ module steamm::omm {
     ): SwapResult {
         pool.quoter_mut().version.assert_version_and_upgrade(CURRENT_VERSION);
 
+        assert!(oracle_price_update_a.oracle_registry_id() == pool.quoter().oracle_registry_id, EInvalidOracleRegistry);
+        assert!(oracle_price_update_a.oracle_index() == pool.quoter().oracle_index_a, EInvalidOracleIndex);
+
+        assert!(oracle_price_update_b.oracle_registry_id() == pool.quoter().oracle_registry_id, EInvalidOracleRegistry);
+        assert!(oracle_price_update_b.oracle_index() == pool.quoter().oracle_index_b, EInvalidOracleIndex);
         let quote = quote_swap(
             pool, 
             bank_a,
