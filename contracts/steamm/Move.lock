@@ -2,10 +2,11 @@
 
 [move]
 version = 3
-manifest_digest = "5AA1C1E116E18FA1C93EC959FFE6F6167750A7DBA463F75ECC5EDF5A0C7752BC"
-deps_digest = "3C4103934B1E040BB6B23F1D610B4EF9F2F1166A50A104EADCF77467C004C600"
+manifest_digest = "7EB056C7FEC2D65ECFEBE5A6CDA113064BB6610CE482676B55342EB248452E5A"
+deps_digest = "060AD7E57DFB13104F21BE5F5C3759D03F0553FC3229247D9A7A6B45F50D03A3"
 dependencies = [
   { id = "Sui", name = "Sui" },
+  { id = "oracles", name = "oracles" },
   { id = "suilend", name = "suilend" },
 ]
 
@@ -40,6 +41,14 @@ dependencies = [
 ]
 
 [[move.package]]
+id = "Switchboard"
+source = { git = "https://github.com/switchboard-xyz/sui.git", rev = "mainnet", subdir = "on_demand/" }
+
+dependencies = [
+  { id = "Sui", name = "Sui" },
+]
+
+[[move.package]]
 id = "Wormhole"
 source = { git = "https://github.com/solendprotocol/wormhole.git", rev = "e1698d3c72b15cdddd7da98ad43e151f83b72a0a", subdir = "sui/wormhole" }
 
@@ -57,8 +66,18 @@ dependencies = [
 ]
 
 [[move.package]]
+id = "oracles"
+source = { git = "https://github.com/solendprotocol/suilend.git", rev = "996f47539c621775c48b7f9c9a601ad6048833da", subdir = "contracts/oracles" }
+
+dependencies = [
+  { id = "Pyth", name = "Pyth" },
+  { id = "Sui", name = "Sui" },
+  { id = "Switchboard", name = "Switchboard" },
+]
+
+[[move.package]]
 id = "sprungsui"
-source = { git = "https://github.com/solendprotocol/suilend.git", rev = "devel", subdir = "contracts/sprungsui" }
+source = { git = "https://github.com/solendprotocol/suilend.git", rev = "updated-ctoken-ratio", subdir = "contracts/sprungsui" }
 
 dependencies = [
   { id = "Sui", name = "Sui" },
@@ -66,7 +85,7 @@ dependencies = [
 
 [[move.package]]
 id = "suilend"
-source = { git = "https://github.com/solendprotocol/suilend.git", rev = "devel", subdir = "contracts/suilend" }
+source = { git = "https://github.com/solendprotocol/suilend.git", rev = "updated-ctoken-ratio", subdir = "contracts/suilend" }
 
 dependencies = [
   { id = "Pyth", name = "Pyth" },
@@ -76,7 +95,7 @@ dependencies = [
 ]
 
 [move.toolchain-version]
-compiler-version = "1.42.2"
+compiler-version = "1.42.3"
 edition = "2024.beta"
 flavor = "sui"
 

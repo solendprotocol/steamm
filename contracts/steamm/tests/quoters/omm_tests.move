@@ -1,24 +1,23 @@
 #[test_only]
 module steamm::omm_tests;
 
-use oracles::oracles::{Self, OracleRegistry, OraclePriceUpdate};
+use oracles::oracles::{Self, OracleRegistry};
 use steamm::b_test_sui::B_TEST_SUI;
 use steamm::b_test_usdc::B_TEST_USDC;
-use steamm::bank::{Self, Bank};
-use steamm::cpmm::CpQuoter;
+use steamm::bank::{Bank};
 use steamm::lp_usdc_sui::LP_USDC_SUI;
 use steamm::omm::{Self, OracleQuoter};
-use steamm::pool::{Self, Pool, minimum_liquidity};
-use steamm::test_utils::{test_setup_cpmm, reserve_args, e9, setup_currencies, base_setup};
-use sui::clock::{Self, Clock};
+use steamm::pool::{Pool};
+use steamm::test_utils::{base_setup};
+use sui::clock::{Self};
 use sui::coin;
-use sui::test_scenario::{Self, Scenario, ctx};
-use sui::test_utils::{destroy, assert_eq};
-use suilend::lending_market::{LendingMarketOwnerCap, LendingMarket};
-use suilend::lending_market_tests::{LENDING_MARKET, setup as suilend_setup};
+use sui::test_scenario::{Self, Scenario};
+use sui::test_utils::{destroy};
+use suilend::lending_market::{LendingMarket};
+use suilend::lending_market_tests::{LENDING_MARKET};
 use suilend::mock_pyth::{Self, PriceState};
-use suilend::test_sui::{Self, TEST_SUI};
-use suilend::test_usdc::{Self, TEST_USDC};
+use suilend::test_sui::{TEST_SUI};
+use suilend::test_usdc::{TEST_USDC};
 
 fun setup(
     fee_bps: u64,

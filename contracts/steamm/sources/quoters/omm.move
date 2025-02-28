@@ -2,8 +2,7 @@
 module steamm::omm;
 use oracles::oracles::{OracleRegistry, OraclePriceUpdate};
 use oracles::oracle_decimal::{OracleDecimal};
-use steamm::math::safe_mul_div;
-use steamm::pool::{Self, Pool, SwapResult, assert_liquidity};
+use steamm::pool::{Self, Pool, SwapResult};
 use steamm::quote::SwapQuote;
 use steamm::registry::Registry;
 use steamm::version::{Self, Version};
@@ -11,7 +10,7 @@ use sui::clock::Clock;
 use sui::coin::{Coin, TreasuryCap, CoinMetadata};
 use suilend::decimal::{Decimal, Self};
 use suilend::lending_market::LendingMarket;
-use std::type_name::{TypeName, Self};
+use std::type_name::{Self};
 use steamm::bank::Bank;
 // ===== Constants =====
 const CURRENT_VERSION: u16 = 1;
