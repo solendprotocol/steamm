@@ -139,8 +139,8 @@ module steamm::omm {
         let price_a = oracle_decimal_to_decimal(oracle_price_update_a.price());
         let price_b = oracle_decimal_to_decimal(oracle_price_update_b.price());
 
-        let (total_funds_a, total_btoken_supply_a) = bank_a.btoken_ratio(lending_market, clock);
-        let (total_funds_b, total_btoken_supply_b) = bank_b.btoken_ratio(lending_market, clock);
+        let (total_funds_a, total_btoken_supply_a) = bank_a.get_btoken_ratio(lending_market, clock);
+        let (total_funds_b, total_btoken_supply_b) = bank_b.get_btoken_ratio(lending_market, clock);
 
 
         let amount_out: u64 = if (a2b) {

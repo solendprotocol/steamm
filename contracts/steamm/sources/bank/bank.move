@@ -723,7 +723,7 @@ fun ctoken_amount<P, T, BToken>(
     decimal::from(amount).div(ctoken_ratio)
 }
 
-public(package) fun btoken_ratio<P, T, BToken>(
+fun btoken_ratio<P, T, BToken>(
     bank: &Bank<P, T, BToken>,
     ctoken_ratio: Option<Decimal>
 ): (Decimal, Decimal) {
@@ -733,6 +733,20 @@ public(package) fun btoken_ratio<P, T, BToken>(
         (decimal::from(1), decimal::from(1))
     } else {
         (bank.total_funds(ctoken_ratio), decimal::from(bank.btoken_supply.supply_value()))
+    }
+}
+
+public(package) fun get_btoken_ratio<P, T, BToken>(
+    bank: &Bank<P, T, BToken>,
+    lending_market: &LendingMarket<P>,
+    clock: &Clock,
+): (Decimal, Decimal) {
+    if (bank.lending.is_some()) {
+        let ctoken_ratio = bank.ctoken_ratio(lending_market, clock);
+        let (total_funds, btoken_supply) = bank.btoken_ratio(some(ctoken_ratio));
+        (total_funds, btoken_supply)
+    } else {
+        (decimal::from(1), decimal::from(1))
     }
 }
 
