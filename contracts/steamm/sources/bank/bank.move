@@ -723,7 +723,7 @@ fun ctoken_amount<P, T, BToken>(
     decimal::from(amount).div(ctoken_ratio)
 }
 
-fun btoken_ratio<P, T, BToken>(
+public(package) fun btoken_ratio<P, T, BToken>(
     bank: &Bank<P, T, BToken>,
     ctoken_ratio: Option<Decimal>
 ): (Decimal, Decimal) {
