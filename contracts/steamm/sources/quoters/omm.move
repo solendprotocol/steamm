@@ -101,6 +101,7 @@ public fun swap<P, A, B, B_A, B_B, LpType: drop>(
 
     assert!(oracle_price_update_b.oracle_registry_id() == pool.quoter().oracle_registry_id, EInvalidOracleRegistry);
     assert!(oracle_price_update_b.oracle_index() == pool.quoter().oracle_index_b, EInvalidOracleIndex);
+
     let quote = quote_swap(
         pool, 
         bank_a,
@@ -112,8 +113,6 @@ public fun swap<P, A, B, B_A, B_B, LpType: drop>(
         clock,
         a2b,
     );
-
-    std::debug::print(&quote);
 
     let response = pool.swap(
         coin_a,
@@ -145,14 +144,41 @@ public(package) fun quote_swap<P, A, B, B_A, B_B, LpType: drop>(
     let price_a = oracle_decimal_to_decimal(oracle_price_update_a.price());
     let price_b = oracle_decimal_to_decimal(oracle_price_update_b.price());
 
-    let (total_funds_a, total_btoken_supply_a) = bank_a.get_btoken_ratio(lending_market, clock);
-    let (total_funds_b, total_btoken_supply_b) = bank_b.get_btoken_ratio(lending_market, clock);
+    let (bank_total_funds_a, total_btoken_supply_a) = bank_a.get_btoken_ratio(lending_market, clock);
+    let (bank_total_funds_b, total_btoken_supply_b) = bank_b.get_btoken_ratio(lending_market, clock);
 
+    let amount_out = quote_swap_impl(
+        amount_in,
+        decimals_a,
+        decimals_b,
+        price_a,
+        price_b,
+        bank_total_funds_a,
+        bank_total_funds_b,
+        total_btoken_supply_a,
+        total_btoken_supply_b,
+        a2b,
+    );
 
-    let amount_out: u64 = if (a2b) {
+    pool.get_quote(amount_in, amount_out, a2b)
+}
+
+fun quote_swap_impl(
+    amount_in: u64,
+    decimals_a: u8,
+    decimals_b: u8,
+    price_a: Decimal,
+    price_b: Decimal,
+    bank_total_funds_a: Decimal,
+    bank_total_funds_b: Decimal,
+    total_btoken_supply_a: Decimal,
+    total_btoken_supply_b: Decimal,
+    a2b: bool,
+): u64 {
+    if (a2b) {
         // 1. convert from btoken_a to regular token_a
         let a_in = decimal::from(amount_in)
-            .mul(total_funds_a)
+            .mul(bank_total_funds_a)
             .div(total_btoken_supply_a);
 
         // 2. convert to dollar value
@@ -168,14 +194,14 @@ public(package) fun quote_swap<P, A, B, B_A, B_B, LpType: drop>(
         // 4. convert to btoken_b
         let b_b_out = b_out
             .mul(total_btoken_supply_b)
-            .div(total_funds_b)
+            .div(bank_total_funds_b)
             .floor();
 
         b_b_out
     } else {
         // 1. convert from btoken_b to regular token_b
         let b_in = decimal::from(amount_in)
-            .mul(total_funds_b)
+            .mul(bank_total_funds_b)
             .div(total_btoken_supply_b);
 
         // 2. convert to dollar value
@@ -191,13 +217,11 @@ public(package) fun quote_swap<P, A, B, B_A, B_B, LpType: drop>(
         // 4. convert to btoken_a
         let b_a_out = a_out
             .mul(total_btoken_supply_a)
-            .div(total_funds_a)
+            .div(bank_total_funds_a)
             .floor();
 
         b_a_out
-    };
-
-    pool.get_quote(amount_in, amount_out, a2b)
+    }
 }
 
 fun oracle_decimal_to_decimal(price: OracleDecimal): Decimal {
@@ -206,4 +230,43 @@ fun oracle_decimal_to_decimal(price: OracleDecimal): Decimal {
     } else {
         decimal::from(price.base() as u64).mul(decimal::from(10u64.pow(price.expo() as u8)))
     }
+}
+
+#[test]
+fun test_quote_swap_impl() {
+    use sui::test_utils::assert_eq;
+
+    // swap 10 bsui for usdc. how much should i get?
+    // 10 bsui => 30 bsui => $90 => 90 usdc => 45 busdc
+    let amount_out = quote_swap_impl(
+        10_000_000_000, 
+        9, 
+        6, 
+        decimal::from(3), 
+        decimal::from(1), 
+        decimal::from(300), 
+        decimal::from(200), 
+        decimal::from(100), 
+        decimal::from(100), 
+        true,
+    );
+
+    assert_eq(amount_out, 45_000_000);
+
+    // swap 10 usdc for sui. how much should i get?
+    // 12 busdc => 24 usdc => $24 => 8 sui => 8/3 bsui
+    let amount_out = quote_swap_impl(
+        12_000_000, 
+        9, 
+        6, 
+        decimal::from(3), 
+        decimal::from(1), 
+        decimal::from(300), 
+        decimal::from(200), 
+        decimal::from(100), 
+        decimal::from(100), 
+        false,
+    );
+
+    assert_eq(amount_out, 2_666_666_666);
 }

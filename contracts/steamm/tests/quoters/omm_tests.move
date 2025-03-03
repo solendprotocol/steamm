@@ -148,7 +148,7 @@ fun test_omm_basic() {
         &clock,
     );
 
-    let swap_result = omm::swap(
+    let _swap_result = omm::swap(
         &mut pool,
         &bank_a,
         &bank_b,
@@ -164,7 +164,42 @@ fun test_omm_basic() {
         scenario.ctx(),
     );
 
-    std::debug::print(&swap_result);
+    assert!(coin_a.value() == 0);
+    assert!(coin_b.value() == 2 * 1_000_000_000 - 20_000_000);
+
+    // Swap other direction 
+    let oracle_price_update_usdc = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
+        0,
+        &clock,
+    );
+
+    price_state.update_price<TEST_SUI>(3, 0, &clock);
+    let oracle_price_update_sui = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
+        1,
+        &clock,
+    );
+
+    let old_coin_b_value = coin_b.value();
+    let swap_result = omm::swap(
+        &mut pool,
+        &bank_a,
+        &bank_b,
+        &lending_market,
+        &mut coin_a,
+        &mut coin_b,
+        oracle_price_update_usdc,
+        oracle_price_update_sui,
+        false ,
+        1_500_000_000, // 1.5 sui
+        0,
+        &clock,
+        scenario.ctx(),
+    );
+
+    assert!(coin_a.value() == 4_500_000 - 45_000);
+    assert!(coin_b.value() == old_coin_b_value - 1_500_000_000);
 
     destroy(coin_a);
     destroy(coin_b);
