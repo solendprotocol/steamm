@@ -12,7 +12,9 @@ use suilend::decimal::{Decimal, Self};
 use suilend::lending_market::LendingMarket;
 use std::type_name::{Self};
 use steamm::bank::Bank;
+
 // ===== Constants =====
+
 const CURRENT_VERSION: u16 = 1;
 
 // ===== Errors =====
@@ -36,6 +38,7 @@ public struct OracleQuoter has store {
 }
 
 // ===== Public Methods =====
+
 public fun new<P, A, B, B_A, B_B, LpType: drop>(
     registry: &mut Registry,
     lending_market: &LendingMarket<P>,
@@ -84,10 +87,10 @@ public fun swap<P, A, B, B_A, B_B, LpType: drop>(
     bank_a: &Bank<P, A, B_A>,
     bank_b: &Bank<P, B, B_B>,
     lending_market: &LendingMarket<P>,
-    coin_a: &mut Coin<B_A>,
-    coin_b: &mut Coin<B_B>,
     oracle_price_update_a: OraclePriceUpdate,
     oracle_price_update_b: OraclePriceUpdate,
+    coin_a: &mut Coin<B_A>,
+    coin_b: &mut Coin<B_B>,
     a2b: bool,
     amount_in: u64,
     min_amount_out: u64,
@@ -107,11 +110,11 @@ public fun swap<P, A, B, B_A, B_B, LpType: drop>(
         bank_a,
         bank_b,
         lending_market,
-        amount_in, 
         oracle_price_update_a,
         oracle_price_update_b,
-        clock,
+        amount_in, 
         a2b,
+        clock,
     );
 
     let response = pool.swap(
@@ -130,11 +133,11 @@ public(package) fun quote_swap<P, A, B, B_A, B_B, LpType: drop>(
     bank_a: &Bank<P, A, B_A>,
     bank_b: &Bank<P, B, B_B>,
     lending_market: &LendingMarket<P>,
-    amount_in: u64,
     oracle_price_update_a: OraclePriceUpdate,
     oracle_price_update_b: OraclePriceUpdate,
-    clock: &Clock,
+    amount_in: u64,
     a2b: bool,
+    clock: &Clock,
 ): SwapQuote {
     let quoter = pool.quoter();
 
