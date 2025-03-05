@@ -11,4 +11,5 @@ suilend = { git = "https://github.com/solendprotocol/suilend.git", subdir = "con
 steamm = { local = "../steamm" }
 
 [addresses]
-steamm_scripts = "0x7e69a01e9d856fdbfa315a3b0835d828ce632d3dd2fdc3d80de256895fca9e0a"
+# steamm_scripts = "0x7e69a01e9d856fdbfa315a3b0835d828ce632d3dd2fdc3d80de256895fca9e0a"
+steamm_scripts = "0x0"
