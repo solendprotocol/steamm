@@ -7,8 +7,8 @@ published-at = "0x4fb1cf45dffd6230305f1d269dd1816678cc8e3ba0b747a813a556921219f2
 
 [dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/mainnet" }
-suilend = { git = "https://github.com/solendprotocol/suilend.git", subdir = "contracts/suilend", rev = "updated-ctoken-ratio" }
-oracles = { git = "https://github.com/solendprotocol/suilend.git", subdir = "contracts/oracles", rev = "996f47539c621775c48b7f9c9a601ad6048833da" }
+suilend = { git = "https://github.com/solendprotocol/suilend.git", subdir = "contracts/suilend", rev = "3abbc6c4c8e4c74e40e9128db0388416878a64d6" }
+oracles = { git = "https://github.com/solendprotocol/suilend.git", subdir = "contracts/oracles", rev = "3abbc6c4c8e4c74e40e9128db0388416878a64d6" }
 
 # For remote import, use the `{ git = "...", subdir = "...", rev = "..." }`.
 # Revision can be a branch, a tag, and a commit hash.

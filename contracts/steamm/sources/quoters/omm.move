@@ -226,9 +226,9 @@ fun quote_swap_impl(
 
 fun oracle_decimal_to_decimal(price: OracleDecimal): Decimal {
     if (price.is_expo_negative()) {
-        decimal::from(price.base() as u64).div(decimal::from(10u64.pow(price.expo() as u8)))
+        decimal::from_u128(price.base()).div(decimal::from(10u64.pow(price.expo() as u8)))
     } else {
-        decimal::from(price.base() as u64).mul(decimal::from(10u64.pow(price.expo() as u8)))
+        decimal::from_u128(price.base()).mul(decimal::from(10u64.pow(price.expo() as u8)))
     }
 }
 

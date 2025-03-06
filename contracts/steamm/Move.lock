@@ -2,7 +2,7 @@
 
 [move]
 version = 3
-manifest_digest = "7EB056C7FEC2D65ECFEBE5A6CDA113064BB6610CE482676B55342EB248452E5A"
+manifest_digest = "6E0F0C28A141237C3EEE860B86267F002D01F02FF695C1FD4E28A580AE260C45"
 deps_digest = "060AD7E57DFB13104F21BE5F5C3759D03F0553FC3229247D9A7A6B45F50D03A3"
 dependencies = [
   { id = "Sui", name = "Sui" },
@@ -67,7 +67,7 @@ dependencies = [
 
 [[move.package]]
 id = "oracles"
-source = { git = "https://github.com/solendprotocol/suilend.git", rev = "996f47539c621775c48b7f9c9a601ad6048833da", subdir = "contracts/oracles" }
+source = { git = "https://github.com/solendprotocol/suilend.git", rev = "3abbc6c4c8e4c74e40e9128db0388416878a64d6", subdir = "contracts/oracles" }
 
 dependencies = [
   { id = "Pyth", name = "Pyth" },
@@ -77,7 +77,7 @@ dependencies = [
 
 [[move.package]]
 id = "sprungsui"
-source = { git = "https://github.com/solendprotocol/suilend.git", rev = "updated-ctoken-ratio", subdir = "contracts/sprungsui" }
+source = { git = "https://github.com/solendprotocol/suilend.git", rev = "3abbc6c4c8e4c74e40e9128db0388416878a64d6", subdir = "contracts/sprungsui" }
 
 dependencies = [
   { id = "Sui", name = "Sui" },
@@ -85,7 +85,7 @@ dependencies = [
 
 [[move.package]]
 id = "suilend"
-source = { git = "https://github.com/solendprotocol/suilend.git", rev = "updated-ctoken-ratio", subdir = "contracts/suilend" }
+source = { git = "https://github.com/solendprotocol/suilend.git", rev = "3abbc6c4c8e4c74e40e9128db0388416878a64d6", subdir = "contracts/suilend" }
 
 dependencies = [
   { id = "Pyth", name = "Pyth" },
