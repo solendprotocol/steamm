@@ -153,10 +153,10 @@ fun test_omm_basic() {
         &bank_a,
         &bank_b,
         &lending_market,
-        &mut coin_a,
-        &mut coin_b,
         oracle_price_update_usdc,
         oracle_price_update_sui,
+        &mut coin_a,
+        &mut coin_b,
         true, // a2b
         6 * 1_000_000,
         0,
@@ -182,15 +182,15 @@ fun test_omm_basic() {
     );
 
     let old_coin_b_value = coin_b.value();
-    let swap_result = omm::swap(
+    let _swap_result = omm::swap(
         &mut pool,
         &bank_a,
         &bank_b,
         &lending_market,
-        &mut coin_a,
-        &mut coin_b,
         oracle_price_update_usdc,
         oracle_price_update_sui,
+        &mut coin_a,
+        &mut coin_b,
         false ,
         1_500_000_000, // 1.5 sui
         0,
@@ -263,10 +263,10 @@ fun test_omm_fail_wrong_oracle() {
         &bank_a,
         &bank_b,
         &lending_market,
-        &mut coin_a,
-        &mut coin_b,
         oracle_price_update_sui,
         oracle_price_update_usdc,
+        &mut coin_a,
+        &mut coin_b,
         true, // a2b
         6 * 1_000_000,
         0,
