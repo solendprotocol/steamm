@@ -2,7 +2,7 @@
 
 [move]
 version = 3
-manifest_digest = "697B29EFDE6083B94EC760ABFA7E71DEE89DB1198E377D9C08D358E206A39BC8"
+manifest_digest = "CA3368926806ECF0E8F6E979D9BD4ED641260164EFC96D54B01EF09F4F68894E"
 deps_digest = "060AD7E57DFB13104F21BE5F5C3759D03F0553FC3229247D9A7A6B45F50D03A3"
 dependencies = [
   { id = "Sui", name = "Sui" },
@@ -41,6 +41,14 @@ dependencies = [
 ]
 
 [[move.package]]
+id = "Switchboard"
+source = { git = "https://github.com/switchboard-xyz/sui.git", rev = "mainnet", subdir = "on_demand/" }
+
+dependencies = [
+  { id = "Sui", name = "Sui" },
+]
+
+[[move.package]]
 id = "Wormhole"
 source = { git = "https://github.com/solendprotocol/wormhole.git", rev = "e1698d3c72b15cdddd7da98ad43e151f83b72a0a", subdir = "sui/wormhole" }
 
@@ -58,8 +66,18 @@ dependencies = [
 ]
 
 [[move.package]]
+id = "oracles"
+source = { git = "https://github.com/solendprotocol/suilend.git", rev = "3abbc6c4c8e4c74e40e9128db0388416878a64d6", subdir = "contracts/oracles" }
+
+dependencies = [
+  { id = "Pyth", name = "Pyth" },
+  { id = "Sui", name = "Sui" },
+  { id = "Switchboard", name = "Switchboard" },
+]
+
+[[move.package]]
 id = "sprungsui"
-source = { git = "https://github.com/solendprotocol/suilend.git", rev = "devel", subdir = "contracts/sprungsui" }
+source = { git = "https://github.com/solendprotocol/suilend.git", rev = "06dc051391967ddd6c3aa6eabefc2e66147ac071", subdir = "contracts/sprungsui" }
 
 dependencies = [
   { id = "Sui", name = "Sui" },
@@ -71,12 +89,13 @@ source = { local = "../steamm" }
 
 dependencies = [
   { id = "Sui", name = "Sui" },
+  { id = "oracles", name = "oracles" },
   { id = "suilend", name = "suilend" },
 ]
 
 [[move.package]]
 id = "suilend"
-source = { git = "https://github.com/solendprotocol/suilend.git", rev = "devel", subdir = "contracts/suilend" }
+source = { git = "https://github.com/solendprotocol/suilend.git", rev = "06dc051391967ddd6c3aa6eabefc2e66147ac071", subdir = "contracts/suilend" }
 
 dependencies = [
   { id = "Pyth", name = "Pyth" },
@@ -86,14 +105,6 @@ dependencies = [
 ]
 
 [move.toolchain-version]
-compiler-version = "1.42.2"
+compiler-version = "1.44.2"
 edition = "2024.beta"
 flavor = "sui"
-
-[env]
-
-[env.mainnet]
-chain-id = "35834a8a"
-original-published-id = "0xe167bfdc4b8410e4af76079a37412590ace95064b2d17f1f3b7fed2009a59843"
-latest-published-id = "0x772b3d9c5d170f8225a231fa4f0366eef608117099191d316482139c2bc223fc"
-published-version = "2"

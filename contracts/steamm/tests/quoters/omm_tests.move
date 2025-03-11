@@ -287,3 +287,91 @@ fun test_omm_fail_wrong_oracle() {
 
     test_scenario::end(scenario);
 }
+
+#[test]
+#[expected_failure(abort_code = steamm::omm::EInvalidBankType)]
+fun test_omm_fail_not_a_btoken() {
+    let mut scenario = test_scenario::begin(@0x26);
+
+    let (
+        bank_a,
+        bank_b,
+        lending_market,
+        lend_cap,
+        price_state,
+        bag,
+        clock,
+        mut registry,
+        meta_b_usdc,
+        meta_b_sui,
+        meta_usdc,
+        meta_sui,
+        mut meta_lp_usdc_sui,
+        treasury_cap_lp,
+    ) = base_setup(option::none(), &mut scenario);
+
+    let (mut oracle_registry, admin_cap) = oracles::new_oracle_registry_for_testing(
+        oracles::new_oracle_registry_config(
+            60,
+            10,
+            60,
+            10,
+            scenario.ctx(),
+        ),
+        scenario.ctx(),
+    );
+
+    oracle_registry.add_pyth_oracle(
+        &admin_cap,
+        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
+        scenario.ctx(),
+    );
+
+    oracle_registry.add_pyth_oracle(
+        &admin_cap,
+        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
+        scenario.ctx(),
+    );
+
+    let pool = omm::new<
+        LENDING_MARKET,
+        TEST_USDC,
+        TEST_SUI,
+        TEST_USDC,
+        B_TEST_SUI,
+        LP_USDC_SUI,
+    >(
+        &mut registry,
+        &lending_market,
+        &meta_usdc,
+        &meta_sui,
+        &meta_usdc,
+        &meta_b_sui,
+        &mut meta_lp_usdc_sui,
+        treasury_cap_lp,
+        &oracle_registry,
+        0,
+        1,
+        100,
+        scenario.ctx(),
+    );
+
+    sui::test_utils::destroy(admin_cap);
+    sui::test_utils::destroy(meta_lp_usdc_sui);
+    sui::test_utils::destroy(meta_b_usdc);
+    sui::test_utils::destroy(meta_b_sui);
+    sui::test_utils::destroy(meta_usdc);
+    sui::test_utils::destroy(meta_sui);
+    sui::test_utils::destroy(registry);
+    sui::test_utils::destroy(lend_cap);
+    sui::test_utils::destroy(clock);
+    sui::test_utils::destroy(bag);
+    sui::test_utils::destroy(pool);
+    sui::test_utils::destroy(oracle_registry);
+    sui::test_utils::destroy(price_state);
+    sui::test_utils::destroy(lending_market);
+    sui::test_utils::destroy(bank_a);
+    sui::test_utils::destroy(bank_b);
+
+    test_scenario::end(scenario);
+}

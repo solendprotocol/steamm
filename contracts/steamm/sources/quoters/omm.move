@@ -22,8 +22,6 @@ const EInvalidBankType: u64 = 0;
 const EInvalidOracleIndex: u64 = 1;
 const EInvalidOracleRegistry: u64 = 2;
 
-/// Oracle AMM specific state. We do not store the invariant,
-/// instead we compute it at runtime.
 public struct OracleQuoter has store {
     version: Version,
 
@@ -148,91 +146,98 @@ public(package) fun quote_swap<P, A, B, B_A, B_B, LpType: drop>(
     let price_b = oracle_decimal_to_decimal(oracle_price_update_b.price());
 
     let (bank_total_funds_a, total_btoken_supply_a) = bank_a.get_btoken_ratio(lending_market, clock);
-    let (bank_total_funds_b, total_btoken_supply_b) = bank_b.get_btoken_ratio(lending_market, clock);
+    let btoken_ratio_a = bank_total_funds_a.div(total_btoken_supply_a);
 
-    let amount_out = quote_swap_impl(
-        amount_in,
-        decimals_a,
-        decimals_b,
-        price_a,
-        price_b,
-        bank_total_funds_a,
-        bank_total_funds_b,
-        total_btoken_supply_a,
-        total_btoken_supply_b,
-        a2b,
-    );
+    let (bank_total_funds_b, total_btoken_supply_b) = bank_b.get_btoken_ratio(lending_market, clock);
+    let btoken_ratio_b = bank_total_funds_b.div(total_btoken_supply_b);
+
+    let amount_out = if (a2b) {
+        quote_swap_impl(
+            amount_in,
+            decimals_a,
+            decimals_b,
+            price_a,
+            price_b,
+            btoken_ratio_a,
+            btoken_ratio_b,
+        )
+    } else {
+        quote_swap_impl(
+            amount_in,
+            decimals_b,
+            decimals_a,
+            price_b,
+            price_a,
+            btoken_ratio_b,
+            btoken_ratio_a,
+        )
+    };
 
     pool.get_quote(amount_in, amount_out, a2b)
 }
 
 fun quote_swap_impl(
-    amount_in: u64,
-    decimals_a: u8,
-    decimals_b: u8,
-    price_a: Decimal,
-    price_b: Decimal,
-    bank_total_funds_a: Decimal,
-    bank_total_funds_b: Decimal,
-    total_btoken_supply_a: Decimal,
-    total_btoken_supply_b: Decimal,
-    a2b: bool,
+    btoken_amount_in: u64,
+    decimals_in: u8,
+    decimals_out: u8,
+    price_in: Decimal,
+    price_out: Decimal,
+    btoken_ratio_in: Decimal,
+    btoken_ratio_out: Decimal,
 ): u64 {
-    if (a2b) {
-        // 1. convert from btoken_a to regular token_a
-        let a_in = decimal::from(amount_in)
-            .mul(bank_total_funds_a)
-            .div(total_btoken_supply_a);
+    /* More intuitive calculation here:
+        // 1. convert from btoken_in to regular token_in
+        let amount_in = decimal::from(btoken_amount_in).mul(btoken_ratio_in);
 
         // 2. convert to dollar value
-        let dollar_value = a_in
-            .div(decimal::from(10u64.pow(decimals_a as u8)))
-            .mul(price_a);
+        let dollar_value = amount_in
+            .div(decimal::from(10u64.pow(decimals_in as u8)))
+            .mul(price_in);
 
-        // 3. convert to b
-        let b_out = dollar_value
-            .div(price_b)
-            .mul(decimal::from(10u64.pow(decimals_b as u8)));
+        // 3. convert to token_out
+        let amount_out = dollar_value
+            .div(price_out)
+            .mul(decimal::from(10u64.pow(decimals_out as u8)));
 
-        // 4. convert to btoken_b
-        let b_b_out = b_out
-            .mul(total_btoken_supply_b)
-            .div(bank_total_funds_b)
+        // 4. convert to btoken_out
+        let btoken_amount_out = amount_out
+            .div(btoken_ratio_out)
             .floor();
 
-        b_b_out
+        btoken_amount_out
+    */
+
+    let btoken_amount_out_unshifted= decimal::from(btoken_amount_in)
+        .mul(btoken_ratio_in)
+        .mul(price_in)
+        .div(price_out)
+        .div(btoken_ratio_out);
+
+    if (decimals_in > decimals_out) {
+        btoken_amount_out_unshifted.div(decimal::from(10u64.pow((decimals_in - decimals_out) as u8))).floor()
     } else {
-        // 1. convert from btoken_b to regular token_b
-        let b_in = decimal::from(amount_in)
-            .mul(bank_total_funds_b)
-            .div(total_btoken_supply_b);
-
-        // 2. convert to dollar value
-        let dollar_value = b_in
-            .div(decimal::from(10u64.pow(decimals_b as u8)))
-            .mul(price_b);
-
-        // 3. convert to a
-        let a_out = dollar_value
-            .div(price_a)
-            .mul(decimal::from(10u64.pow(decimals_a as u8)));
-
-        // 4. convert to btoken_a
-        let b_a_out = a_out
-            .mul(total_btoken_supply_a)
-            .div(bank_total_funds_a)
-            .floor();
-
-        b_a_out
+        btoken_amount_out_unshifted.mul(decimal::from(10u64.pow((decimals_out - decimals_in) as u8))).floor()
     }
 }
 
 fun oracle_decimal_to_decimal(price: OracleDecimal): Decimal {
     if (price.is_expo_negative()) {
-        decimal::from(price.base() as u64).div(decimal::from(10u64.pow(price.expo() as u8)))
+        decimal::from_u128(price.base()).div(decimal::from(10u64.pow(price.expo() as u8)))
     } else {
-        decimal::from(price.base() as u64).mul(decimal::from(10u64.pow(price.expo() as u8)))
+        decimal::from_u128(price.base()).mul(decimal::from(10u64.pow(price.expo() as u8)))
     }
+}
+
+#[test]
+fun test_oracle_decimal_to_decimal() {
+    use sui::test_utils::assert_eq;
+    use oracles::oracle_decimal::{Self};
+
+    let price = oracle_decimal_to_decimal(oracle_decimal::new(140, 4, false));
+    assert_eq(price, decimal::from(1_400_000));
+
+    let price = oracle_decimal_to_decimal(oracle_decimal::new(140, 3, true));
+    assert_eq(price, decimal::from(140).div(decimal::from(1000)));
 }
 
 #[test]
@@ -242,33 +247,27 @@ fun test_quote_swap_impl() {
     // swap 10 bsui for usdc. how much should i get?
     // 10 bsui => 30 bsui => $90 => 90 usdc => 45 busdc
     let amount_out = quote_swap_impl(
-        10_000_000_000, 
+        10_000_000_001, 
         9, 
         6, 
         decimal::from(3), 
         decimal::from(1), 
-        decimal::from(300), 
-        decimal::from(200), 
-        decimal::from(100), 
-        decimal::from(100), 
-        true,
+        decimal::from(3),
+        decimal::from(2),
     );
 
     assert_eq(amount_out, 45_000_000);
 
-    // swap 10 usdc for sui. how much should i get?
+    // swap 12 busdc for bsui. how much should i get?
     // 12 busdc => 24 usdc => $24 => 8 sui => 8/3 bsui
     let amount_out = quote_swap_impl(
         12_000_000, 
-        9, 
         6, 
-        decimal::from(3), 
+        9, 
         decimal::from(1), 
-        decimal::from(300), 
-        decimal::from(200), 
-        decimal::from(100), 
-        decimal::from(100), 
-        false,
+        decimal::from(3), 
+        decimal::from(2), 
+        decimal::from(3), 
     );
 
     assert_eq(amount_out, 2_666_666_666);
