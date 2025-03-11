@@ -126,7 +126,7 @@ public fun swap<P, A, B, B_A, B_B, LpType: drop>(
     response
 }
 
-public(package) fun quote_swap<P, A, B, B_A, B_B, LpType: drop>(
+public fun quote_swap<P, A, B, B_A, B_B, LpType: drop>(
     pool: &Pool<B_A, B_B, OracleQuoter, LpType>,
     bank_a: &Bank<P, A, B_A>,
     bank_b: &Bank<P, B, B_B>,
