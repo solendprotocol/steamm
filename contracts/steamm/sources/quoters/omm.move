@@ -12,6 +12,7 @@ use suilend::decimal::{Decimal, Self};
 use suilend::lending_market::LendingMarket;
 use std::type_name::{Self};
 use steamm::bank::Bank;
+use steamm::events::emit_event;
 
 // ===== Constants =====
 
@@ -68,7 +69,7 @@ public fun new<P, A, B, B_A, B_B, LpType: drop>(
         decimals_b: meta_b.get_decimals(),
     };
 
-    pool::new<B_A, B_B, OracleQuoter, LpType>(
+    let pool = pool::new<B_A, B_B, OracleQuoter, LpType>(
         registry,
         swap_fee_bps,
         quoter,
@@ -77,7 +78,19 @@ public fun new<P, A, B, B_A, B_B, LpType: drop>(
         meta_lp,
         lp_treasury,
         ctx,
-    )
+    );
+
+    let result = NewOracleQuoter {
+        pool_id: object::id(&pool),
+        oracle_registry_id: object::id(oracle_registry),
+        oracle_index_a,
+        oracle_index_b,
+        
+    };
+
+    emit_event(result);
+
+    return pool
 }
 
 public fun swap<P, A, B, B_A, B_B, LpType: drop>(
@@ -227,6 +240,17 @@ fun oracle_decimal_to_decimal(price: OracleDecimal): Decimal {
         decimal::from_u128(price.base()).mul(decimal::from(10u64.pow(price.expo() as u8)))
     }
 }
+
+// ===== Events =====
+
+public struct NewOracleQuoter has copy, drop, store {
+    pool_id: ID,
+    oracle_registry_id: ID,
+    oracle_index_a: u64,
+    oracle_index_b: u64,
+}
+
+// ===== Tests =====
 
 #[test]
 fun test_oracle_decimal_to_decimal() {
