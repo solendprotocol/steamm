@@ -375,3 +375,183 @@ fun test_omm_fail_not_a_btoken() {
 
     test_scenario::end(scenario);
 }
+
+#[test]
+fun test_omm_quote_swap_insufficient_liquidity() {
+    let mut scenario = test_scenario::begin(@0x26);
+
+    let (mut pool, oracle_registry, mut price_state, lending_market, bank_a, bank_b) = setup(
+        100,
+        &mut scenario,
+    );
+    let clock = clock::create_for_testing(scenario.ctx());
+
+    // Add some initial liquidity to the pool
+    let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(100 * 1_000_000, scenario.ctx());
+    let mut coin_b = coin::mint_for_testing<B_TEST_SUI>(10 * 1_000_000_000, scenario.ctx());
+
+    let (lp_coins, _) = pool.deposit_liquidity(
+        &mut coin_a,
+        &mut coin_b,
+        100 * 1_000,
+        100 * 1_000,
+        scenario.ctx(),
+    );
+
+    destroy(coin_a);
+    destroy(coin_b);
+
+    // Update oracle prices
+    price_state.update_price<TEST_USDC>(1, 0, &clock);
+    let oracle_price_update_usdc = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
+        0,
+        &clock,
+    );
+
+    price_state.update_price<TEST_SUI>(3, 0, &clock);
+    let oracle_price_update_sui = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
+        1,
+        &clock,
+    );
+
+    // Try to quote a swap with an amount much larger than pool liquidity
+    // Attempting to swap 1000 USDC when pool only has 100
+    let quote = omm::quote_swap(
+        &pool,
+        &bank_a,
+        &bank_b,
+        &lending_market,
+        oracle_price_update_usdc,
+        oracle_price_update_sui,
+        1000 * 1_000_000, // 1000 USDC, much larger than pool liquidity
+        true, // a2b (USDC to SUI)
+        &clock,
+    );
+
+    // Verify that amount_out is 0 due to insufficient liquidity
+    assert!(quote.amount_out() == 0, 0);
+    assert!(quote.output_fees().pool_fees() == 0, 0);
+    assert!(quote.output_fees().protocol_fees() == 0, 0);
+
+    price_state.update_price<TEST_USDC>(1, 0, &clock);
+    let oracle_price_update_usdc = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
+        0,
+        &clock,
+    );
+
+    price_state.update_price<TEST_SUI>(3, 0, &clock);
+    let oracle_price_update_sui = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
+        1,
+        &clock,
+    );
+
+    // Check the opposite direction as well - trying to swap more SUI than available
+    let quote = omm::quote_swap(
+        &pool,
+        &bank_a,
+        &bank_b,
+        &lending_market,
+        oracle_price_update_usdc,
+        oracle_price_update_sui,
+        100 * 1_000_000_000, // 100 SUI, much larger than pool liquidity
+        false, // b2a (SUI to USDC)
+        &clock,
+    );
+
+    // Verify that amount_out is 0 due to insufficient liquidity
+    assert!(quote.amount_out() == 0, 0);
+    assert!(quote.output_fees().pool_fees() == 0, 0);
+    assert!(quote.output_fees().protocol_fees() == 0, 0);
+
+    destroy(lp_coins);
+    destroy(pool);
+    destroy(oracle_registry);
+    destroy(clock);
+    destroy(price_state);
+    destroy(lending_market);
+    destroy(bank_a);
+    destroy(bank_b);
+
+    test_scenario::end(scenario);
+}
+
+#[test]
+#[expected_failure(abort_code = steamm::pool::ESwapOutputAmountIsZero)]
+fun test_omm_swap_insufficient_liquidity() {
+    let mut scenario = test_scenario::begin(@0x26);
+
+    let (mut pool, oracle_registry, mut price_state, lending_market, bank_a, bank_b) = setup(
+        100,
+        &mut scenario,
+    );
+    let clock = clock::create_for_testing(scenario.ctx());
+
+    // Add some initial liquidity to the pool - deliberately small amount
+    let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(100 * 1_000_000, scenario.ctx());
+    let mut coin_b = coin::mint_for_testing<B_TEST_SUI>(10 * 1_000_000_000, scenario.ctx());
+
+    let (lp_coins, _) = pool.deposit_liquidity(
+        &mut coin_a,
+        &mut coin_b,
+        100 * 1_000_000,
+        10 * 1_000_000_000,
+        scenario.ctx(),
+    );
+
+    destroy(coin_a);
+    destroy(coin_b);
+
+    // Update oracle prices
+    price_state.update_price<TEST_USDC>(1, 0, &clock);
+    let oracle_price_update_usdc = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
+        0,
+        &clock,
+    );
+
+    price_state.update_price<TEST_SUI>(3, 0, &clock);
+    let oracle_price_update_sui = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
+        1,
+        &clock,
+    );
+
+    // Create coins for swapping - attempting to swap more than the pool has
+    let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(1000 * 1_000_000, scenario.ctx()); // 1000 USDC
+    let mut coin_b = coin::mint_for_testing<B_TEST_SUI>(0, scenario.ctx());
+
+    // This should fail with EInsufficientLiquidity (or similar error)
+    // as we're trying to swap 1000 USDC when pool only has 100 USDC
+    let _swap_result = omm::swap(
+        &mut pool,
+        &bank_a,
+        &bank_b,
+        &lending_market,
+        oracle_price_update_usdc,
+        oracle_price_update_sui,
+        &mut coin_a,
+        &mut coin_b,
+        true, // a2b (USDC to SUI)
+        1000 * 1_000_000, // 1000 USDC, much larger than pool liquidity
+        0, // min amount out - doesn't matter as we expect failure
+        &clock,
+        scenario.ctx(),
+    );
+
+    destroy(coin_a);
+    destroy(coin_b);
+    destroy(lp_coins);
+    destroy(pool);
+    destroy(oracle_registry);
+    destroy(clock);
+    destroy(price_state);
+    destroy(lending_market);
+    destroy(bank_a);
+    destroy(bank_b);
+
+    test_scenario::end(scenario);
+}
