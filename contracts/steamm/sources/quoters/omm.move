@@ -164,7 +164,7 @@ public fun quote_swap<P, A, B, B_A, B_B, LpType: drop>(
     let (bank_total_funds_b, total_btoken_supply_b) = bank_b.get_btoken_ratio(lending_market, clock);
     let btoken_ratio_b = bank_total_funds_b.div(total_btoken_supply_b);
 
-    let amount_out = if (a2b) {
+    let mut amount_out = if (a2b) {
         quote_swap_impl(
             amount_in,
             decimals_a,
@@ -184,6 +184,20 @@ public fun quote_swap<P, A, B, B_A, B_B, LpType: drop>(
             btoken_ratio_b,
             btoken_ratio_a,
         )
+    };
+
+    amount_out = if (a2b) {
+        if (amount_out >= pool.balance_amount_b()) {
+            0
+        } else {
+            amount_out
+        }
+    } else {
+        if (amount_out >= pool.balance_amount_a()) {
+            0
+        } else {
+            amount_out
+        }
     };
 
     pool.get_quote(amount_in, amount_out, a2b)
