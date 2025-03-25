@@ -640,11 +640,12 @@ fun deploy<P, T, BToken>(
     let lending = bank.lending.borrow_mut();
     lending.ctokens = lending.ctokens + ctoken_amount;
 
-    emit_event(DeployEvent {
+    emit_event(DeployEventV2 {
         bank_id: object::id(bank),
         lending_market_id: object::id(lending_market),
         deployed_amount: amount_to_deploy,
         ctokens_minted: ctoken_amount,
+        funds_available: bank.funds_available.value(),
     });
 }
 
@@ -699,11 +700,12 @@ fun recall<P, T, BToken>(
         ECTokenRatioTooLow,
     );
 
-    emit_event(RecallEvent {
+    emit_event(RecallEventV2 {
         bank_id: object::id(bank),
         lending_market_id: object::id(lending_market),
         recalled_amount: recalled_amount,
         ctokens_burned: ctoken_amount,
+        funds_available: bank.funds_available.value(),
     });
 }
 
@@ -877,6 +879,7 @@ public struct BurnBTokenEvent has copy, drop, store {
     burned_amount: u64,
 }
 
+#[allow(unused_field)]
 public struct DeployEvent has copy, drop, store {
     bank_id: ID,
     lending_market_id: ID,
@@ -884,11 +887,28 @@ public struct DeployEvent has copy, drop, store {
     ctokens_minted: u64,
 }
 
+#[allow(unused_field)]
 public struct RecallEvent has copy, drop, store {
     bank_id: ID,
     lending_market_id: ID,
     recalled_amount: u64,
     ctokens_burned: u64,
+}
+
+public struct DeployEventV2 has copy, drop, store {
+    bank_id: ID,
+    lending_market_id: ID,
+    deployed_amount: u64,
+    ctokens_minted: u64,
+    funds_available: u64,
+}
+
+public struct RecallEventV2 has copy, drop, store {
+    bank_id: ID,
+    lending_market_id: ID,
+    recalled_amount: u64,
+    ctokens_burned: u64,
+    funds_available: u64,
 }
 
 public struct NeedsRebalance has copy, drop, store {
