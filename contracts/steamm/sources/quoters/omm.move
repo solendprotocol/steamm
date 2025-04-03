@@ -13,6 +13,8 @@ use suilend::lending_market::LendingMarket;
 use std::type_name::{Self};
 use steamm::bank::Bank;
 use steamm::events::emit_event;
+use steamm::fixed_point64 as fp64;
+use steamm::utils::decimal_to_fixedpoint64;
 
 // ===== Constants =====
 
@@ -247,6 +249,158 @@ fun quote_swap_impl(
     }
 }
 
+public fun swap2<P, A, B, B_A, B_B, LpType: drop>(
+    pool: &mut Pool<B_A, B_B, OracleQuoter, LpType>,
+    bank_a: &Bank<P, A, B_A>,
+    bank_b: &Bank<P, B, B_B>,
+    lending_market: &LendingMarket<P>,
+    oracle_price_update_a: OraclePriceUpdate,
+    oracle_price_update_b: OraclePriceUpdate,
+    coin_a: &mut Coin<B_A>,
+    coin_b: &mut Coin<B_B>,
+    a2b: bool,
+    amount_in: u64,
+    min_amount_out: u64,
+    clock: &Clock,
+    ctx: &mut TxContext,
+): SwapResult {
+    pool.quoter_mut().version.assert_version_and_upgrade(CURRENT_VERSION);
+
+    assert!(oracle_price_update_a.oracle_registry_id() == pool.quoter().oracle_registry_id, EInvalidOracleRegistry);
+    assert!(oracle_price_update_a.oracle_index() == pool.quoter().oracle_index_a, EInvalidOracleIndex);
+
+    assert!(oracle_price_update_b.oracle_registry_id() == pool.quoter().oracle_registry_id, EInvalidOracleRegistry);
+    assert!(oracle_price_update_b.oracle_index() == pool.quoter().oracle_index_b, EInvalidOracleIndex);
+
+    let quote = quote_swap2(
+        pool, 
+        bank_a,
+        bank_b,
+        lending_market,
+        oracle_price_update_a,
+        oracle_price_update_b,
+        amount_in, 
+        a2b,
+        clock,
+    );
+
+    let response = pool.swap(
+        coin_a,
+        coin_b,
+        quote,
+        min_amount_out,
+        ctx,
+    );
+
+    response
+}
+
+public fun quote_swap2<P, A, B, B_A, B_B, LpType: drop>(
+    pool: &Pool<B_A, B_B, OracleQuoter, LpType>,
+    bank_a: &Bank<P, A, B_A>,
+    bank_b: &Bank<P, B, B_B>,
+    lending_market: &LendingMarket<P>,
+    oracle_price_update_a: OraclePriceUpdate,
+    oracle_price_update_b: OraclePriceUpdate,
+    amount_in: u64,
+    a2b: bool,
+    clock: &Clock,
+): SwapQuote {
+    let quoter = pool.quoter();
+
+    let decimals_a = quoter.decimals_a;
+    let decimals_b = quoter.decimals_b; 
+
+    let price_a = oracle_decimal_to_decimal(oracle_price_update_a.price());
+    let price_b = oracle_decimal_to_decimal(oracle_price_update_b.price());
+
+    let (bank_total_funds_a, total_btoken_supply_a) = bank_a.get_btoken_ratio(lending_market, clock);
+    let btoken_ratio_a = bank_total_funds_a.div(total_btoken_supply_a);
+
+    let (bank_total_funds_b, total_btoken_supply_b) = bank_b.get_btoken_ratio(lending_market, clock);
+    let btoken_ratio_b = bank_total_funds_b.div(total_btoken_supply_b);
+
+    let btoken_reserve_a = decimal::from(pool.balance_amount_a()).mul(btoken_ratio_a).floor(); // todo: maybe floor after
+    let btoken_reserve_b = decimal::from(pool.balance_amount_b()).mul(btoken_ratio_b).floor(); // todo: maybe floor after
+
+    let mut amount_out = if (a2b) {
+        quote_swap_impl2(
+            amount_in,
+            btoken_reserve_b,
+            decimals_a,
+            decimals_b,
+            price_a,
+            price_b,
+            btoken_ratio_a,
+            btoken_ratio_b,
+            a2b,
+        )
+    } else {
+        quote_swap_impl2(
+            amount_in,
+            btoken_reserve_a,
+            decimals_b,
+            decimals_a,
+            price_b,
+            price_a,
+            btoken_ratio_b,
+            btoken_ratio_a,
+            a2b,
+        )
+    };
+
+    amount_out = if (a2b) {
+        if (amount_out >= pool.balance_amount_b()) {
+            0
+        } else {
+            amount_out
+        }
+    } else {
+        if (amount_out >= pool.balance_amount_a()) {
+            0
+        } else {
+            amount_out
+        }
+    };
+
+    pool.get_quote(amount_in, amount_out, a2b)
+}
+
+fun quote_swap_impl2(
+    btoken_amount_in: u64,
+    btoken_reserve_out: u64,
+    decimals_in: u8,
+    decimals_out: u8,
+    price_in: Decimal,
+    price_out: Decimal,
+    btoken_ratio_in: Decimal,
+    btoken_ratio_out: Decimal,
+    a2b: bool,
+): u64 {
+    let btoken_price_in = btoken_ratio_in.mul(price_in);
+    let btoken_price_out = btoken_ratio_out.mul(price_out);
+
+    if (a2b) {
+        swap_a_to_b(
+            btoken_amount_in,
+            btoken_reserve_out,
+            btoken_price_in,
+            btoken_price_out,
+            decimals_in,
+            decimals_out,
+        )
+    } else {
+        swap_b_to_a(
+            btoken_amount_in,
+            btoken_reserve_out,
+            btoken_price_out,
+            price_in,
+            decimals_out,
+            decimals_in,
+        )
+    }
+}
+
 fun oracle_decimal_to_decimal(price: OracleDecimal): Decimal {
     if (price.is_expo_negative()) {
         decimal::from_u128(price.base()).div(decimal::from(10u64.pow(price.expo() as u8)))
@@ -254,6 +408,81 @@ fun oracle_decimal_to_decimal(price: OracleDecimal): Decimal {
         decimal::from_u128(price.base()).mul(decimal::from(10u64.pow(price.expo() as u8)))
     }
 }
+
+
+fun swap_a_to_b(
+    input_a: u64,
+    reserve_b: u64,
+    price_a: Decimal,
+    price_b: Decimal,
+    decimals_a: u8,
+    decimals_b: u8,
+): u64 {
+    if (input_a == 0) {
+        return 0
+    };
+
+    let oracle_price = {
+        let p_a = price_a.mul(
+            decimal::from(10u64.pow(decimals_a as u8))
+        );
+        let p_b = price_b.mul(
+            decimal::from(10u64.pow(decimals_b as u8))
+        );
+
+        p_a.div(p_b)
+    };
+
+    let reserve_b_fp64 = fp64::from(reserve_b as u128);
+
+    let e = {
+        let exp_numerator = fp64::from(input_a as u128);
+        let exp_denominator = decimal_to_fixedpoint64(oracle_price).mul(reserve_b_fp64);
+
+        fp64::exp(exp_numerator.div(exp_denominator))
+    };
+
+    let output_b = reserve_b_fp64.mul(e.sub(fp64::one())).div(e);
+
+    output_b.to_u128_down() as u64
+}
+
+fun swap_b_to_a(
+    input_b: u64,
+    reserve_a: u64,
+    price_a: Decimal,
+    price_b: Decimal,
+    decimals_a: u8,
+    decimals_b: u8,
+): u64 {
+    if (input_b == 0) {
+        return 0
+    };
+
+    let reserve_a_fp64 = fp64::from(reserve_a as u128);
+    let oracle_price = {
+        let p_a = price_a.mul(
+            decimal::from(10u64.pow(decimals_a as u8))
+        );
+        let p_b = price_b.mul(
+            decimal::from(10u64.pow(decimals_b as u8))
+        );
+
+        p_a.div(p_b)
+    };
+
+    let e = {
+        let exp_numerator = fp64::from(input_b as u128).mul(decimal_to_fixedpoint64(oracle_price));
+        let exp_denominator = reserve_a_fp64;
+
+        fp64::exp(exp_numerator.div(exp_denominator))
+    };
+
+    let output_a = reserve_a_fp64.mul(e.sub(fp64::one())).div(e);
+
+    output_a.to_u128_down() as u64
+}
+
 
 // ===== Events =====
 
