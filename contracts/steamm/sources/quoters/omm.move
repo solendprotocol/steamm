@@ -1,5 +1,8 @@
 /// Oracle AMM Hook implementation. This quoter can only be initialized with btoken types.
 module steamm::omm;
+
+use std::debug::print;
+use std::string::utf8;
 use oracles::oracles::{OracleRegistry, OraclePriceUpdate};
 use oracles::oracle_decimal::{OracleDecimal};
 use steamm::pool::{Self, Pool, SwapResult};
@@ -430,8 +433,35 @@ fun swap_a_to_b(
             decimal::from(10u64.pow(decimals_b as u8))
         );
 
+        // 1000000000000000000
+        // 3000000000000000000
+        print(&utf8(b"Decimals A"));
+        print(&decimals_a);
+        print(&utf8(b"Decimals BN"));
+        print(&decimals_b);
+
+        print(&utf8(b"Price A"));
+        print(&price_a);
+        print(&p_a);
+        print(&utf8(b"Price B"));
+        print(&price_b);
+        print(&p_b);
+
         p_a.div(p_b)
     };
+
+    // [debug] "Price A"
+// [debug] 0xf95b06141ed4a174f239417323bde3f209b972f5930d8521ea38a52aff3a6ddf::decimal::Decimal {
+//   value: 1000000000000000000000000
+// }
+// [debug] "Price B"
+// [debug] 0xf95b06141ed4a174f239417323bde3f209b972f5930d8521ea38a52aff3a6ddf::decimal::Decimal {
+//   value: 3000000000000000000000000000
+// }
+
+    print(&utf8(b"Oracle Price"));
+    print(&oracle_price);
+
 
     let reserve_b_fp64 = fp64::from(reserve_b as u128);
 
@@ -443,6 +473,8 @@ fun swap_a_to_b(
     };
 
     let output_b = reserve_b_fp64.mul(e.sub(fp64::one())).div(e);
+
+    print(&output_b);
 
     output_b.to_u128_down() as u64
 }
@@ -461,15 +493,19 @@ fun swap_b_to_a(
 
     let reserve_a_fp64 = fp64::from(reserve_a as u128);
     let oracle_price = {
-        let p_a = price_a.mul(
+        let numerator = price_b.mul(
             decimal::from(10u64.pow(decimals_a as u8))
         );
-        let p_b = price_b.mul(
+        
+        let denominator = price_a.mul(
             decimal::from(10u64.pow(decimals_b as u8))
         );
 
-        p_a.div(p_b)
+        numerator.div(denominator)
     };
+
+    print(&utf8(b"Oracle Price"));
+    print(&oracle_price);
 
     let e = {
         let exp_numerator = fp64::from(input_b as u128).mul(decimal_to_fixedpoint64(oracle_price));
