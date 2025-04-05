@@ -12,6 +12,7 @@ use steamm::quote;
 use steamm::pool::Pool;
 use steamm::cpmm::CpQuoter;
 use steamm::omm::OracleQuoter;
+use steamm::stable::StableQuoter;
 use steamm::quote::{SwapQuote, DepositQuote, RedeemQuote};
 use suilend::lending_market::{LendingMarket};
 
@@ -88,6 +89,62 @@ public fun omm_swap<P, A, B, BTokenA, BTokenB, LpType: drop>(
     );
 
     pool.omm_swap(
+        bank_a,
+        bank_b,
+        lending_market,
+        oracle_price_update_a,
+        oracle_price_update_b,
+        &mut btoken_a,
+        &mut btoken_b,
+        a2b,
+        btoken_amount_in,
+        0,
+        clock,
+        ctx,
+    );
+
+    cleanup_swap(
+        bank_a,
+        bank_b,
+        lending_market,
+        coin_a,
+        coin_b,
+        btoken_a,
+        btoken_b,
+        min_amount_out,
+        clock,
+        ctx,
+    );
+}
+
+public fun stable_swap<P, A, B, BTokenA, BTokenB, LpType: drop>(
+    pool: &mut Pool<BTokenA, BTokenB, StableQuoter, LpType>,
+    bank_a: &mut Bank<P, A, BTokenA>,
+    bank_b: &mut Bank<P, B, BTokenB>,
+    lending_market: &LendingMarket<P>,
+    oracle_price_update_a: OraclePriceUpdate,
+    oracle_price_update_b: OraclePriceUpdate,
+    coin_a: &mut Coin<A>,
+    coin_b: &mut Coin<B>,
+    a2b: bool,
+    amount_in: u64,
+    min_amount_out: u64,
+    clock: &Clock,
+    ctx: &mut TxContext,
+) {
+    let (mut btoken_a, mut btoken_b, btoken_amount_in) = to_btokens(
+        bank_a,
+        bank_b,
+        lending_market,
+        coin_a,
+        coin_b,
+        a2b,
+        amount_in,
+        clock,
+        ctx,
+    );
+
+    pool.stable_swap(
         bank_a,
         bank_b,
         lending_market,

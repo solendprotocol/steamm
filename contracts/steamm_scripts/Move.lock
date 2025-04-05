@@ -2,13 +2,11 @@
 
 [move]
 version = 3
-manifest_digest = "721B25BB4CDCD4218F498ADC29C1531627B203E49104F8C2190A52C4FBEE0E27"
-deps_digest = "F9B494B64F0615AED0E98FC12A85B85ECD2BC5185C22D30E7F67786BB52E507C"
+manifest_digest = "6A7D603624DBEEDCB1A61CA77443363F1CB04F0DFDE68B0D84070A98B4A08BBB"
+deps_digest = "3C4103934B1E040BB6B23F1D610B4EF9F2F1166A50A104EADCF77467C004C600"
 dependencies = [
   { id = "Sui", name = "Sui" },
-  { id = "oracles", name = "oracles" },
   { id = "steamm", name = "steamm" },
-  { id = "suilend", name = "suilend" },
 ]
 
 [[move.package]]
@@ -106,6 +104,6 @@ dependencies = [
 ]
 
 [move.toolchain-version]
-compiler-version = "1.44.3"
+compiler-version = "1.42.2"
 edition = "2024.beta"
 flavor = "sui"
