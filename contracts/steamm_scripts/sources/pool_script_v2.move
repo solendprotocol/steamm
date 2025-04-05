@@ -247,6 +247,47 @@ public fun quote_omm_swap<P, A, B, BTokenA, BTokenB, LpType: drop>(
     )
 }
 
+public fun quote_stable_swap<P, A, B, BTokenA, BTokenB, LpType: drop>(
+    pool: &Pool<BTokenA, BTokenB, StableQuoter, LpType>,
+    bank_a: &Bank<P, A, BTokenA>,
+    bank_b: &Bank<P, B, BTokenB>,
+    lending_market: &LendingMarket<P>,
+    oracle_price_update_a: OraclePriceUpdate,
+    oracle_price_update_b: OraclePriceUpdate,
+    amount_in: u64,
+    a2b: bool,
+    clock: &Clock,
+): SwapQuote {
+    let amount_in_ = to_btoken_amount_in(
+        bank_a,
+        bank_b,
+        lending_market,
+        a2b,
+        amount_in,
+        clock,
+    );
+
+    let btoken_quote = pool.stable_quote_swap(
+        bank_a,
+        bank_b,
+        lending_market,
+        oracle_price_update_a,
+        oracle_price_update_b,
+        amount_in_,
+        a2b,
+        clock,
+    );
+
+    to_underlying_quote(
+        btoken_quote,
+        bank_a,
+        bank_b,
+        lending_market,
+        a2b,
+        clock
+    )
+}
+
 // ===== Liquidity Functions =====
 
 public fun deposit_liquidity<P, A, B, BTokenA, BTokenB, Quoter: store, LpType: drop>(
