@@ -47,7 +47,7 @@ public fun reserve_args(scenario: &mut Scenario): Bag {
     let ctx = test_scenario::ctx(scenario);
 
     let usdc_config = {
-        let config = reserve_config::default_reserve_config();
+        let config = reserve_config::default_reserve_config(ctx);
         let mut builder = reserve_config::from(&config, ctx);
         reserve_config::set_open_ltv_pct(&mut builder, 50);
         reserve_config::set_close_ltv_pct(&mut builder, 50);
@@ -58,7 +58,7 @@ public fun reserve_args(scenario: &mut Scenario): Bag {
     };
 
     let sui_config = {
-        let config = reserve_config::default_reserve_config();
+        let config = reserve_config::default_reserve_config(ctx);
         let mut builder = reserve_config::from(
             &config,
             ctx,
@@ -94,7 +94,7 @@ public fun reserve_args_2(scenario: &mut Scenario): Bag {
     let mut bag = bag::new(test_scenario::ctx(scenario));
 
     let reserve_args = {
-        let config = reserve_config::default_reserve_config();
+        let config = reserve_config::default_reserve_config(scenario.ctx());
         let mut builder = reserve_config::from(&config, test_scenario::ctx(scenario));
         reserve_config::set_open_ltv_pct(&mut builder, 50);
         reserve_config::set_close_ltv_pct(&mut builder, 50);
@@ -112,7 +112,7 @@ public fun reserve_args_2(scenario: &mut Scenario): Bag {
     );
 
     let reserve_args = {
-        let config = reserve_config::default_reserve_config();
+        let config = reserve_config::default_reserve_config(scenario.ctx());
         lending_market_tests::new_args(100 * 1_000_000_000, config)
     };
 
@@ -170,13 +170,13 @@ public fun setup_lending_market(
 
         suilend_setup(
             reserve_args(scenario),
-            scenario,
+            scenario.ctx(),
         ).destruct_state()
     } else {
         let reserve_args = reserve_args_opt.destroy_some();
         suilend_setup(
             reserve_args,
-            scenario,
+            scenario.ctx(),
         ).destruct_state()
     }
 }
