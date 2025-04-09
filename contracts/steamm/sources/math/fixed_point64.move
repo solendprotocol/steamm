@@ -73,6 +73,10 @@ public fun one(): FixedPoint64 {
     from(1_u128)
 }
 
+public fun zero(): FixedPoint64 {
+    from(0_u128)
+}
+
 /*
 * @notice Creates a FixedPoint64 from a u128 `value`.
 *
@@ -422,6 +426,22 @@ public fun exp(x: FixedPoint64): FixedPoint64 {
     FixedPoint64 {value: (exp_raw(raw_value) as u128)}
 }
 
+/// Because log2 is negative for values < 1 we instead return log2(x) + 64 which
+/// is positive for all values of x.
+/// As seen in: https://github.com/aptos-labs/aptos-core/blob/447f579396590983dd5fee46cad44e4defd297f3/aptos-move/framework/aptos-stdlib/sources/math_fixed64.move#L28
+public fun log2_plus_64(x: FixedPoint64): FixedPoint64 {
+    let raw_value = (x.value());
+    log2_64(raw_value)
+}
+
+/// As seen in: https://github.com/aptos-labs/aptos-core/blob/447f579396590983dd5fee46cad44e4defd297f3/aptos-move/framework/aptos-stdlib/sources/math_fixed64.move#L35
+public fun ln_plus_64ln2(x: FixedPoint64): FixedPoint64 {
+    use std::debug::print;
+    let raw_value = x.value();
+    let x = (log2_64(raw_value).value() as u256);
+    from_raw_value(((x * LN2) >> 64 as u128))
+}
+
 // === Private Functions ===
 
 /*
@@ -458,6 +478,47 @@ fun exp_raw(x: u256): u256 {
     let taylor6 = (taylor5 * x) >> 64;
     (power << shift) + taylor1 + taylor2 / 2 + taylor3 / 6 + taylor4 / 24 + taylor5 / 120 +
     taylor6 / 720
+}
+
+/// Returns floor(log2(x))
+/// TODO: remove, use log2_down instead from math128
+public fun floor_log2(mut x: u128): u8 {
+    let mut res = 0;
+    assert!(x != 0, 0);
+    // Effectively the position of the most significant set bit
+    let mut n = 64;
+    while (n > 0) {
+        if (x >= (1 << n)) {
+            x = x >> n;
+            res = res + n;
+        };
+        n = n >> 1;
+    };
+    res
+}
+
+// Return log2(x) as FixedPoint64
+// As seen in: https://github.com/aptos-labs/aptos-core/blob/447f579396590983dd5fee46cad44e4defd297f3/aptos-move/framework/aptos-stdlib/sources/math128.move#L120
+public fun log2_64(mut x: u128): FixedPoint64 {
+    let integer_part = floor_log2(x);
+    // Normalize x to [1, 2) in fixed point 63. To ensure x is smaller then 1<<64
+    if (x >= 1 << 63) {
+        x = x >> (integer_part - 63);
+    } else {
+        x = x << (63 - integer_part);
+    };
+    let mut frac = 0;
+    let mut delta = 1 << 63;
+    while (delta != 0) {
+        // log x = 1/2 log x^2
+        // x in [1, 2)
+        x = (x * x) >> 63;
+        // x is now in [1, 4)
+        // if x in [2, 4) then log x = 1 + log (x / 2)
+        if (x >= (2 << 63)) { frac = frac + delta; x = x >> 1; };
+        delta = delta >> 1;
+    };
+    from_raw_value(((integer_part as u128) << 64) + frac)
 }
 
 /*
