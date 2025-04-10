@@ -1,7 +1,7 @@
 module steamm::quoter_math;
 
 use steamm::fixed_point64::{Self, FixedPoint64};
-use std::string::utf8;
+use std::string::{String, utf8};
 use std::debug::print;
 const MAX_ITER: u64 = 25;
 
@@ -219,9 +219,9 @@ public fun newton_raphson(
     z_initial: FixedPoint64
 ): FixedPoint64 {
     let one = fixed_point64::one();
-    let z_min = fixed_point64::from_rational(1, 10000000000); // 1e-10
+    let z_min = fixed_point64::from_rational(1, 1000000000000000); // 1e-15
     let z_max = fixed_point64::from_rational(999, 1000);     // 0.999
-    let tol = fixed_point64::from_rational(1, 10000000000);  // 1e-10
+    let tol = fixed_point64::from_rational(1, 1000000000000000);  // 1e-15
     let max_iter = 100;
     
     let mut z = z_initial;
@@ -329,6 +329,61 @@ public fun find_brackets(k: FixedPoint64, a: FixedPoint64): (FixedPoint64, Fixed
 }
 
 
+#[test]
+fun test_newton_raphson() {
+    // k:  0.0002 ; A:  1
+    let k = fixed_point64::from_rational(2, 10000); // 0.0002
+    let a = fixed_point64::from(1);                // A = 1
+    let (z_left, z_right) = find_brackets(k, a);
+    let z_initial = z_left.add(z_right).div(fixed_point64::from(2));
+    let z = newton_raphson(k, a, z_initial);
+    
+    assert!(z_left.to_string() == utf8(b"0.000199979965304955"), 0);
+    assert!(z_right.to_string() == utf8(b"0.000199980023512034"), 0);
+    assert!(z_initial.to_string() == utf8(b"0.000199979994408495"), 0);
+    assert!(z.to_string() == utf8(b"0.000199980001333266"), 0);
+
+    let (result, _) = compute_f(z, a, k);
+    assert!(result.to_string() == utf8(b"0.000000000000000000"), 0);
+    
+    // k:  0.630828828828829 ; A:  1 ;
+    let k = fixed_point64::from_rational(630828828828829, 1000000000000000); // 0.630828828828829
+    let a = fixed_point64::from(1);                // A = 1
+    let (z_left, z_right) = find_brackets(k, a);
+    let z_initial = z_left.add(z_right).div(fixed_point64::from(2));
+    let z = newton_raphson(k, a, z_initial);
+
+    assert!(z_left.to_string() == utf8(b"0.467849443507954710"), 0);
+    assert!(z_right.to_string() == utf8(b"0.467849443566161789"), 0);
+    assert!(z_initial.to_string() == utf8(b"0.467849443537058250"), 0);
+    assert!(z.to_string() == utf8(b"0.467849443548411605"), 0);
+
+    let (result, _) = compute_f(z, a, k);
+    print(&result.to_string());
+    assert!(result.to_string() == utf8(b"0.000000000000000000"), 0);
+
+    // TODO: We are here, proceed with next examples.
+
+    // // k:  69.50951091091092 ; A: 1 ;
+    // let k = fixed_point64::from_rational(6950951091091092, 100000000000000); // 69.50951091091092
+    // let a = fixed_point64::from(1);                // A = 1
+    // let (z_left, z_right) = find_brackets(k, a);
+    // // print(&z_left.mul(fixed_point64::from(1000000000000000)).to_u128());
+    // // print(&z_right.mul(fixed_point64::from(1000000000000000)).to_u128());
+
+    // assert!(z_left.mul(fixed_point64::from(1000000000000000)).to_u128() == 999989999941793_u128, 0);
+    // assert!(z_right.mul(fixed_point64::from(1000000000000000)).to_u128() == 999990000000000_u128, 0);
+    
+    // // k:  69.7897903903904 ; A:  100
+    // let k = fixed_point64::from_rational(697897903903904, 10000000000000);
+    // let a = fixed_point64::from(100);                // A = 1
+    // let (z_left, z_right) = find_brackets(k, a);
+    // // print(&z_left.mul(fixed_point64::from(1000000000000000)).to_u128());
+    // // print(&z_right.mul(fixed_point64::from(1000000000000000)).to_u128());
+
+    // assert!(z_left.mul(fixed_point64::from(1000000000000000)).to_u128() == 999989999941793_u128, 0);
+    // assert!(z_right.mul(fixed_point64::from(1000000000000000)).to_u128() == 999990000000000_u128, 0);
+}
 
 #[test]
 fun test_find_brackets() {

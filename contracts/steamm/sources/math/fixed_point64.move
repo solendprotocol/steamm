@@ -539,3 +539,70 @@ fun pow_raw(mut x: u256, mut n: u128): u256 {
     };
     res
 }
+
+#[test_only]
+use std::string::{String, utf8};
+
+#[test_only]
+public fun to_string(fp: FixedPoint64): String {
+    // Assuming the scaling factor is 10^15 (1000000000000000)
+    let scaling_factor = 1u128 << 64; // 2^64 = 18,446,744,073,709,551,616
+    let raw_value = fp.value;
+    
+    // Get the raw value as u64
+    let integer_part = raw_value / scaling_factor;
+    let fractional_part = raw_value % scaling_factor;
+    
+    // Use 10^15 to get 15 decimal places
+    let decimal_scaling = 1_000_000_000_000_000_000u256; // 10^18
+    let fractional_display = ((fractional_part as u256) * decimal_scaling / (scaling_factor as u256)) as u128;
+
+    let integer_bytes = u64_to_bytes(integer_part as u64);
+    let fractional_bytes = u64_to_bytes_padded(fractional_display as u64, 18);
+
+    // Print the result
+    let mut result = vector::empty<u8>();
+    vector::append(&mut result, integer_bytes);
+    vector::push_back(&mut result, b"."[0]); // Add decimal point
+    vector::append(&mut result, fractional_bytes);
+
+    utf8(result)
+}
+
+#[test_only]
+fun u64_to_bytes(num: u64): vector<u8> {
+    if (num == 0) {
+        return b"0"
+    };
+    let mut bytes = vector::empty<u8>();
+    let mut n = num;
+    while (n > 0) {
+        let digit = (n % 10) as u8;
+        vector::push_back(&mut bytes, 48u8 + digit); // ASCII '0' = 48
+        n = n / 10;
+    };
+    vector::reverse(&mut bytes);
+
+    bytes
+}
+
+#[test_only]
+fun u64_to_bytes_padded(num: u64, digits: u64): vector<u8> {
+    let bytes = u64_to_bytes(num);
+    let len = vector::length(&bytes);
+    
+    // If already >= digits, return as is (or truncate if desired)
+    if (len >= digits) {
+        return bytes
+    };
+    
+    // Pad with leading zeros
+    let mut result = vector::empty<u8>();
+    let mut i = len;
+    while (i < digits) {
+        vector::push_back(&mut result, 48u8); // '0'
+        i = i + 1;
+    };
+    vector::append(&mut result, bytes);
+    result
+}
