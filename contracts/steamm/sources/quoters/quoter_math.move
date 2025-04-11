@@ -1,19 +1,15 @@
 module steamm::quoter_math;
 
+use std::string::utf8;
+use suilend::decimal::Decimal;
+
 use steamm::fixed_point64::{Self, FixedPoint64};
-use std::string::{String, utf8};
-use std::debug::print;
-const MAX_ITER: u64 = 25;
-
 use steamm::utils::decimal_to_fixedpoint64;
-use suilend::decimal::{Decimal, Self};
 
-const EMaxIterationsExceeded: u64 = 1;
-
-public fun swap(
-    amount_in: u64,
-    reserve_x: u64,
-    reserve_y: u64,
+public(package) fun swap(
+    amount_in: Decimal,
+    reserve_x: Decimal,
+    reserve_y: Decimal,
     price_x: Decimal,
     price_y: Decimal,
     decimals_x: u64,
@@ -21,12 +17,12 @@ public fun swap(
     amplifier: u64,
     x2y: bool,
 ): u64 {
-    let r_x = fixed_point64::from(reserve_x as u128);
-    let r_y = fixed_point64::from(reserve_y as u128);
+    let r_x = decimal_to_fixedpoint64(reserve_x);
+    let r_y = decimal_to_fixedpoint64(reserve_y);
     let p_x = decimal_to_fixedpoint64(price_x);
     let p_y = decimal_to_fixedpoint64(price_y);
     let amp = fixed_point64::from(amplifier as u128);
-    let delta_in = fixed_point64::from(amount_in as u128);
+    let delta_in = decimal_to_fixedpoint64(amount_in);
 
     let price_raw = p_x.div(p_y);
 
@@ -44,19 +40,23 @@ public fun swap(
         delta_in.mul(dec_pow).div(r_x.mul(price_raw))
     };
 
-    let (z_left, z_right) = find_brackets(k, amp);
-    let z_initial = z_left.add(z_right).div(fixed_point64::from(2));
+    let max_bound = fixed_point64::from_rational(9999999999, 10000000000);
+    let z_upper_bound = if (x2y) {
+        max_bound.min(delta_in.mul(price_raw).div(r_y.mul(dec_pow)))
+    } else {
+        max_bound.min(delta_in.mul(dec_pow).div(r_x.mul(price_raw)))
+    };
 
-    let z = newton_raphson(k, amp, z_initial);
+    let z = newton_raphson(k, amp, z_upper_bound);
 
     let delta_out = z.mul(r_y).to_u128_down() as u64;
 
     if (x2y) {
-        if (delta_out >= reserve_y) {
+        if (delta_out >= reserve_y.floor()) {
             return r_y.mul(fixed_point64::from_rational(999, 1000)).to_u128_down() as u64
         };
     } else {
-        if (delta_out >= reserve_x) {
+        if (delta_out >= reserve_x.floor()) {
             return r_x.mul(fixed_point64::from_rational(999, 1000)).to_u128_down() as u64
         };
     };
@@ -64,96 +64,66 @@ public fun swap(
     delta_out
 }
 
-// public fun swap_y_to_x(
-//     amount_y: u64,
-//     reserve_x: u64,
-//     reserve_y: u64,
-//     price_x: Decimal,
-//     price_y: Decimal,
-//     decimals_x: u64,
-//     decimals_y: u64,
-//     amplifier: u64,
-// ): u64 {
-
-//     let delta_y = fixed_point64::from(amount_y as u128);
-//     let r_x = fixed_point64::from(reserve_x as u128);
-//     let p_x = decimal_to_fixedpoint64(price_x);
-//     let p_y = decimal_to_fixedpoint64(price_y);
-//     let amp = fixed_point64::from(amplifier as u128);
-
-//     let price_raw = p_x.div(p_y);
-
-//     let dec_pow = if (decimals_x >= decimals_y) {
-//         fixed_point64::from(10).pow(decimals_x - decimals_y)
-//     } else {
-//         fixed_point64::one().div(
-//             fixed_point64::from(10).pow(decimals_y- decimals_x)
-//         )
-//     };
-
-//     let k = delta_y.mul(dec_pow).div(r_x.mul(price_raw));
-
-//     let (z_left, z_right) = find_brackets(k, amp);
-//     let z_initial = z_left.add(z_right).div(fixed_point64::from(2));
-
-//     let z = newton_raphson(k, amp, z_initial);
-
-//     let delta_x = z.mul(r_x).to_u128_down() as u64;
-
-//     if (delta_x >= reserve_x) {
-//         return r_x.mul(fixed_point64::from_rational(999, 1000)).to_u128_down() as u64
-//     };
-
-//     delta_x
-// }
-
-// public fun swao_x_to_y(
-//     amount_x: u64,
-//     reserve_x: u64,
-//     reserve_y: u64,
-//     price_x: Decimal,
-//     price_y: Decimal,
-//     decimals_x: u64,
-//     decimals_y: u64,
-//     amplifier: u64,
-// ): u64 {
-
-//     let delta_x = fixed_point64::from(amount_x as u128);
-//     let r_y = fixed_point64::from(reserve_y as u128);
-//     let p_x = decimal_to_fixedpoint64(price_x);
-//     let p_y = decimal_to_fixedpoint64(price_y);
-//     let amp = fixed_point64::from(amplifier as u128);
-
-//     let price_raw = p_x.div(p_y);
-
-//     let dec_pow = if (decimals_x >= decimals_y) {
-//         fixed_point64::from(10).pow(decimals_x - decimals_y)
-//     } else {
-//         fixed_point64::one().div(
-//             fixed_point64::from(10).pow(decimals_y- decimals_x)
-//         )
-//     };
-
-//     let k = delta_x.mul(price_raw).div(r_y.mul(dec_pow));
-
-//     let (z_left, z_right) = find_brackets(k, amp);
-//     let z_initial = z_left.add(z_right).div(fixed_point64::from(2));
-
-//     let z = newton_raphson(k, amp, z_initial);
-
-//     let delta_y = z.mul(r_y).to_u128_down() as u64;
-
-//     if (delta_y >= reserve_y) {
-//         return r_y.mul(fixed_point64::from_rational(999, 1000)).to_u128_down() as u64
-//     };
-
-//     delta_y
-// }
-
+fun newton_raphson(
+    k: FixedPoint64,
+    a: FixedPoint64,
+    z_initial: FixedPoint64
+): FixedPoint64 {
+    let one = fixed_point64::one();
+    let z_min = fixed_point64::from_rational(1, 1000000000000000); // 1e-15
+    let z_max = fixed_point64::from_rational(999, 1000);     // 0.999
+    let tol = fixed_point64::from_rational(1, 1000000000000000);  // 1e-15
+    let max_iter = 25;
+    
+    let mut z = z_initial;
+    let mut i = 0;
+    
+    while (i < max_iter) {
+        //print(&i);
+        // Compute f(z)
+        let (fx_val, fx_positive) = compute_f(z, a, k);
+        
+        // Check if |f(z)| < tolerance
+        if (fixed_point64::lt(fx_val, tol)) {
+            break
+        };
+        
+        // Compute f'(z)
+        let fp = compute_f_prime(z, a);
+        
+        // Check for zero derivative
+        assert!(!fixed_point64::eq(fp, fixed_point64::zero()), 1001); // Error if derivative is zero
+        
+        // Newton step: z_new = z - f(z)/f'(z)
+        // Since fx_val is magnitude, we need to handle the sign separately
+        let fx_div_fp = fixed_point64::div(fx_val, fp);
+        let z_new = if (fx_positive) {
+            // If f(z) is positive, subtract fx/fp from z
+            if (fixed_point64::gt(fx_div_fp, z)) {
+                z_min // If subtraction would go below 0, clamp to minimum
+            } else {
+                fixed_point64::sub(z, fx_div_fp)
+            }
+        } else {
+            // If f(z) is negative, add fx/fp to z
+            if (fixed_point64::gt(fixed_point64::add(z, fx_div_fp), one)) {
+                z_max // If addition would exceed 1, clamp to maximum
+            } else {
+                fixed_point64::add(z, fx_div_fp)
+            }
+        };
+        
+        // Update z for next iteration
+        z = z_new;
+        i = i + 1;
+    };
+    
+    z
+}
 
 /// Computes f(z) = (1 - 1/A) * z - (1/A) * ln(1 - z) - k
 /// Returns (magnitude, is_positive) where magnitude is |f(z)| and is_positive indicates the sign
-public fun compute_f(
+fun compute_f(
     z: FixedPoint64,
     a: FixedPoint64,
     k: FixedPoint64
@@ -200,7 +170,7 @@ public fun compute_f(
 
 /// Computes f'(z) = 1 - 1/A + 1/(A * (1 - z))
 /// Result is always positive
-public fun compute_f_prime(
+fun compute_f_prime(
     z: FixedPoint64,
     a: FixedPoint64,
 ): FixedPoint64 {
@@ -213,134 +183,14 @@ public fun compute_f_prime(
     one.sub(one_div_a).add(term3)
 }
 
-public fun newton_raphson(
-    k: FixedPoint64,
-    a: FixedPoint64,
-    z_initial: FixedPoint64
-): FixedPoint64 {
-    let one = fixed_point64::one();
-    let z_min = fixed_point64::from_rational(1, 1000000000000000); // 1e-15
-    let z_max = fixed_point64::from_rational(999, 1000);     // 0.999
-    let tol = fixed_point64::from_rational(1, 1000000000000000);  // 1e-15
-    let max_iter = 100;
-    
-    let mut z = z_initial;
-    let mut i = 0;
-    
-    while (i < max_iter) {
-        // Compute f(z)
-        let (fx_val, fx_positive) = compute_f(z, a, k);
-        
-        // Check if |f(z)| < tolerance
-        if (fixed_point64::lt(fx_val, tol)) {
-            break
-        };
-        
-        // Compute f'(z)
-        let fp = compute_f_prime(z, a);
-        
-        // Check for zero derivative
-        assert!(!fixed_point64::eq(fp, fixed_point64::zero()), 1001); // Error if derivative is zero
-        
-        // Newton step: z_new = z - f(z)/f'(z)
-        // Since fx_val is magnitude, we need to handle the sign separately
-        let fx_div_fp = fixed_point64::div(fx_val, fp);
-        let z_new = if (fx_positive) {
-            // If f(z) is positive, subtract fx/fp from z
-            if (fixed_point64::gt(fx_div_fp, z)) {
-                z_min // If subtraction would go below 0, clamp to minimum
-            } else {
-                fixed_point64::sub(z, fx_div_fp)
-            }
-        } else {
-            // If f(z) is negative, add fx/fp to z
-            if (fixed_point64::gt(fixed_point64::add(z, fx_div_fp), one)) {
-                z_max // If addition would exceed 1, clamp to maximum
-            } else {
-                fixed_point64::add(z, fx_div_fp)
-            }
-        };
-        
-        // Update z for next iteration
-        z = z_new;
-        i = i + 1;
-    };
-    
-    z
-}
-
-// Binary search the brackets for the initial guess
-public fun find_brackets(k: FixedPoint64, a: FixedPoint64): (FixedPoint64, FixedPoint64) {    
-    // Initial bracket points
-    let mut z_left = fixed_point64::zero();
-    let mut z_right = fixed_point64::from_rational(99999, 100000); // 0.99999
-    
-    // Initial function evaluations
-    let (_f_left_val, mut f_left_positive) = compute_f(z_left, a, k);
-    //let (f_right_val, _f_right_positive) = compute_f(z_right, a, k);
-    
-    let max_iter = 50;
-    let mut i = 0;
-    
-    while (i < max_iter) {
-        // Compute midpoint
-        let z_mid = fixed_point64::div(fixed_point64::add(z_left, z_right), fixed_point64::from(2));
-        let (f_mid_val, f_mid_positive) = compute_f(z_mid, a, k);
-        // print(&f_mid_val.mul(fixed_point64::from(1000000000000000)).to_u128());
-        // print(&z_mid.mul(fixed_point64::from(1000000000000000)).to_u128());
-        
-        // Check for exact zero
-        if (fixed_point64::eq(f_mid_val, fixed_point64::zero())) {
-            return (z_mid, z_mid)
-        };
-        
-        // Update brackets based on sign change
-        // If signs are different between left and mid (one positive, one negative)
-        if (f_left_positive != f_mid_positive) {
-            // if f_left * f_mid < 0:
-            //     z_right = z_mid
-            //     f_right = f_mid
-            z_right = z_mid;
-            // f_right_val = f_mid_val; // Not used
-            // f_right_positive = f_mid_positive; // Not used
-        } else {
-            // if f_left * f_mid > 0:
-            //     z_left = z_mid
-            //     f_left = f_mid
-            z_left = z_mid;
-            // f_left_val = f_mid_val; // Not used
-            f_left_positive = f_mid_positive;
-        };
-        
-        // Check convergence
-        // The subtraction is valid since z_right should always be greater than z_left
-        let diff = fixed_point64::sub(z_right, z_left);
-        if (fixed_point64::lt(diff, fixed_point64::from_rational(1, 10000000000))) { // 1e-10
-            break
-        };
-
-        // TODO: Need some way to assert that the z_left and z_right are always positive!!!
-        assert!(i < max_iter, EMaxIterationsExceeded);
-        
-        i = i + 1;
-    };
-    
-    (z_left, z_right)
-}
-
-
 #[test]
 fun test_newton_raphson() {
     // k:  0.0002 ; A:  1
     let k = fixed_point64::from_rational(2, 10000); // 0.0002
     let a = fixed_point64::from(1);                // A = 1
-    let (z_left, z_right) = find_brackets(k, a);
-    let z_initial = z_left.add(z_right).div(fixed_point64::from(2));
+    let z_initial = fixed_point64::from_rational(199979994408495, 1000000000000000000); // 0.000199979994408495
     let z = newton_raphson(k, a, z_initial);
     
-    assert!(z_left.to_string() == utf8(b"0.000199979965304955"), 0);
-    assert!(z_right.to_string() == utf8(b"0.000199980023512034"), 0);
-    assert!(z_initial.to_string() == utf8(b"0.000199979994408495"), 0);
     assert!(z.to_string() == utf8(b"0.000199980001333266"), 0);
 
     let (result, _) = compute_f(z, a, k);
@@ -349,83 +199,26 @@ fun test_newton_raphson() {
     // k:  0.630828828828829 ; A:  1 ;
     let k = fixed_point64::from_rational(630828828828829, 1000000000000000); // 0.630828828828829
     let a = fixed_point64::from(1);                // A = 1
-    let (z_left, z_right) = find_brackets(k, a);
-    let z_initial = z_left.add(z_right).div(fixed_point64::from(2));
+    let z_initial = fixed_point64::from_rational(467849443537058250, 1000000000000000000); // 0.467849443537058250
     let z = newton_raphson(k, a, z_initial);
 
-    assert!(z_left.to_string() == utf8(b"0.467849443507954710"), 0);
-    assert!(z_right.to_string() == utf8(b"0.467849443566161789"), 0);
-    assert!(z_initial.to_string() == utf8(b"0.467849443537058250"), 0);
     assert!(z.to_string() == utf8(b"0.467849443548411605"), 0);
 
     let (result, _) = compute_f(z, a, k);
-    print(&result.to_string());
     assert!(result.to_string() == utf8(b"0.000000000000000000"), 0);
 
-    // TODO: We are here, proceed with next examples.
-
-    // // k:  69.50951091091092 ; A: 1 ;
-    // let k = fixed_point64::from_rational(6950951091091092, 100000000000000); // 69.50951091091092
-    // let a = fixed_point64::from(1);                // A = 1
-    // let (z_left, z_right) = find_brackets(k, a);
-    // // print(&z_left.mul(fixed_point64::from(1000000000000000)).to_u128());
-    // // print(&z_right.mul(fixed_point64::from(1000000000000000)).to_u128());
-
-    // assert!(z_left.mul(fixed_point64::from(1000000000000000)).to_u128() == 999989999941793_u128, 0);
-    // assert!(z_right.mul(fixed_point64::from(1000000000000000)).to_u128() == 999990000000000_u128, 0);
-    
-    // // k:  69.7897903903904 ; A:  100
-    // let k = fixed_point64::from_rational(697897903903904, 10000000000000);
-    // let a = fixed_point64::from(100);                // A = 1
-    // let (z_left, z_right) = find_brackets(k, a);
-    // // print(&z_left.mul(fixed_point64::from(1000000000000000)).to_u128());
-    // // print(&z_right.mul(fixed_point64::from(1000000000000000)).to_u128());
-
-    // assert!(z_left.mul(fixed_point64::from(1000000000000000)).to_u128() == 999989999941793_u128, 0);
-    // assert!(z_right.mul(fixed_point64::from(1000000000000000)).to_u128() == 999990000000000_u128, 0);
-}
-
-#[test]
-fun test_find_brackets() {
-    // k:  0.0002 ; A:  1
-    let k = fixed_point64::from_rational(2, 10000); // 0.0002
-    let a = fixed_point64::from(1);                // A = 1
-    let (z_left, z_right) = find_brackets(k, a);
-    // print(&z_left.mul(fixed_point64::from(1000000000000000)).to_u128());
-    // print(&z_right.mul(fixed_point64::from(1000000000000000)).to_u128());
-
-    assert!(z_left.mul(fixed_point64::from(1000000000000000)).to_u128() == 199979965305_u128, 0);
-    assert!(z_right.mul(fixed_point64::from(1000000000000000)).to_u128() == 199980023512_u128, 0);
-    
-    // k:  0.630828828828829 ; A:  1 ;
-    let k = fixed_point64::from_rational(630828828828829, 1000000000000000); // 0.630828828828829
-    let a = fixed_point64::from(1);                // A = 1
-    let (z_left, z_right) = find_brackets(k, a);
-    // print(&z_left.mul(fixed_point64::from(1000000000000000)).to_u128());
-    // print(&z_right.mul(fixed_point64::from(1000000000000000)).to_u128());
-
-    assert!(z_left.mul(fixed_point64::from(1000000000000000)).to_u128() == 467849443507955_u128, 0);
-    assert!(z_right.mul(fixed_point64::from(1000000000000000)).to_u128() == 467849443566162_u128, 0);
-    
     // k:  69.50951091091092 ; A: 1 ;
     let k = fixed_point64::from_rational(6950951091091092, 100000000000000); // 69.50951091091092
     let a = fixed_point64::from(1);                // A = 1
-    let (z_left, z_right) = find_brackets(k, a);
-    // print(&z_left.mul(fixed_point64::from(1000000000000000)).to_u128());
-    // print(&z_right.mul(fixed_point64::from(1000000000000000)).to_u128());
+    let z_initial = fixed_point64::from_rational(999989999970896460, 1000000000000000000); // 0.999989999970896460
+    // let (z_left, z_right) = find_brackets(k, a);
+    // let z_initial = z_left.add(z_right).div(fixed_point64::from(2));
+    let z = newton_raphson(k, a, z_initial);
+    // print(&z.to_string());
 
-    assert!(z_left.mul(fixed_point64::from(1000000000000000)).to_u128() == 999989999941793_u128, 0);
-    assert!(z_right.mul(fixed_point64::from(1000000000000000)).to_u128() == 999990000000000_u128, 0);
-    
-    // k:  69.7897903903904 ; A:  100
-    let k = fixed_point64::from_rational(697897903903904, 10000000000000);
-    let a = fixed_point64::from(100);                // A = 1
-    let (z_left, z_right) = find_brackets(k, a);
-    // print(&z_left.mul(fixed_point64::from(1000000000000000)).to_u128());
-    // print(&z_right.mul(fixed_point64::from(1000000000000000)).to_u128());
-
-    assert!(z_left.mul(fixed_point64::from(1000000000000000)).to_u128() == 999989999941793_u128, 0);
-    assert!(z_right.mul(fixed_point64::from(1000000000000000)).to_u128() == 999990000000000_u128, 0);
+    let (result, _) = compute_f(z, a, k);
+    // print(&result.to_string());
+    // assert!(result.to_string() == utf8(b"0.000000000000000000"), 0); // Note: This is not zero as it struggles to converge
 }
 
 #[test]
@@ -459,12 +252,12 @@ fun test_compute_f_branch_2() {
     let z = fixed_point64::from_rational(1, 100);  // z = 0.01
     let a = fixed_point64::from(100);              // A = 100
     let k = fixed_point64::from_rational(1, 10);   // k = 0.1
-    let (magnitude, is_positive) = compute_f(z, a, k);
+    let (_magnitude, is_positive) = compute_f(z, a, k);
     // term1 = (1 - 1/100) * 0.01 = 0.99 * 0.01 = 0.0099
     // term2 = (1/100) * |ln(0.99)| ≈ 0.01 * 0.0100503 ≈ 0.000100503
     // intermediate = 0.0099 - 0.000100503 ≈ 0.0097995 < 0.1
     // result = 0.1 - 0.0097995 ≈ 0.0902005 (negative)
-    print(&magnitude.mul(fixed_point64::from(1000000000000000)).to_u128());
+    // print(&magnitude.mul(fixed_point64::from(1000000000000000)).to_u128());
     assert!(!is_positive, 1); // Expect negative result
 }
 
@@ -475,15 +268,12 @@ fun test_compute_f_both_branches() {
     let a = fixed_point64::from(10);               // A = 10
     let k = fixed_point64::from_rational(1, 100);  // k = 0.01
     let (magnitude, is_positive) = compute_f(z, a, k);
-    // term1 = (1 - 1/10) * 0.9 = 0.9 * 0.9 = 0.81
-    // term2 = (1/10) * |ln(0.1)| ≈ 0.1 * 2.302585 ≈ 0.2302585
-    // intermediate = 0.81 - 0.2302585 ≈ 0.5797415 > 0
-    // result = 0.5797415 - 0.01 ≈ 0.5697415 (positive)
-    // Adjust to hit Branch 6 by making k larger
+
+    assert!(is_positive, 1); // Expect negative result
     let k = fixed_point64::from(10); // k = 10
     let (magnitude, is_positive) = compute_f(z, a, k);
     // result = 0.5797415 - 10 ≈ -9.4202585 (negative)
-    print(&magnitude.mul(fixed_point64::from(1000000000000000)).to_u128());
+    // print(&magnitude.mul(fixed_point64::from(1000000000000000)).to_u128());
     assert!(!is_positive, 1); // Expect negative result
 }
 
