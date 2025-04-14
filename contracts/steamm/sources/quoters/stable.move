@@ -1,5 +1,6 @@
 /// Stable AMM Hook implementation. This quoter can only be initialized with btoken types.
 module steamm::stable;
+
 use oracles::oracles::{OracleRegistry, OraclePriceUpdate};
 use oracles::oracle_decimal::{OracleDecimal};
 use steamm::pool::{Self, Pool, SwapResult};
@@ -171,7 +172,7 @@ public fun quote_swap<P, A, B, B_A, B_B, LpType: drop>(
     let btoken_ratio_b = bank_total_funds_b.div(total_btoken_supply_b);
 
 
-    let mut amount_out_underlying = if (a2b) {
+    let amount_out_underlying = if (a2b) {
         let underlying_amount_in = decimal::from(amount_in).mul(btoken_ratio_a);
         let underlying_reserve_in = decimal::from(pool.balance_amount_a()).mul(btoken_ratio_a);
         let underlying_reserve_out = decimal::from(pool.balance_amount_b()).mul(btoken_ratio_b);
@@ -419,7 +420,7 @@ fun test_quote_swap_impl_amp_1() {
         true, // a2b
     );
 
-    assert_eq(amount_out, 9989); // note: should be 999 // note: should be 999
+    assert_eq(amount_out, 9999);
 }
 
 #[test]
@@ -524,7 +525,7 @@ fun test_quote_swap_impl_amp_10() {
         true, // a2b
     );
 
-    assert_eq(amount_out, 9989); // note: should be 999
+    assert_eq(amount_out, 9999);
     
     // === Insane slippage ===
 
@@ -540,7 +541,7 @@ fun test_quote_swap_impl_amp_10() {
         true, // a2b
     );
 
-    assert_eq(amount_out, 9989); // note: should be 999
+    assert_eq(amount_out, 9999);
 }
 
 #[test]
@@ -645,7 +646,7 @@ fun test_quote_swap_impl_amp_100() {
         true, // a2b
     );
 
-    assert_eq(amount_out, 9989); // note: should be 999
+    assert_eq(amount_out, 9999); // note: should be 999
     
     // === Insane slippage ===
 
@@ -661,7 +662,7 @@ fun test_quote_swap_impl_amp_100() {
         true, // a2b
     );
 
-    assert_eq(amount_out, 9989); // note: should be 999
+    assert_eq(amount_out, 9999); // note: should be 999
 }
 
 #[test]
@@ -763,7 +764,7 @@ fun test_quote_swap_impl_amp_1000() {
         true, // a2b
     );
 
-    assert_eq(amount_out, 9989); // note: should be 999
+    assert_eq(amount_out, 9999);
     
     // === Insane slippage ===
 
@@ -779,5 +780,5 @@ fun test_quote_swap_impl_amp_1000() {
         true, // a2b
     );
 
-    assert_eq(amount_out, 9989); // note: should be 999
+    assert_eq(amount_out, 9999);
 }

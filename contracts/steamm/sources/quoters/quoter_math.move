@@ -49,15 +49,21 @@ public(package) fun swap(
 
     let z = newton_raphson(k, amp, z_upper_bound);
 
-    let delta_out = z.mul(r_y).to_u128_down() as u64;
+    let delta_out = if (x2y) {
+        z.mul(r_y).to_u128_down() as u64
+    } else {
+        z.mul(r_x).to_u128_down() as u64
+    };
 
     if (x2y) {
         if (delta_out >= reserve_y.floor()) {
-            return r_y.mul(fixed_point64::from_rational(999, 1000)).to_u128_down() as u64
+            // return r_y.mul(fixed_point64::from_rational(999, 1000)).to_u128_down() as u64
+            return 0
         };
     } else {
         if (delta_out >= reserve_x.floor()) {
-            return r_x.mul(fixed_point64::from_rational(999, 1000)).to_u128_down() as u64
+            // return r_x.mul(fixed_point64::from_rational(999, 1000)).to_u128_down() as u64
+            return 0
         };
     };
 
@@ -70,20 +76,25 @@ fun newton_raphson(
     z_initial: FixedPoint64
 ): FixedPoint64 {
     let one = fixed_point64::one();
-    let z_min = fixed_point64::from_rational(1, 1000000000000000); // 1e-15
-    let z_max = fixed_point64::from_rational(999, 1000);     // 0.999
-    let tol = fixed_point64::from_rational(1, 1000000000000000);  // 1e-15
-    let max_iter = 25;
+    let z_min = fixed_point64::from_rational(1, 100000); // 1e-5 // todo: increase scale?
+    let z_max = fixed_point64::from_rational(999999999999999999, 1000000000000000000); // 0.999999999999999999
+    let tol = fixed_point64::from_rational(1, 1000000000_00000); // 1e-10
+    let max_iter = 20;
     
-    let mut z = z_initial;
+    // Improve initial guess
+    let mut z = if (z_initial.gte(one)) {
+        z_max
+    } else {
+        z_initial
+    };
+    
     let mut i = 0;
     
     while (i < max_iter) {
-        //print(&i);
         // Compute f(z)
         let (fx_val, fx_positive) = compute_f(z, a, k);
         
-        // Check if |f(z)| < tolerance
+        // Check convergence
         if (fixed_point64::lt(fx_val, tol)) {
             break
         };
@@ -91,26 +102,51 @@ fun newton_raphson(
         // Compute f'(z)
         let fp = compute_f_prime(z, a);
         
-        // Check for zero derivative
-        assert!(!fixed_point64::eq(fp, fixed_point64::zero()), 1001); // Error if derivative is zero
+        // Check for near-zero derivative
+        assert!(
+            !fixed_point64::lt(fp, fixed_point64::from_rational(1, 10000000000)), // 1e-10
+            1001 // Error if derivative is near zero
+        );
         
-        // Newton step: z_new = z - f(z)/f'(z)
-        // Since fx_val is magnitude, we need to handle the sign separately
+        // Newton step: z_new = z - alpha * f(z)/f'(z)
         let fx_div_fp = fixed_point64::div(fx_val, fp);
-        let z_new = if (fx_positive) {
-            // If f(z) is positive, subtract fx/fp from z
-            if (fixed_point64::gt(fx_div_fp, z)) {
-                z_min // If subtraction would go below 0, clamp to minimum
-            } else {
-                fixed_point64::sub(z, fx_div_fp)
-            }
+        let mut alpha = one; // Start with alpha = 1.0
+        let z_new_temp = if (fx_positive) {
+            fixed_point64::sub(z, fx_div_fp)
         } else {
-            // If f(z) is negative, add fx/fp to z
-            if (fixed_point64::gt(fixed_point64::add(z, fx_div_fp), one)) {
-                z_max // If addition would exceed 1, clamp to maximum
+            fixed_point64::add(z, fx_div_fp)
+        };
+        
+        let mut z_new = z_new_temp;
+        
+        // Check if z_new is outside valid range
+        if (fixed_point64::lte(z_new, fixed_point64::zero()) || fixed_point64::gte(z_new, one)) {
+            // Reduce alpha to 0.5
+            alpha = fixed_point64::from_rational(1, 2); // 0.5
+            let damped_step = fixed_point64::mul(fx_div_fp, alpha);
+            z_new = if (fx_positive) {
+                fixed_point64::sub(z, damped_step)
             } else {
-                fixed_point64::add(z, fx_div_fp)
-            }
+                fixed_point64::add(z, damped_step)
+            };
+            // Clamp to [z_min, z_max]
+            z_new = if (fixed_point64::lt(z_new, z_min)) {
+                z_min
+            } else if (fixed_point64::gt(z_new, z_max)) {
+                z_max
+            } else {
+                z_new
+            };
+        };
+        
+        // Check if step is too small
+        let step_size = if (fixed_point64::gte(z_new, z)) {
+            fixed_point64::sub(z_new, z)
+        } else {
+            fixed_point64::sub(z, z_new)
+        };
+        if (fixed_point64::lt(step_size, tol)) {
+            break
         };
         
         // Update z for next iteration
@@ -184,13 +220,39 @@ fun compute_f_prime(
 }
 
 #[test]
+fun test_iter_newton_raphson() {
+    use std::debug::print;
+    // let k = fixed_point64::from_rational(10049999999999999999, 1000000000000000000); // 10.049999999999999999c
+    // let a = fixed_point64::from(1);                // A = 1
+    // let z_initial = fixed_point64::from_rational(999999999899999999, 1000000000000000000); // 0.999999999899999999
+    // let z = newton_raphson(k, a, z_initial);
+
+    // print(&z.to_string());
+    
+    
+    let k = fixed_point64::from_rational(10019999999999999999, 1000000000000000000); // 10.049999999999999999c
+    let a = fixed_point64::from(1);                // A = 1
+    let z_initial = fixed_point64::from_rational(999999999899999999, 1000000000000000000); // 0.999999999899999999
+    let z = newton_raphson(k, a, z_initial);
+
+    print(&z.to_string());
+    
+    // assert!(z.to_string() == utf8(b"0.000199980001333266"), 0);
+
+    // let (result, _) = compute_f(z, a, k);
+    // assert!(result.to_string() == utf8(b"0.000000000000000000"), 0);
+}
+
+#[test]
 fun test_newton_raphson() {
+    use std::debug::print;
     // k:  0.0002 ; A:  1
     let k = fixed_point64::from_rational(2, 10000); // 0.0002
     let a = fixed_point64::from(1);                // A = 1
     let z_initial = fixed_point64::from_rational(199979994408495, 1000000000000000000); // 0.000199979994408495
     let z = newton_raphson(k, a, z_initial);
     
+    print(&z.to_string());
     assert!(z.to_string() == utf8(b"0.000199980001333266"), 0);
 
     let (result, _) = compute_f(z, a, k);

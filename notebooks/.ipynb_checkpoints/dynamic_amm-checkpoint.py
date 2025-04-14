@@ -56,7 +56,6 @@ def swap_y_to_x_stable(amount_y, reserve_x, reserve_y, price_x, price_y, decimal
     
     upper_bound_z = min(0.99999, amount_y * dec_pow / (p_o_raw * reserve_x))
     z = newton_raphson(k, A, upper_bound_z)
-    
     delta_x = z * reserve_x
     if delta_x >= reserve_x:
         return reserve_x * 0.999
@@ -72,7 +71,8 @@ def newton_raphson(k, A, z_initial, tol=1e-10, max_iter=100):
     
     # Improve initial guess
     if z_initial <= 0 or z_initial >= 1:
-        z_initial = max(1e-5, min(0.99999, k / (1 - 1/A)))
+        #z_initial = max(1e-5, min(0.99999, k / (1 - 1/A)))
+        z_initial = max(1e-5, min(0.999999999999999999, k / (1 - 1/A)))
     
     z = z_initial
     it = 0
@@ -98,7 +98,8 @@ def newton_raphson(k, A, z_initial, tol=1e-10, max_iter=100):
         if z_new <= 0 or z_new >= 1:
             alpha *= 0.5  # Reduce step size
             z_new = z - alpha * step
-            z_new = max(1e-5, min(0.99999, z_new))
+            #z_new = max(1e-5, min(0.99999, z_new))
+            z_new = max(1e-5, min(0.999999999999999999, z_new))
         
         # Check if step is too small
         if abs(z_new - z) < tol:
@@ -109,7 +110,6 @@ def newton_raphson(k, A, z_initial, tol=1e-10, max_iter=100):
     if it >= max_iter:
         print("Warning: Max iterations reached, may not have converged")
     
-    #print("NR iters: ", it)
     return z
 
 def get_slippage(amount_x, amount_y, price_x, price_y, decimals_x, decimals_y, direction):

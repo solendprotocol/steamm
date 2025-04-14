@@ -34,6 +34,9 @@ use suilend::test_usdc::{Self, TEST_USDC};
 public fun e9(amt: u64): u64 {
     1_000_000_000 * amt
 }
+public fun e6(amt: u64): u64 {
+    1_000_000 * amt
+}
 
 #[test_only]
 public macro fun assert_eq_approx($a: u64, $b: u64, $tolerance_bps: u64) {
