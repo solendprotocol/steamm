@@ -2,6 +2,8 @@
 module steamm::dmm_tests;
 
 use std::debug::print;
+use std::string::utf8;
+use suilend::decimal;
 use oracles::oracles::{Self, OracleRegistry};
 use steamm::b_test_sui::B_TEST_SUI;
 use steamm::b_test_usdc::B_TEST_USDC;
@@ -11,8 +13,11 @@ use steamm::dummy_omm::{Self, OracleQuoter};
 use steamm::stable::{Self as dmm, StableQuoter as DynQuoter};
 use steamm::pool::{Pool};
 use steamm::test_utils::{base_setup_2};
+use steamm::global_admin;
+use steamm::utils::decimal_to_fixedpoint64;
 use sui::clock::{Self};
 use sui::coin;
+use sui::balance;
 use sui::test_scenario::{Self, Scenario};
 use sui::test_utils::{destroy, assert_eq};
 use suilend::lending_market::{LendingMarket};
@@ -22,7 +27,6 @@ use suilend::test_sui::{TEST_SUI};
 use suilend::test_usdc::{TEST_USDC};
 use steamm::test_utils::{e9, e6};
 use steamm::fixed_point64::{Self as fp64};
-use sui::random;
 
 fun setup(
     fee_bps: u64,
@@ -363,6 +367,8 @@ fun setup_all(
     (pool, dyn_pool1, dyn_pool10, dyn_pool100, dyn_pool1000, dyn_pool8000, oracle_registry, price_state, lending_market, bank_sui, bank_usdc)
 }
 
+/// Checks that the dynamic fee quotation is less than the naive oracle implementation
+/// It should ALWAYS give a worst price than the given oracle price
 #[test]
 fun test_dmm_positive_slippage_y2x() {
     let mut scenario = test_scenario::begin(@0x26);
@@ -484,6 +490,8 @@ fun test_dmm_positive_slippage_y2x() {
     test_scenario::end(scenario);
 }
 
+/// Checks that the dynamic fee quotation is less than the naive oracle implementation
+/// It should ALWAYS give a worst price than the given oracle price
 #[test]
 fun test_dmm_positive_slippage_x2y() {
     let mut scenario = test_scenario::begin(@0x26);
@@ -605,6 +613,8 @@ fun test_dmm_positive_slippage_x2y() {
     test_scenario::end(scenario);
 }
 
+/// Checks that the dynamic fee quotation progressively gives a worse quote
+/// as the trade size, and therefore imbalance, increases
 #[test]
 fun test_a2b_consecutive_price_decrease_amp_1() {
     let mut scenario = test_scenario::begin(@0x26);
@@ -741,6 +751,8 @@ fun test_a2b_consecutive_price_decrease_amp_1() {
     test_scenario::end(scenario);
 }
 
+/// Checks that the dynamic fee quotation progressively gives a worse quote
+/// as the trade size, and therefore imbalance, increases
 #[test]
 fun test_b2a_consecutive_price_increase_amp_1() {
     let mut scenario = test_scenario::begin(@0x26);
@@ -877,6 +889,8 @@ fun test_b2a_consecutive_price_increase_amp_1() {
     test_scenario::end(scenario);
 }
 
+/// Checks that the dynamic fee quotation progressively gives a worse quote
+/// as the trade size, and therefore imbalance, increases
 #[test]
 fun test_a2b_consecutive_price_decrease_amp_10() {
     let mut scenario = test_scenario::begin(@0x26);
@@ -1013,6 +1027,8 @@ fun test_a2b_consecutive_price_decrease_amp_10() {
     test_scenario::end(scenario);
 }
 
+/// Checks that the dynamic fee quotation progressively gives a worse quote
+/// as the trade size, and therefore imbalance, increases
 #[test]
 fun test_b2a_consecutive_price_increase_amp_10() {
     let mut scenario = test_scenario::begin(@0x26);
@@ -1149,6 +1165,8 @@ fun test_b2a_consecutive_price_increase_amp_10() {
     test_scenario::end(scenario);
 }
 
+/// Checks that the dynamic fee quotation progressively gives a worse quote
+/// as the trade size, and therefore imbalance, increases
 #[test]
 fun test_a2b_consecutive_price_decrease_amp_100() {
     let mut scenario = test_scenario::begin(@0x26);
@@ -1285,6 +1303,8 @@ fun test_a2b_consecutive_price_decrease_amp_100() {
     test_scenario::end(scenario);
 }
 
+/// Checks that the dynamic fee quotation progressively gives a worse quote
+/// as the trade size, and therefore imbalance, increases
 #[test]
 fun test_b2a_consecutive_price_increase_amp_100() {
     let mut scenario = test_scenario::begin(@0x26);
@@ -1421,6 +1441,8 @@ fun test_b2a_consecutive_price_increase_amp_100() {
     test_scenario::end(scenario);
 }
 
+/// Checks that the dynamic fee quotation progressively gives a worse quote
+/// as the trade size, and therefore imbalance, increases
 #[test]
 fun test_a2b_consecutive_price_decrease_amp_1000() {
     let mut scenario = test_scenario::begin(@0x26);
@@ -1557,6 +1579,8 @@ fun test_a2b_consecutive_price_decrease_amp_1000() {
     test_scenario::end(scenario);
 }
 
+/// Checks that the dynamic fee quotation progressively gives a worse quote
+/// as the trade size, and therefore imbalance, increases
 #[test]
 fun test_b2a_consecutive_price_increase_amp_1000() {
     let mut scenario = test_scenario::begin(@0x26);
@@ -1693,6 +1717,8 @@ fun test_b2a_consecutive_price_increase_amp_1000() {
     test_scenario::end(scenario);
 }
 
+/// Checks that the dynamic fee quotation progressively gives a worse quote
+/// as the trade size, and therefore imbalance, increases
 #[test]
 fun test_a2b_consecutive_price_decrease_amp_8000() {
     let mut scenario = test_scenario::begin(@0x26);
@@ -1829,6 +1855,8 @@ fun test_a2b_consecutive_price_decrease_amp_8000() {
     test_scenario::end(scenario);
 }
 
+/// Checks that the dynamic fee quotation progressively gives a worse quote
+/// as the trade size, and therefore imbalance, increases
 #[test]
 fun test_b2a_consecutive_price_increase_amp_8000() {
     let mut scenario = test_scenario::begin(@0x26);
@@ -1965,6 +1993,8 @@ fun test_b2a_consecutive_price_increase_amp_8000() {
     test_scenario::end(scenario);
 }
 
+/// Tests that slippage will be worse for smaller Amplifiers. It tests this accross
+/// a series of increaasing trade prices
 #[test]
 fun test_a2b_price_slippage_comparison() {
     let mut scenario = test_scenario::begin(@0x26);
@@ -2237,6 +2267,8 @@ fun test_a2b_price_slippage_comparison() {
     test_scenario::end(scenario);
 }
 
+/// Tests that slippage will be worse for smaller Amplifiers. It tests this accross
+/// a series of increaasing trade prices
 #[test]
 fun test_b2a_price_slippage_comparison() {
     let mut scenario = test_scenario::begin(@0x26);
@@ -2511,343 +2543,414 @@ fun test_b2a_price_slippage_comparison() {
 }
 
 
-// #[test]
-// #[expected_failure(abort_code = steamm::dummy_omm::EInvalidOracleIndex)]
-// fun test_omm_fail_wrong_oracle() {
-//     let mut scenario = test_scenario::begin(@0x26);
+#[test]
+fun test_dmm_btoken_ratio_higher_b2a() {
+    let mut scenario = test_scenario::begin(@0x26);
 
-//     let (mut pool, oracle_registry, mut price_state, lending_market, bank_a, bank_b) = setup(
-//         100,
-//         &mut scenario,
-//     );
-//     let clock = clock::create_for_testing(scenario.ctx());
+    let (mut pool, mut dyn_pool, oracle_registry, mut price_state, mut lending_market, mut bank_sui, mut bank_usdc) = setup(
+        100,
+        1,
+        &mut scenario,
+    );
+    let clock = clock::create_for_testing(scenario.ctx());
 
-//     let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(1_000 * 1_000_000, scenario.ctx());
-//     let mut coin_b = coin::mint_for_testing<B_TEST_SUI>(20 * 1_000_000_000, scenario.ctx());
+    let mut coin_sui = coin::mint_for_testing<B_TEST_SUI>(2_000 * 1_000_000_000, scenario.ctx());
+    let mut coin_usdc = coin::mint_for_testing<B_TEST_USDC>(2_000 * 1_000_000, scenario.ctx());
 
-//     let (lp_coins, _) = pool.deposit_liquidity(
-//         &mut coin_a,
-//         &mut coin_b,
-//         1_000 * 1_000_000,
-//         20 * 1_000_000_000,
-//         scenario.ctx(),
-//     );
+    let (lp_coins, _) = pool.deposit_liquidity(
+        &mut coin_sui,
+        &mut coin_usdc,
+        e9(1_000),
+        e6(1_000),
+        scenario.ctx(),
+    );
+    
+    let (lp_coins_2, _) = dyn_pool.deposit_liquidity(
+        &mut coin_sui,
+        &mut coin_usdc,
+        e9(1_000),
+        e6(1_000),
+        scenario.ctx(),
+    );
 
-//     destroy(coin_a);
-//     destroy(coin_b);
+    destroy(coin_sui);
+    destroy(coin_usdc);
 
-//     let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(6 * 1_000_000, scenario.ctx());
-//     let mut coin_b = coin::mint_for_testing<B_TEST_SUI>(0, scenario.ctx());
+    price_state.update_price<TEST_USDC>(1, 0, &clock);
+    price_state.update_price<TEST_SUI>(3, 0, &clock);
 
-//     price_state.update_price<TEST_USDC>(1, 0, &clock);
-//     let oracle_price_update_usdc = oracle_registry.get_pyth_price(
-//         mock_pyth::get_price_obj<TEST_USDC>(&price_state),
-//         0,
-//         &clock,
-//     );
+    // Quotes prior to btoken ratio manipulation
 
-//     price_state.update_price<TEST_SUI>(3, 0, &clock);
-//     let oracle_price_update_sui = oracle_registry.get_pyth_price(
-//         mock_pyth::get_price_obj<TEST_SUI>(&price_state),
-//         1,
-//         &clock,
-//     );
+    let oracle_price_update_usdc = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
+        0,
+        &clock,
+    );
 
-//     // oracle updates are switched
-//     let _swap_result = dummy_omm::swap(
-//         &mut pool,
-//         &bank_a,
-//         &bank_b,
-//         &lending_market,
-//         oracle_price_update_sui,
-//         oracle_price_update_usdc,
-//         &mut coin_a,
-//         &mut coin_b,
-//         true, // a2b
-//         6 * 1_000_000,
-//         0,
-//         &clock,
-//         scenario.ctx(),
-//     );
+    let oracle_price_update_sui = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
+        1,
+        &clock,
+    );
 
-//     destroy(coin_a);
-//     destroy(coin_b);
-//     destroy(pool);
-//     destroy(lp_coins);
-//     destroy(oracle_registry);
-//     destroy(clock);
-//     destroy(price_state);
-//     destroy(lending_market);
-//     destroy(bank_a);
-//     destroy(bank_b);
+    let res_b2a_prior = dummy_omm::quote_swap(
+        &pool,
+        &bank_sui,
+        &bank_usdc,
+        &lending_market,
+        oracle_price_update_sui,
+        oracle_price_update_usdc,
+        e6(10),
+        false, // a2b
+        &clock,
+    );
 
-//     test_scenario::end(scenario);
-// }
+    let oracle_price_update_usdc = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
+        0,
+        &clock,
+    );
 
-// #[test]
-// #[expected_failure(abort_code = steamm::dummy_omm::EInvalidBankType)]
-// fun test_omm_fail_not_a_btoken() {
-//     let mut scenario = test_scenario::begin(@0x26);
+    let oracle_price_update_sui = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
+        1,
+        &clock,
+    );
+    
+    let res_b2a_dyn_prior = dmm::quote_swap(
+        &dyn_pool,
+        &bank_sui,
+        &bank_usdc,
+        &lending_market,
+        oracle_price_update_sui,
+        oracle_price_update_usdc,
+        e6(10),
+        false, // a2b
+        &clock,
+    );
 
-//     let (
-//         bank_a,
-//         bank_b,
-//         lending_market,
-//         lend_cap,
-//         price_state,
-//         bag,
-//         clock,
-//         mut registry,
-//         meta_b_usdc,
-//         meta_b_sui,
-//         meta_usdc,
-//         meta_sui,
-//         mut meta_lp_usdc_sui,
-//         treasury_cap_lp,
-//     ) = base_setup(option::none(), &mut scenario);
+    // Manipulate btoken prices
+    let admin = global_admin::init_for_testing(scenario.ctx());
+    bank_sui.init_lending(&admin, &mut lending_market, 0, 0, scenario.ctx());
+    bank_usdc.init_lending(&admin, &mut lending_market, 0, 0, scenario.ctx());
 
-//     let (mut oracle_registry, admin_cap) = oracles::new_oracle_registry_for_testing(
-//         oracles::new_oracle_registry_config(
-//             60,
-//             10,
-//             60,
-//             10,
-//             scenario.ctx(),
-//         ),
-//         scenario.ctx(),
-//     );
+    let bsui_supply = bank_sui.btoken_supply_for_testing();
+    destroy(bsui_supply.increase_supply(e9(1_000) + e9(1_000))); // 2.0x. need to add the supply from the previous deposited liquidity as we bypassed it and minted coins using test function
+    let funds_available_sui = bank_sui.funds_available_for_testing();
+    funds_available_sui.join(balance::create_for_testing(e9(1_000)));
+    
+    let busdc_supply = bank_usdc.btoken_supply_for_testing();
+    destroy(busdc_supply.increase_supply(e6(1_000) + e6(500)));  // 1.0x. need to add the supply from the previous deposited liquidity as we bypassed it and minted coins using test function
+    let funds_available_usdc = bank_usdc.funds_available_for_testing();
+    funds_available_usdc.join(balance::create_for_testing(e6(1_000)));
 
-//     oracle_registry.add_pyth_oracle(
-//         &admin_cap,
-//         mock_pyth::get_price_obj<TEST_USDC>(&price_state),
-//         scenario.ctx(),
-//     );
+    let (bank_total_funds, total_btoken_supply) = bank_usdc.get_btoken_ratio(&lending_market, &clock);
+    let btoken_ratio_usdc_after = bank_total_funds.div(total_btoken_supply);
 
-//     oracle_registry.add_pyth_oracle(
-//         &admin_cap,
-//         mock_pyth::get_price_obj<TEST_SUI>(&price_state),
-//         scenario.ctx(),
-//     );
+    let (bank_total_funds, total_btoken_supply) = bank_sui.get_btoken_ratio(&lending_market, &clock);
+    let btoken_ratio_sui_after = bank_total_funds.div(total_btoken_supply);
 
-//     let pool = dummy_omm::new<
-//         LENDING_MARKET,
-//         TEST_USDC,
-//         TEST_SUI,
-//         TEST_USDC,
-//         B_TEST_SUI,
-//         LP_USDC_SUI,
-//     >(
-//         &mut registry,
-//         &lending_market,
-//         &meta_usdc,
-//         &meta_sui,
-//         &meta_usdc,
-//         &meta_b_sui,
-//         &mut meta_lp_usdc_sui,
-//         treasury_cap_lp,
-//         &oracle_registry,
-//         0,
-//         1,
-//         100,
-//         scenario.ctx(),
-//     );
+    // Quotes after btoken ratio manipulation
 
-//     sui::test_utils::destroy(admin_cap);
-//     sui::test_utils::destroy(meta_lp_usdc_sui);
-//     sui::test_utils::destroy(meta_b_usdc);
-//     sui::test_utils::destroy(meta_b_sui);
-//     sui::test_utils::destroy(meta_usdc);
-//     sui::test_utils::destroy(meta_sui);
-//     sui::test_utils::destroy(registry);
-//     sui::test_utils::destroy(lend_cap);
-//     sui::test_utils::destroy(clock);
-//     sui::test_utils::destroy(bag);
-//     sui::test_utils::destroy(pool);
-//     sui::test_utils::destroy(oracle_registry);
-//     sui::test_utils::destroy(price_state);
-//     sui::test_utils::destroy(lending_market);
-//     sui::test_utils::destroy(bank_a);
-//     sui::test_utils::destroy(bank_b);
+    let oracle_price_update_usdc = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
+        0,
+        &clock,
+    );
 
-//     test_scenario::end(scenario);
-// }
+    let oracle_price_update_sui = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
+        1,
+        &clock,
+    );
 
-// #[test]
-// fun test_omm_quote_swap_insufficient_liquidity() {
-//     let mut scenario = test_scenario::begin(@0x26);
+    let res_b2a_post = dummy_omm::quote_swap(
+        &pool,
+        &bank_sui,
+        &bank_usdc,
+        &lending_market,
+        oracle_price_update_sui,
+        oracle_price_update_usdc,
+        e6(10),
+        false, // a2b
+        &clock,
+    );
 
-//     let (mut pool, oracle_registry, mut price_state, lending_market, bank_a, bank_b) = setup(
-//         100,
-//         &mut scenario,
-//     );
-//     let clock = clock::create_for_testing(scenario.ctx());
+    let oracle_price_update_usdc = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
+        0,
+        &clock,
+    );
 
-//     // Add some initial liquidity to the pool
-//     let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(100 * 1_000_000, scenario.ctx());
-//     let mut coin_b = coin::mint_for_testing<B_TEST_SUI>(10 * 1_000_000_000, scenario.ctx());
+    let oracle_price_update_sui = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
+        1,
+        &clock,
+    );
+    
+    let res_b2a_dyn_post = dmm::quote_swap(
+        &dyn_pool,
+        &bank_sui,
+        &bank_usdc,
+        &lending_market,
+        oracle_price_update_sui,
+        oracle_price_update_usdc,
+        e6(10),
+        false, // a2b
+        &clock,
+    );
 
-//     let (lp_coins, _) = pool.deposit_liquidity(
-//         &mut coin_a,
-//         &mut coin_b,
-//         100 * 1_000,
-//         100 * 1_000,
-//         scenario.ctx(),
-//     );
+    let new_delta_out = res_b2a_prior.amount_out() + res_b2a_prior.output_fees().protocol_fees() + res_b2a_prior.output_fees().pool_fees();
+    let dx = fp64::from(new_delta_out as u128).div(fp64::from(e9(1) as u128));
+    let dy = fp64::from(e6(10) as u128).div(fp64::from(e6(1) as u128));
+    let price_b2a_prior = dy.div(dx);
+    
+    let new_delta_out = res_b2a_post.amount_out() + res_b2a_post.output_fees().protocol_fees() + res_b2a_post.output_fees().pool_fees();
+    let dx = fp64::from(new_delta_out as u128).div(fp64::from(e9(1) as u128));
+    let price_b2a_post = dy.div(dx);
 
-//     destroy(coin_a);
-//     destroy(coin_b);
+    // b2a -> buy sui, price should be 3
+    assert!(price_b2a_prior.to_string() == utf8(b"3.000000000299999999"), 0); // slightly above 3 due to rounding in favour of pool
+    
+    // this is the price in btoken ratio
+    // we therefore have to multiply by the token ratio SUI (2x) then divide by the token ratio USDC (1.5x)
+    // 2.25 * 2 / 1.5 = 3
+    // print(&price_b2a_post.to_string());
+    assert!(price_b2a_post.to_string() == utf8(b"2.250000000225000000"), 0); // slightly above 3 due to rounding in favour of pool
 
-//     // Update oracle prices
-//     price_state.update_price<TEST_USDC>(1, 0, &clock);
-//     let oracle_price_update_usdc = oracle_registry.get_pyth_price(
-//         mock_pyth::get_price_obj<TEST_USDC>(&price_state),
-//         0,
-//         &clock,
-//     );
+    let new_delta_out = res_b2a_dyn_prior.amount_out() + res_b2a_dyn_prior.output_fees().protocol_fees() + res_b2a_dyn_prior.output_fees().pool_fees();
+    let dx = fp64::from(new_delta_out as u128).div(fp64::from(e9(1) as u128));
+    let dy = fp64::from(e6(10) as u128).div(fp64::from(e6(1) as u128));
+    let price_b2a_prior_dyn = dy.div(dx);
+    
+    let new_delta_out = res_b2a_dyn_post.amount_out() + res_b2a_dyn_post.output_fees().protocol_fees() + res_b2a_dyn_post.output_fees().pool_fees();
+    let dx = fp64::from(new_delta_out as u128).div(fp64::from(e9(1) as u128));
+    let price_b2a_post_dyn = dy.div(dx);
 
-//     price_state.update_price<TEST_SUI>(3, 0, &clock);
-//     let oracle_price_update_sui = oracle_registry.get_pyth_price(
-//         mock_pyth::get_price_obj<TEST_SUI>(&price_state),
-//         1,
-//         &clock,
-//     );
+    // print(&price_b2a_prior_dyn.to_string());
+    // print(&price_b2a_post_dyn.to_string());
+    // print(&dx.to_string());
 
-//     // Try to quote a swap with an amount much larger than pool liquidity
-//     // Attempting to swap 1000 USDC when pool only has 100
-//     let quote = dummy_omm::quote_swap(
-//         &pool,
-//         &bank_a,
-//         &bank_b,
-//         &lending_market,
-//         oracle_price_update_usdc,
-//         oracle_price_update_sui,
-//         1000 * 1_000_000, // 1000 USDC, much larger than pool liquidity
-//         true, // a2b (USDC to SUI)
-//         &clock,
-//     );
+    assert!(price_b2a_prior_dyn.to_string() == utf8(b"3.005002778207706029"), 0); // slightly above 3 due to rounding in favour of pool
 
-//     // Verify that amount_out is 0 due to insufficient liquidity
-//     assert!(quote.amount_out() == 0, 0);
-//     assert!(quote.output_fees().pool_fees() == 0, 0);
-//     assert!(quote.output_fees().protocol_fees() == 0, 0);
+    // 2.2537520836557796
+    // 2.255003704163794615
 
-//     price_state.update_price<TEST_USDC>(1, 0, &clock);
-//     let oracle_price_update_usdc = oracle_registry.get_pyth_price(
-//         mock_pyth::get_price_obj<TEST_USDC>(&price_state),
-//         0,
-//         &clock,
-//     );
+    // 2.2537520836557796
+    // 2.255003704163794615
+    // TODO: we're here, something is wrong with the post price..
 
-//     price_state.update_price<TEST_SUI>(3, 0, &clock);
-//     let oracle_price_update_sui = oracle_registry.get_pyth_price(
-//         mock_pyth::get_price_obj<TEST_SUI>(&price_state),
-//         1,
-//         &clock,
-//     );
+    destroy(admin);
+    destroy(pool);
+    destroy(dyn_pool);
+    destroy(lp_coins);
+    destroy(lp_coins_2);
+    destroy(oracle_registry);
+    destroy(clock);
+    destroy(price_state);
+    destroy(lending_market);
+    destroy(bank_sui);
+    destroy(bank_usdc);
 
-//     // Check the opposite direction as well - trying to swap more SUI than available
-//     let quote = dummy_omm::quote_swap(
-//         &pool,
-//         &bank_a,
-//         &bank_b,
-//         &lending_market,
-//         oracle_price_update_usdc,
-//         oracle_price_update_sui,
-//         100 * 1_000_000_000, // 100 SUI, much larger than pool liquidity
-//         false, // b2a (SUI to USDC)
-//         &clock,
-//     );
+    test_scenario::end(scenario);
+}
 
-//     // Verify that amount_out is 0 due to insufficient liquidity
-//     assert!(quote.amount_out() == 0, 0);
-//     assert!(quote.output_fees().pool_fees() == 0, 0);
-//     assert!(quote.output_fees().protocol_fees() == 0, 0);
+#[test]
+fun test_dmm_btoken_ratio_equally_higher_b2a() {
+    let mut scenario = test_scenario::begin(@0x26);
 
-//     destroy(lp_coins);
-//     destroy(pool);
-//     destroy(oracle_registry);
-//     destroy(clock);
-//     destroy(price_state);
-//     destroy(lending_market);
-//     destroy(bank_a);
-//     destroy(bank_b);
+    let (mut pool, mut dyn_pool, oracle_registry, mut price_state, mut lending_market, mut bank_sui, mut bank_usdc) = setup(
+        100,
+        1,
+        &mut scenario,
+    );
+    let clock = clock::create_for_testing(scenario.ctx());
 
-//     test_scenario::end(scenario);
-// }
+    let mut coin_sui = coin::mint_for_testing<B_TEST_SUI>(2_000 * 1_000_000_000, scenario.ctx());
+    let mut coin_usdc = coin::mint_for_testing<B_TEST_USDC>(2_000 * 1_000_000, scenario.ctx());
 
-// #[test]
-// #[expected_failure(abort_code = steamm::pool::ESwapOutputAmountIsZero)]
-// fun test_omm_swap_insufficient_liquidity() {
-//     let mut scenario = test_scenario::begin(@0x26);
+    let (lp_coins, _) = pool.deposit_liquidity(
+        &mut coin_sui,
+        &mut coin_usdc,
+        e9(1_000),
+        e6(1_000),
+        scenario.ctx(),
+    );
+    
+    let (lp_coins_2, _) = dyn_pool.deposit_liquidity(
+        &mut coin_sui,
+        &mut coin_usdc,
+        e9(1_000),
+        e6(1_000),
+        scenario.ctx(),
+    );
 
-//     let (mut pool, oracle_registry, mut price_state, lending_market, bank_a, bank_b) = setup(
-//         100,
-//         &mut scenario,
-//     );
-//     let clock = clock::create_for_testing(scenario.ctx());
+    destroy(coin_sui);
+    destroy(coin_usdc);
 
-//     // Add some initial liquidity to the pool - deliberately small amount
-//     let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(100 * 1_000_000, scenario.ctx());
-//     let mut coin_b = coin::mint_for_testing<B_TEST_SUI>(10 * 1_000_000_000, scenario.ctx());
+    price_state.update_price<TEST_USDC>(1, 0, &clock);
+    price_state.update_price<TEST_SUI>(3, 0, &clock);
 
-//     let (lp_coins, _) = pool.deposit_liquidity(
-//         &mut coin_a,
-//         &mut coin_b,
-//         100 * 1_000_000,
-//         10 * 1_000_000_000,
-//         scenario.ctx(),
-//     );
+    // Quotes prior to btoken ratio manipulation
+    let oracle_price_update_usdc = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
+        0,
+        &clock,
+    );
 
-//     destroy(coin_a);
-//     destroy(coin_b);
+    let oracle_price_update_sui = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
+        1,
+        &clock,
+    );
 
-//     // Update oracle prices
-//     price_state.update_price<TEST_USDC>(1, 0, &clock);
-//     let oracle_price_update_usdc = oracle_registry.get_pyth_price(
-//         mock_pyth::get_price_obj<TEST_USDC>(&price_state),
-//         0,
-//         &clock,
-//     );
+    let res_b2a_prior = dummy_omm::quote_swap(
+        &pool,
+        &bank_sui,
+        &bank_usdc,
+        &lending_market,
+        oracle_price_update_sui,
+        oracle_price_update_usdc,
+        e6(10),
+        false, // a2b
+        &clock,
+    );
 
-//     price_state.update_price<TEST_SUI>(3, 0, &clock);
-//     let oracle_price_update_sui = oracle_registry.get_pyth_price(
-//         mock_pyth::get_price_obj<TEST_SUI>(&price_state),
-//         1,
-//         &clock,
-//     );
+    let oracle_price_update_usdc = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
+        0,
+        &clock,
+    );
 
-//     // Create coins for swapping - attempting to swap more than the pool has
-//     let mut coin_a = coin::mint_for_testing<B_TEST_USDC>(1000 * 1_000_000, scenario.ctx()); // 1000 USDC
-//     let mut coin_b = coin::mint_for_testing<B_TEST_SUI>(0, scenario.ctx());
+    let oracle_price_update_sui = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
+        1,
+        &clock,
+    );
+    
+    let res_b2a_dyn_prior = dmm::quote_swap(
+        &dyn_pool,
+        &bank_sui,
+        &bank_usdc,
+        &lending_market,
+        oracle_price_update_sui,
+        oracle_price_update_usdc,
+        e6(10),
+        false, // a2b
+        &clock,
+    );
 
-//     // This should fail with EInsufficientLiquidity (or similar error)
-//     // as we're trying to swap 1000 USDC when pool only has 100 USDC
-//     let _swap_result = dummy_omm::swap(
-//         &mut pool,
-//         &bank_a,
-//         &bank_b,
-//         &lending_market,
-//         oracle_price_update_usdc,
-//         oracle_price_update_sui,
-//         &mut coin_a,
-//         &mut coin_b,
-//         true, // a2b (USDC to SUI)
-//         1000 * 1_000_000, // 1000 USDC, much larger than pool liquidity
-//         0, // min amount out - doesn't matter as we expect failure
-//         &clock,
-//         scenario.ctx(),
-//     );
+    // Manipulate btoken prices
+    let admin = global_admin::init_for_testing(scenario.ctx());
+    bank_sui.init_lending(&admin, &mut lending_market, 0, 0, scenario.ctx());
+    bank_usdc.init_lending(&admin, &mut lending_market, 0, 0, scenario.ctx());
 
-//     destroy(coin_a);
-//     destroy(coin_b);
-//     destroy(lp_coins);
-//     destroy(pool);
-//     destroy(oracle_registry);
-//     destroy(clock);
-//     destroy(price_state);
-//     destroy(lending_market);
-//     destroy(bank_a);
-//     destroy(bank_b);
+    let bsui_supply = bank_sui.btoken_supply_for_testing();
+    destroy(bsui_supply.increase_supply(e9(1_000) + e9(1_000))); // 2.0x
+    let funds_available_sui = bank_sui.funds_available_for_testing();
+    funds_available_sui.join(balance::create_for_testing(e9(1_000)));
+    
+    let busdc_supply = bank_usdc.btoken_supply_for_testing();
+    destroy(busdc_supply.increase_supply(e6(1_000) + e6(1_000)));
+    let funds_available_usdc = bank_usdc.funds_available_for_testing();
+    funds_available_usdc.join(balance::create_for_testing(e6(1_000)));
 
-//     test_scenario::end(scenario);
-// }
+    let (bank_total_funds, total_btoken_supply) = bank_usdc.get_btoken_ratio(&lending_market, &clock);
+    let btoken_ratio_usdc_after = bank_total_funds.div(total_btoken_supply);
+
+    let (bank_total_funds, total_btoken_supply) = bank_sui.get_btoken_ratio(&lending_market, &clock);
+    let btoken_ratio_sui_after = bank_total_funds.div(total_btoken_supply);
+
+    // Quotes after btoken ratio manipulation
+
+    let oracle_price_update_usdc = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
+        0,
+        &clock,
+    );
+
+    let oracle_price_update_sui = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
+        1,
+        &clock,
+    );
+
+    let res_b2a_post = dummy_omm::quote_swap(
+        &pool,
+        &bank_sui,
+        &bank_usdc,
+        &lending_market,
+        oracle_price_update_sui,
+        oracle_price_update_usdc,
+        e6(10),
+        false, // a2b
+        &clock,
+    );
+
+    let oracle_price_update_usdc = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
+        0,
+        &clock,
+    );
+
+    let oracle_price_update_sui = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
+        1,
+        &clock,
+    );
+    
+    let res_b2a_dyn_post = dmm::quote_swap(
+        &dyn_pool,
+        &bank_sui,
+        &bank_usdc,
+        &lending_market,
+        oracle_price_update_sui,
+        oracle_price_update_usdc,
+        e6(10),
+        false, // a2b
+        &clock,
+    );
+
+    let new_delta_out = res_b2a_prior.amount_out() + res_b2a_prior.output_fees().protocol_fees() + res_b2a_prior.output_fees().pool_fees();
+    let dx_ = decimal::from(new_delta_out).div(decimal::from(e9(1)));
+    let dx = decimal_to_fixedpoint64(dx_);
+    let dy = fp64::from(e6(10) as u128).div(fp64::from(e6(1) as u128));
+    let price_b2a_prior = dy.div(dx);
+    
+    let new_delta_out = res_b2a_post.amount_out() + res_b2a_post.output_fees().protocol_fees() + res_b2a_post.output_fees().pool_fees();
+    let dx = fp64::from(new_delta_out as u128).div(fp64::from(e9(1) as u128));
+    let dy = fp64::from(e9(10) as u128).div(fp64::from(e9(1) as u128));
+    let price_b2a_post = dy.div(dx);
+
+    // b2a -> buy sui, price should be 3
+    assert!(price_b2a_prior.to_string_clipped(9) == utf8(b"3.000000000"), 0);
+    assert!(price_b2a_post.to_string_clipped(9) == utf8(b"3.000000000"), 0);
+
+    let new_delta_out = res_b2a_dyn_prior.amount_out() + res_b2a_dyn_prior.output_fees().protocol_fees() + res_b2a_dyn_prior.output_fees().pool_fees();
+    let dx = fp64::from(new_delta_out as u128).div(fp64::from(e9(1) as u128));
+    let dy = fp64::from(e6(10) as u128).div(fp64::from(e6(1) as u128));
+    let price_b2a_prior_dyn = dy.div(dx);
+    
+    let new_delta_out = res_b2a_dyn_post.amount_out() + res_b2a_dyn_post.output_fees().protocol_fees() + res_b2a_dyn_post.output_fees().pool_fees();
+    let dx_post = fp64::from(new_delta_out as u128).div(fp64::from(e9(1) as u128));
+    
+    assert!(dx_post.lte(dx), 0); // asserts that any rounding error or numerical approximation is in favour of the pool
+    let price_b2a_post_dyn = dy.div(dx_post);
+
+    assert!(price_b2a_prior_dyn.to_string_clipped(9) == utf8(b"3.005002778"), 0);
+    assert!(price_b2a_post_dyn.to_string_clipped(9) == utf8(b"3.005002779"), 0); // slightly above the previous result due to numerical approximation
+
+    destroy(admin);
+    destroy(pool);
+    destroy(dyn_pool);
+    destroy(lp_coins);
+    destroy(lp_coins_2);
+    destroy(oracle_registry);
+    destroy(clock);
+    destroy(price_state);
+    destroy(lending_market);
+    destroy(bank_sui);
+    destroy(bank_usdc);
+
+    test_scenario::end(scenario);
+}

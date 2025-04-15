@@ -979,6 +979,20 @@ public fun mock_min_token_block_size<P, T, BToken>(
 }
 
 #[test_only]
+public(package) fun funds_available_for_testing<P, T, BToken>(
+    bank: &mut Bank<P, T, BToken>,
+): &mut Balance<T> {
+    &mut bank.funds_available
+}
+
+#[test_only]
+public(package) fun btoken_supply_for_testing<P, T, BToken>(
+    bank: &mut Bank<P, T, BToken>,
+): &mut Supply<BToken> {
+    &mut bank.btoken_supply
+}
+
+#[test_only]
 public(package) fun deposit_for_testing<P, T, BToken>(bank: &mut Bank<P, T, BToken>, amount: u64) {
     bank
         .funds_available

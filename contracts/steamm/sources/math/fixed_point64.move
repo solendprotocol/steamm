@@ -570,6 +570,32 @@ public fun to_string(fp: FixedPoint64): String {
 }
 
 #[test_only]
+public fun to_string_clipped(fp: FixedPoint64, decimal_places: u8): String {
+    let scaling_factor = 1u128 << 64; // 2^64
+    let raw_value = fp.value;
+    
+    let integer_part = raw_value / scaling_factor;
+    let fractional_part = raw_value % scaling_factor;
+    
+    // Calculate decimal scaling based on desired decimal places
+    let decimal_scaling = 10u256.pow(decimal_places);
+    let fractional_display = ((fractional_part as u256) * decimal_scaling / (scaling_factor as u256)) as u128;
+
+    let integer_bytes = u64_to_bytes(integer_part as u64);
+    let fractional_bytes = u64_to_bytes_padded(fractional_display as u64, decimal_places as u64);
+
+    let mut result = vector::empty<u8>();
+    vector::append(&mut result, integer_bytes);
+    if (decimal_places > 0) {
+        vector::push_back(&mut result, b"."[0]); // Add decimal point only if we have decimals
+        vector::append(&mut result, fractional_bytes);
+    };
+
+    utf8(result)
+}
+
+
+#[test_only]
 fun u64_to_bytes(num: u64): vector<u8> {
     if (num == 0) {
         return b"0"

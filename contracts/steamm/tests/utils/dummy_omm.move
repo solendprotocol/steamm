@@ -1,5 +1,6 @@
 /// Oracle AMM Hook implementation. This quoter can only be initialized with btoken types.
 module steamm::dummy_omm;
+
 use oracles::oracles::{OracleRegistry, OraclePriceUpdate};
 use oracles::oracle_decimal::{OracleDecimal};
 use steamm::pool::{Self, Pool, SwapResult};

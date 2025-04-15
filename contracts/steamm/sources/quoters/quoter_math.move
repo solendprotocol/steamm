@@ -30,7 +30,7 @@ public(package) fun swap(
         fixed_point64::from(10).pow(decimals_x - decimals_y)
     } else {
         fixed_point64::one().div(
-            fixed_point64::from(10).pow(decimals_y- decimals_x)
+            fixed_point64::from(10).pow(decimals_y - decimals_x)
         )
     };
 
