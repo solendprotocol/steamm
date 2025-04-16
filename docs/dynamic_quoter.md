@@ -286,16 +286,16 @@ This constraint is useful as it serves as the initial guess used in the numerica
 For y2x, the P is multiplying and the decimal adjusment dividing:
 
 $$
-\Delta y = \frac{P}{10^{d_x - d_y}} R_y \left( \left( 1 - \frac{1}{A} \right) \frac{\Delta x}{R_x} - \frac{1}{A} \ln \left(1 - \frac{\Delta x}{R_x}\right) \right)
+\Delta y = \frac{P}{10^{d_x - d_y}} R_x \left( \left( 1 - \frac{1}{A} \right) \frac{\Delta x}{R_x} - \frac{1}{A} \ln \left(1 - \frac{\Delta x}{R_x}\right) \right)
 $$
 
 $$
-\frac{\Delta y \cdot 10^{d_x - d_y}}{R_y \cdot P} = \left( \left( 1 - \frac{1}{A} \right) \frac{\Delta x}{R_x} - \frac{1}{A} \ln \left(1 - \frac{\Delta x}{R_x}\right) \right)
+\frac{\Delta y \cdot 10^{d_x - d_y}}{R_x \cdot P} = \left( \left( 1 - \frac{1}{A} \right) \frac{\Delta x}{R_x} - \frac{1}{A} \ln \left(1 - \frac{\Delta x}{R_x}\right) \right)
 $$
 
 let k be:
 $$
-\frac{\Delta y \cdot 10^{d_x - d_y}}{R_y \cdot P}
+\frac{\Delta y \cdot 10^{d_x - d_y}}{R_x \cdot P}
 $$
 
 $$
