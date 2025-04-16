@@ -110,7 +110,9 @@ public fun swap<P, A, B, B_A, B_B, LpType: drop>(
     coin_a: &mut Coin<B_A>,
     coin_b: &mut Coin<B_B>,
     a2b: bool,
+    // Amount in (btoken)
     amount_in: u64,
+    // Min amount in (btoken)
     min_amount_out: u64,
     clock: &Clock,
     ctx: &mut TxContext,
@@ -153,6 +155,7 @@ public fun quote_swap<P, A, B, B_A, B_B, LpType: drop>(
     lending_market: &LendingMarket<P>,
     oracle_price_update_a: OraclePriceUpdate,
     oracle_price_update_b: OraclePriceUpdate,
+    // Amount in (btoken)
     amount_in: u64,
     a2b: bool,
     clock: &Clock,
@@ -177,6 +180,7 @@ public fun quote_swap<P, A, B, B_A, B_B, LpType: drop>(
         let underlying_reserve_in = decimal::from(pool.balance_amount_a()).mul(btoken_ratio_a);
         let underlying_reserve_out = decimal::from(pool.balance_amount_b()).mul(btoken_ratio_b);
 
+        // quote_swap_impl uses the underlying values instead of btoken values
         quote_swap_impl(
             underlying_amount_in,
             underlying_reserve_in,
@@ -193,6 +197,7 @@ public fun quote_swap<P, A, B, B_A, B_B, LpType: drop>(
         let underlying_reserve_in = decimal::from(pool.balance_amount_b()).mul(btoken_ratio_b);
         let underlying_reserve_out = decimal::from(pool.balance_amount_a()).mul(btoken_ratio_a);
 
+        // quote_swap_impl uses the underlying values instead of btoken values
         quote_swap_impl(
             underlying_amount_in,
             underlying_reserve_in,
@@ -230,19 +235,22 @@ public fun quote_swap<P, A, B, B_A, B_B, LpType: drop>(
 }
 
 fun quote_swap_impl(
+    // Amount in (underlying)
     amount_in: Decimal,
+    // Reserve in (underlying)
     reserve_in: Decimal,
+    // Reserve out (underlying)
     reserve_out: Decimal,
     decimals_in: u8,
     decimals_out: u8,
+    // Price In (underlying)
     price_in: Decimal,
+    // Price Out (underlying)
     price_out: Decimal,
     amplifier: u64,
     a2b: bool,
 ): u64 {
-    // let btoken_price_in = btoken_ratio_in.mul(price_in);
-    // let btoken_price_out = btoken_ratio_out.mul(price_out);
-
+    // quoter_math::swap uses the underlying values instead of btoken values
     if (a2b) {
         quoter_math::swap(
             amount_in, // input_a

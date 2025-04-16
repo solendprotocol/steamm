@@ -6,10 +6,15 @@ use steamm::fixed_point64::{Self, FixedPoint64};
 use steamm::utils::decimal_to_fixedpoint64;
 
 public(package) fun swap(
+    // Amount in (underlying)
     amount_in: Decimal,
+    // Amount X (underlying)
     reserve_x: Decimal,
+    // Amount Y (underlying)
     reserve_y: Decimal,
+    // Price X (underlying)
     price_x: Decimal,
+    // Price Y (underlying)
     price_y: Decimal,
     decimals_x: u64,
     decimals_y: u64,
@@ -33,35 +38,42 @@ public(package) fun swap(
         )
     };
 
+    // k can be interpreted as the trade utilisation, based on the oracle price
+    // In general terms: k = Δin * Price / Reserve Out
+    // Depending on the direction of the trade we either multiply or divide by the price
+    // x2y: k = ΔX * Price / (Reserve Y * DecPow)
+    // y2x: k = ΔY * DecPow / (Reserve X * Price)
     let k = if (x2y) {
         delta_in.mul(price_raw).div(r_y.mul(dec_pow))
     } else {
         delta_in.mul(dec_pow).div(r_x.mul(price_raw))
     };
 
+    // z can be interpreted as the effective utilisation. Since k is the trade utilisation
+    // if the trade was executed with the oracle price, this means that z will always be
+    // lower than k. Since slippage is supposed to reduce the trade output, in effect this
+    // means that the effective utilisation `z` is lower than the oracle-given utilisation `k`.
+    // Therefore we can use `k` as our initial guess for `z`.
     let max_bound = fixed_point64::from_rational(9999999999, 10000000000);
-    let z_upper_bound = if (x2y) {
-        max_bound.min(delta_in.mul(price_raw).div(r_y.mul(dec_pow)))
-    } else {
-        max_bound.min(delta_in.mul(dec_pow).div(r_x.mul(price_raw)))
-    };
+    let z_upper_bound = max_bound.min(k);
 
     let z = newton_raphson(k, amp, z_upper_bound);
 
+    // `z` is defined as Δout / ReserveOut. Therefore depending on the
+    // direction of the trade we pick the corresponding ouput reserve
     let delta_out = if (x2y) {
         z.mul(r_y).to_u128_down() as u64
     } else {
         z.mul(r_x).to_u128_down() as u64
     };
 
+    // If the trade still depletes the output reserve we quote an output of zero
     if (x2y) {
         if (delta_out >= reserve_y.floor()) {
-            // return r_y.mul(fixed_point64::from_rational(999, 1000)).to_u128_down() as u64
             return 0
         };
     } else {
         if (delta_out >= reserve_x.floor()) {
-            // return r_x.mul(fixed_point64::from_rational(999, 1000)).to_u128_down() as u64
             return 0
         };
     };
@@ -69,6 +81,23 @@ public(package) fun swap(
     delta_out
 }
 
+/// Implements the Newton-Raphson method for finding roots of a function in fixed-point arithmetic.
+/// This function iteratively refines an initial guess to approximate a root of the function f(z) = 0,
+/// where f(z) is defined by the parameters `k` and `a`.
+///
+/// # Arguments
+/// * `k` - A fixed-point parameter used in the function f(z) and its derivative.
+/// * `a` - A fixed-point parameter used in the function f(z) and its derivative.
+/// * `z_initial` - The initial guess for the root, in fixed-point format.
+///
+/// # Returns
+/// * A `FixedPoint64` value representing the approximate root of the function.
+///
+/// # Remarks
+/// - The method uses a maximum of 20 iterations and a tolerance of 1e-10 for convergence.
+/// - The solution is clamped to the range [1e-5, 0.999999999999999999] to ensure stability.
+/// - If the derivative is near zero (less than 1e-10), the function aborts with error code 1001.
+/// - A damping factor (alpha) is applied if the step takes the solution outside the valid range.
 fun newton_raphson(
     k: FixedPoint64,
     a: FixedPoint64,
