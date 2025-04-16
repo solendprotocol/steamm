@@ -349,3 +349,7 @@ This constraint is useful as it serves as the initial guess used in the numerica
 The result is the following:
 
 ![Slippage plot](../assets/stable_slippage.png)
+
+### Note on the impact of BToken Ratios
+
+The btoken ratio of the output has an impact on how the pool perceives the scarcity of the output reserve, which itself is what controls the slippage.

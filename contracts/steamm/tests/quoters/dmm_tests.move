@@ -2542,12 +2542,14 @@ fun test_b2a_price_slippage_comparison() {
     test_scenario::end(scenario);
 }
 
-
+// Checks that a lower btoken ratio for the input token does not affect slippage
+// Note: Due to numerical precision, the results may be slightly different if the
+// btoken ratio is a rational number with repeating decimals or an irrational number.
 #[test]
-fun test_dmm_btoken_ratio_higher_b2a() {
+fun test_dmm_input_btoken_ratio_lower_b2a_no_slippage_impact() {
     let mut scenario = test_scenario::begin(@0x26);
 
-    let (mut pool, mut dyn_pool, oracle_registry, mut price_state, mut lending_market, mut bank_sui, mut bank_usdc) = setup(
+    let (pool, mut dyn_pool, oracle_registry, mut price_state, mut lending_market, mut bank_sui, mut bank_usdc) = setup(
         100,
         1,
         &mut scenario,
@@ -2556,14 +2558,6 @@ fun test_dmm_btoken_ratio_higher_b2a() {
 
     let mut coin_sui = coin::mint_for_testing<B_TEST_SUI>(2_000 * 1_000_000_000, scenario.ctx());
     let mut coin_usdc = coin::mint_for_testing<B_TEST_USDC>(2_000 * 1_000_000, scenario.ctx());
-
-    let (lp_coins, _) = pool.deposit_liquidity(
-        &mut coin_sui,
-        &mut coin_usdc,
-        e9(1_000),
-        e6(1_000),
-        scenario.ctx(),
-    );
     
     let (lp_coins_2, _) = dyn_pool.deposit_liquidity(
         &mut coin_sui,
@@ -2580,7 +2574,6 @@ fun test_dmm_btoken_ratio_higher_b2a() {
     price_state.update_price<TEST_SUI>(3, 0, &clock);
 
     // Quotes prior to btoken ratio manipulation
-
     let oracle_price_update_usdc = oracle_registry.get_pyth_price(
         mock_pyth::get_price_obj<TEST_USDC>(&price_state),
         0,
@@ -2593,29 +2586,7 @@ fun test_dmm_btoken_ratio_higher_b2a() {
         &clock,
     );
 
-    let res_b2a_prior = dummy_omm::quote_swap(
-        &pool,
-        &bank_sui,
-        &bank_usdc,
-        &lending_market,
-        oracle_price_update_sui,
-        oracle_price_update_usdc,
-        e6(10),
-        false, // a2b
-        &clock,
-    );
-
-    let oracle_price_update_usdc = oracle_registry.get_pyth_price(
-        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
-        0,
-        &clock,
-    );
-
-    let oracle_price_update_sui = oracle_registry.get_pyth_price(
-        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
-        1,
-        &clock,
-    );
+    let amount_in = e6(10);
     
     let res_b2a_dyn_prior = dmm::quote_swap(
         &dyn_pool,
@@ -2624,7 +2595,7 @@ fun test_dmm_btoken_ratio_higher_b2a() {
         &lending_market,
         oracle_price_update_sui,
         oracle_price_update_usdc,
-        e6(10),
+        amount_in,
         false, // a2b
         &clock,
     );
@@ -2635,23 +2606,22 @@ fun test_dmm_btoken_ratio_higher_b2a() {
     bank_usdc.init_lending(&admin, &mut lending_market, 0, 0, scenario.ctx());
 
     let bsui_supply = bank_sui.btoken_supply_for_testing();
-    destroy(bsui_supply.increase_supply(e9(1_000) + e9(1_000))); // 2.0x. need to add the supply from the previous deposited liquidity as we bypassed it and minted coins using test function
+    destroy(bsui_supply.increase_supply(e9(1_000))); // 1.0x
     let funds_available_sui = bank_sui.funds_available_for_testing();
     funds_available_sui.join(balance::create_for_testing(e9(1_000)));
     
     let busdc_supply = bank_usdc.btoken_supply_for_testing();
-    destroy(busdc_supply.increase_supply(e6(1_000) + e6(500)));  // 1.0x. need to add the supply from the previous deposited liquidity as we bypassed it and minted coins using test function
+    destroy(busdc_supply.increase_supply(e6(1_000) + e6(100)));  // 1.1x. need to add the supply from the previous deposited liquidity as we bypassed it and minted coins using test function
     let funds_available_usdc = bank_usdc.funds_available_for_testing();
     funds_available_usdc.join(balance::create_for_testing(e6(1_000)));
 
     let (bank_total_funds, total_btoken_supply) = bank_usdc.get_btoken_ratio(&lending_market, &clock);
     let btoken_ratio_usdc_after = bank_total_funds.div(total_btoken_supply);
-
+    
     let (bank_total_funds, total_btoken_supply) = bank_sui.get_btoken_ratio(&lending_market, &clock);
     let btoken_ratio_sui_after = bank_total_funds.div(total_btoken_supply);
 
     // Quotes after btoken ratio manipulation
-
     let oracle_price_update_usdc = oracle_registry.get_pyth_price(
         mock_pyth::get_price_obj<TEST_USDC>(&price_state),
         0,
@@ -2664,29 +2634,7 @@ fun test_dmm_btoken_ratio_higher_b2a() {
         &clock,
     );
 
-    let res_b2a_post = dummy_omm::quote_swap(
-        &pool,
-        &bank_sui,
-        &bank_usdc,
-        &lending_market,
-        oracle_price_update_sui,
-        oracle_price_update_usdc,
-        e6(10),
-        false, // a2b
-        &clock,
-    );
-
-    let oracle_price_update_usdc = oracle_registry.get_pyth_price(
-        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
-        0,
-        &clock,
-    );
-
-    let oracle_price_update_sui = oracle_registry.get_pyth_price(
-        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
-        1,
-        &clock,
-    );
+    let btoken_amount_in = decimal::from(amount_in).div(btoken_ratio_usdc_after).floor();
     
     let res_b2a_dyn_post = dmm::quote_swap(
         &dyn_pool,
@@ -2695,55 +2643,34 @@ fun test_dmm_btoken_ratio_higher_b2a() {
         &lending_market,
         oracle_price_update_sui,
         oracle_price_update_usdc,
-        e6(10),
+        btoken_amount_in,
         false, // a2b
         &clock,
     );
 
-    let new_delta_out = res_b2a_prior.amount_out() + res_b2a_prior.output_fees().protocol_fees() + res_b2a_prior.output_fees().pool_fees();
-    let dx = fp64::from(new_delta_out as u128).div(fp64::from(e9(1) as u128));
-    let dy = fp64::from(e6(10) as u128).div(fp64::from(e6(1) as u128));
-    let price_b2a_prior = dy.div(dx);
-    
-    let new_delta_out = res_b2a_post.amount_out() + res_b2a_post.output_fees().protocol_fees() + res_b2a_post.output_fees().pool_fees();
-    let dx = fp64::from(new_delta_out as u128).div(fp64::from(e9(1) as u128));
-    let price_b2a_post = dy.div(dx);
-
-    // b2a -> buy sui, price should be 3
-    assert!(price_b2a_prior.to_string() == utf8(b"3.000000000299999999"), 0); // slightly above 3 due to rounding in favour of pool
-    
-    // this is the price in btoken ratio
-    // we therefore have to multiply by the token ratio SUI (2x) then divide by the token ratio USDC (1.5x)
-    // 2.25 * 2 / 1.5 = 3
-    // print(&price_b2a_post.to_string());
-    assert!(price_b2a_post.to_string() == utf8(b"2.250000000225000000"), 0); // slightly above 3 due to rounding in favour of pool
+    // Before
 
     let new_delta_out = res_b2a_dyn_prior.amount_out() + res_b2a_dyn_prior.output_fees().protocol_fees() + res_b2a_dyn_prior.output_fees().pool_fees();
     let dx = fp64::from(new_delta_out as u128).div(fp64::from(e9(1) as u128));
     let dy = fp64::from(e6(10) as u128).div(fp64::from(e6(1) as u128));
     let price_b2a_prior_dyn = dy.div(dx);
+    assert!(price_b2a_prior_dyn.to_string_clipped(9) == utf8(b"3.005002778"), 0);
+    let slippage = price_b2a_prior_dyn.sub(fp64::from(3)).div(fp64::from(3));
+    assert!(slippage.to_string() == utf8(b"0.001667592735902009"), 0); // slippage: ~0.001667592735902009
+
+    // After
     
     let new_delta_out = res_b2a_dyn_post.amount_out() + res_b2a_dyn_post.output_fees().protocol_fees() + res_b2a_dyn_post.output_fees().pool_fees();
-    let dx = fp64::from(new_delta_out as u128).div(fp64::from(e9(1) as u128));
+    let dx = fp64::from(new_delta_out as u128).div(fp64::from(e9(1) as u128)).mul(decimal_to_fixedpoint64(btoken_ratio_sui_after)); // sui
+    let dy = fp64::from(amount_in as u128).div(fp64::from(e6(1) as u128)); // usdc
     let price_b2a_post_dyn = dy.div(dx);
-
-    // print(&price_b2a_prior_dyn.to_string());
-    // print(&price_b2a_post_dyn.to_string());
-    // print(&dx.to_string());
-
-    assert!(price_b2a_prior_dyn.to_string() == utf8(b"3.005002778207706029"), 0); // slightly above 3 due to rounding in favour of pool
-
-    // 2.2537520836557796
-    // 2.255003704163794615
-
-    // 2.2537520836557796
-    // 2.255003704163794615
-    // TODO: we're here, something is wrong with the post price..
+    assert!(price_b2a_post_dyn.to_string() == utf8(b"3.005002778207706029"), 0);
+    let slippage = price_b2a_post_dyn.sub(fp64::from(3)).div(fp64::from(3));
+    assert!(slippage.to_string() == utf8(b"0.001667592735902009"), 0); // slippage: ~0.001667592735902009
 
     destroy(admin);
     destroy(pool);
     destroy(dyn_pool);
-    destroy(lp_coins);
     destroy(lp_coins_2);
     destroy(oracle_registry);
     destroy(clock);
@@ -2755,11 +2682,14 @@ fun test_dmm_btoken_ratio_higher_b2a() {
     test_scenario::end(scenario);
 }
 
+// Checks that a higher btoken ratio for the input token does not affect slippage
+// Note: Due to numerical precision, the results may be slightly different if the
+// btoken ratio is a rational number with repeating decimals or an irrational number.
 #[test]
-fun test_dmm_btoken_ratio_equally_higher_b2a() {
+fun test_dmm_input_btoken_ratio_higher_b2a_no_slippage_impact() {
     let mut scenario = test_scenario::begin(@0x26);
 
-    let (mut pool, mut dyn_pool, oracle_registry, mut price_state, mut lending_market, mut bank_sui, mut bank_usdc) = setup(
+    let (pool, mut dyn_pool, oracle_registry, mut price_state, mut lending_market, mut bank_sui, mut bank_usdc) = setup(
         100,
         1,
         &mut scenario,
@@ -2768,14 +2698,6 @@ fun test_dmm_btoken_ratio_equally_higher_b2a() {
 
     let mut coin_sui = coin::mint_for_testing<B_TEST_SUI>(2_000 * 1_000_000_000, scenario.ctx());
     let mut coin_usdc = coin::mint_for_testing<B_TEST_USDC>(2_000 * 1_000_000, scenario.ctx());
-
-    let (lp_coins, _) = pool.deposit_liquidity(
-        &mut coin_sui,
-        &mut coin_usdc,
-        e9(1_000),
-        e6(1_000),
-        scenario.ctx(),
-    );
     
     let (lp_coins_2, _) = dyn_pool.deposit_liquidity(
         &mut coin_sui,
@@ -2804,29 +2726,7 @@ fun test_dmm_btoken_ratio_equally_higher_b2a() {
         &clock,
     );
 
-    let res_b2a_prior = dummy_omm::quote_swap(
-        &pool,
-        &bank_sui,
-        &bank_usdc,
-        &lending_market,
-        oracle_price_update_sui,
-        oracle_price_update_usdc,
-        e6(10),
-        false, // a2b
-        &clock,
-    );
-
-    let oracle_price_update_usdc = oracle_registry.get_pyth_price(
-        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
-        0,
-        &clock,
-    );
-
-    let oracle_price_update_sui = oracle_registry.get_pyth_price(
-        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
-        1,
-        &clock,
-    );
+    let amount_in = e6(10);
     
     let res_b2a_dyn_prior = dmm::quote_swap(
         &dyn_pool,
@@ -2835,7 +2735,7 @@ fun test_dmm_btoken_ratio_equally_higher_b2a() {
         &lending_market,
         oracle_price_update_sui,
         oracle_price_update_usdc,
-        e6(10),
+        amount_in,
         false, // a2b
         &clock,
     );
@@ -2846,23 +2746,22 @@ fun test_dmm_btoken_ratio_equally_higher_b2a() {
     bank_usdc.init_lending(&admin, &mut lending_market, 0, 0, scenario.ctx());
 
     let bsui_supply = bank_sui.btoken_supply_for_testing();
-    destroy(bsui_supply.increase_supply(e9(1_000) + e9(1_000))); // 2.0x
+    destroy(bsui_supply.increase_supply(e9(1_000))); // 1.0x
     let funds_available_sui = bank_sui.funds_available_for_testing();
     funds_available_sui.join(balance::create_for_testing(e9(1_000)));
     
     let busdc_supply = bank_usdc.btoken_supply_for_testing();
-    destroy(busdc_supply.increase_supply(e6(1_000) + e6(1_000)));
+    destroy(busdc_supply.increase_supply(e6(1_000)));
     let funds_available_usdc = bank_usdc.funds_available_for_testing();
-    funds_available_usdc.join(balance::create_for_testing(e6(1_000)));
+    funds_available_usdc.join(balance::create_for_testing(e6(1_000) + e6(1000)));
 
     let (bank_total_funds, total_btoken_supply) = bank_usdc.get_btoken_ratio(&lending_market, &clock);
     let btoken_ratio_usdc_after = bank_total_funds.div(total_btoken_supply);
-
+    
     let (bank_total_funds, total_btoken_supply) = bank_sui.get_btoken_ratio(&lending_market, &clock);
     let btoken_ratio_sui_after = bank_total_funds.div(total_btoken_supply);
 
     // Quotes after btoken ratio manipulation
-
     let oracle_price_update_usdc = oracle_registry.get_pyth_price(
         mock_pyth::get_price_obj<TEST_USDC>(&price_state),
         0,
@@ -2875,29 +2774,7 @@ fun test_dmm_btoken_ratio_equally_higher_b2a() {
         &clock,
     );
 
-    let res_b2a_post = dummy_omm::quote_swap(
-        &pool,
-        &bank_sui,
-        &bank_usdc,
-        &lending_market,
-        oracle_price_update_sui,
-        oracle_price_update_usdc,
-        e6(10),
-        false, // a2b
-        &clock,
-    );
-
-    let oracle_price_update_usdc = oracle_registry.get_pyth_price(
-        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
-        0,
-        &clock,
-    );
-
-    let oracle_price_update_sui = oracle_registry.get_pyth_price(
-        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
-        1,
-        &clock,
-    );
+    let btoken_amount_in = decimal::from(amount_in).div(btoken_ratio_usdc_after).floor();
     
     let res_b2a_dyn_post = dmm::quote_swap(
         &dyn_pool,
@@ -2906,44 +2783,325 @@ fun test_dmm_btoken_ratio_equally_higher_b2a() {
         &lending_market,
         oracle_price_update_sui,
         oracle_price_update_usdc,
-        e6(10),
+        btoken_amount_in,
         false, // a2b
         &clock,
     );
 
-    let new_delta_out = res_b2a_prior.amount_out() + res_b2a_prior.output_fees().protocol_fees() + res_b2a_prior.output_fees().pool_fees();
-    let dx_ = decimal::from(new_delta_out).div(decimal::from(e9(1)));
-    let dx = decimal_to_fixedpoint64(dx_);
-    let dy = fp64::from(e6(10) as u128).div(fp64::from(e6(1) as u128));
-    let price_b2a_prior = dy.div(dx);
-    
-    let new_delta_out = res_b2a_post.amount_out() + res_b2a_post.output_fees().protocol_fees() + res_b2a_post.output_fees().pool_fees();
-    let dx = fp64::from(new_delta_out as u128).div(fp64::from(e9(1) as u128));
-    let dy = fp64::from(e9(10) as u128).div(fp64::from(e9(1) as u128));
-    let price_b2a_post = dy.div(dx);
-
-    // b2a -> buy sui, price should be 3
-    assert!(price_b2a_prior.to_string_clipped(9) == utf8(b"3.000000000"), 0);
-    assert!(price_b2a_post.to_string_clipped(9) == utf8(b"3.000000000"), 0);
+    // Before
 
     let new_delta_out = res_b2a_dyn_prior.amount_out() + res_b2a_dyn_prior.output_fees().protocol_fees() + res_b2a_dyn_prior.output_fees().pool_fees();
     let dx = fp64::from(new_delta_out as u128).div(fp64::from(e9(1) as u128));
     let dy = fp64::from(e6(10) as u128).div(fp64::from(e6(1) as u128));
     let price_b2a_prior_dyn = dy.div(dx);
+    assert!(price_b2a_prior_dyn.to_string_clipped(9) == utf8(b"3.005002778"), 0);
+    let slippage = price_b2a_prior_dyn.sub(fp64::from(3)).div(fp64::from(3));
+    assert!(slippage.to_string() == utf8(b"0.001667592735902009"), 0); // slippage: ~0.001667592735902009
+
+    // After
     
     let new_delta_out = res_b2a_dyn_post.amount_out() + res_b2a_dyn_post.output_fees().protocol_fees() + res_b2a_dyn_post.output_fees().pool_fees();
-    let dx_post = fp64::from(new_delta_out as u128).div(fp64::from(e9(1) as u128));
-    
-    assert!(dx_post.lte(dx), 0); // asserts that any rounding error or numerical approximation is in favour of the pool
-    let price_b2a_post_dyn = dy.div(dx_post);
-
-    assert!(price_b2a_prior_dyn.to_string_clipped(9) == utf8(b"3.005002778"), 0);
-    assert!(price_b2a_post_dyn.to_string_clipped(9) == utf8(b"3.005002779"), 0); // slightly above the previous result due to numerical approximation
+    let dx = fp64::from(new_delta_out as u128).div(fp64::from(e9(1) as u128)).mul(decimal_to_fixedpoint64(btoken_ratio_sui_after)); // sui
+    let dy = fp64::from(amount_in as u128).div(fp64::from(e6(1) as u128)); // usdc
+    let price_b2a_post_dyn = dy.div(dx);
+    assert!(price_b2a_post_dyn.to_string_clipped(9) == utf8(b"3.005002778"), 0);
+    let slippage = price_b2a_post_dyn.sub(fp64::from(3)).div(fp64::from(3));
+    assert!(slippage.to_string() == utf8(b"0.001667592735902009"), 0); // slippage: ~0.001667592735902009
 
     destroy(admin);
     destroy(pool);
     destroy(dyn_pool);
-    destroy(lp_coins);
+    destroy(lp_coins_2);
+    destroy(oracle_registry);
+    destroy(clock);
+    destroy(price_state);
+    destroy(lending_market);
+    destroy(bank_sui);
+    destroy(bank_usdc);
+
+    test_scenario::end(scenario);
+}
+
+/// Checks that a lower btoken ratio for the output token increases slippage.
+/// The btoken ratio of the output has an impact on how the pool perceives
+/// the scarcity of the output reserve, which itself is what controls the slippage
+/// A lower bToken ratio means that the actual reserve amount is lower than the
+/// btoken reserve amount, which leads to more scarcity, hence more slippage
+#[test]
+fun test_dmm_output_btoken_ratio_lower_b2a_higher_slippage() {
+    let mut scenario = test_scenario::begin(@0x26);
+
+    let (pool, mut dyn_pool, oracle_registry, mut price_state, mut lending_market, mut bank_sui, mut bank_usdc) = setup(
+        100,
+        1,
+        &mut scenario,
+    );
+    let clock = clock::create_for_testing(scenario.ctx());
+
+    let mut coin_sui = coin::mint_for_testing<B_TEST_SUI>(2_000 * 1_000_000_000, scenario.ctx());
+    let mut coin_usdc = coin::mint_for_testing<B_TEST_USDC>(2_000 * 1_000_000, scenario.ctx());
+    
+    let (lp_coins_2, _) = dyn_pool.deposit_liquidity(
+        &mut coin_sui,
+        &mut coin_usdc,
+        e9(1_000),
+        e6(1_000),
+        scenario.ctx(),
+    );
+
+    destroy(coin_sui);
+    destroy(coin_usdc);
+
+    price_state.update_price<TEST_USDC>(1, 0, &clock);
+    price_state.update_price<TEST_SUI>(3, 0, &clock);
+
+    // Quotes prior to btoken ratio manipulation
+    let oracle_price_update_usdc = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
+        0,
+        &clock,
+    );
+
+    let oracle_price_update_sui = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
+        1,
+        &clock,
+    );
+
+    let amount_in = e6(10);
+    
+    let res_b2a_dyn_prior = dmm::quote_swap(
+        &dyn_pool,
+        &bank_sui,
+        &bank_usdc,
+        &lending_market,
+        oracle_price_update_sui,
+        oracle_price_update_usdc,
+        amount_in,
+        false, // a2b
+        &clock,
+    );
+
+    // Manipulate btoken prices
+    let admin = global_admin::init_for_testing(scenario.ctx());
+    bank_sui.init_lending(&admin, &mut lending_market, 0, 0, scenario.ctx());
+    bank_usdc.init_lending(&admin, &mut lending_market, 0, 0, scenario.ctx());
+
+    let bsui_supply = bank_sui.btoken_supply_for_testing();
+    destroy(bsui_supply.increase_supply(e9(1_000) + e9(1_000))); // 1.0x
+    let funds_available_sui = bank_sui.funds_available_for_testing();
+    funds_available_sui.join(balance::create_for_testing(e9(1_000)));
+    
+    let busdc_supply = bank_usdc.btoken_supply_for_testing();
+    destroy(busdc_supply.increase_supply(e6(1_000)));
+    let funds_available_usdc = bank_usdc.funds_available_for_testing();
+    funds_available_usdc.join(balance::create_for_testing(e6(1_000)));
+
+    let (bank_total_funds, total_btoken_supply) = bank_usdc.get_btoken_ratio(&lending_market, &clock);
+    let btoken_ratio_usdc_after = bank_total_funds.div(total_btoken_supply);
+    
+    let (bank_total_funds, total_btoken_supply) = bank_sui.get_btoken_ratio(&lending_market, &clock);
+    let btoken_ratio_sui_after = bank_total_funds.div(total_btoken_supply);
+
+    // Quotes after btoken ratio manipulation
+    let oracle_price_update_usdc = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
+        0,
+        &clock,
+    );
+
+    let oracle_price_update_sui = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
+        1,
+        &clock,
+    );
+
+    let btoken_amount_in = decimal::from(amount_in).div(btoken_ratio_usdc_after).floor();
+    
+    let res_b2a_dyn_post = dmm::quote_swap(
+        &dyn_pool,
+        &bank_sui,
+        &bank_usdc,
+        &lending_market,
+        oracle_price_update_sui,
+        oracle_price_update_usdc,
+        btoken_amount_in,
+        false, // a2b
+        &clock,
+    );
+
+    // Before
+
+    let new_delta_out = res_b2a_dyn_prior.amount_out() + res_b2a_dyn_prior.output_fees().protocol_fees() + res_b2a_dyn_prior.output_fees().pool_fees();
+    let dx = fp64::from(new_delta_out as u128).div(fp64::from(e9(1) as u128));
+    let dy = fp64::from(e6(10) as u128).div(fp64::from(e6(1) as u128));
+    let price_b2a_prior_dyn = dy.div(dx);
+    assert!(price_b2a_prior_dyn.to_string_clipped(9) == utf8(b"3.005002778"), 0);
+    let slippage = price_b2a_prior_dyn.sub(fp64::from(3)).div(fp64::from(3));
+    assert!(slippage.to_string() == utf8(b"0.001667592735902009"), 0); // slippage: ~0.001667592735902009
+
+    // After
+    
+    let new_delta_out = res_b2a_dyn_post.amount_out() + res_b2a_dyn_post.output_fees().protocol_fees() + res_b2a_dyn_post.output_fees().pool_fees();
+    let dx = fp64::from(new_delta_out as u128).div(fp64::from(e9(1) as u128)).mul(decimal_to_fixedpoint64(btoken_ratio_sui_after)); // sui
+    let dy = fp64::from(amount_in as u128).div(fp64::from(e6(1) as u128)); // usdc
+    let price_b2a_post_dyn = dy.div(dx);
+
+    assert!(price_b2a_post_dyn.gt(price_b2a_prior_dyn), 0); // Price is higher due to higher slippage
+    assert!(price_b2a_post_dyn.to_string() == utf8(b"3.010011111540298562"), 0);
+    let slippage_post = price_b2a_post_dyn.sub(fp64::from(3)).div(fp64::from(3));
+
+    assert!(slippage_post.gt(slippage), 0); // Slippage is higher due to higher slippage
+    assert!(slippage_post.to_string() == utf8(b"0.003337037180099520"), 0); // slippage: ~0.003337037180099520
+
+    destroy(admin);
+    destroy(pool);
+    destroy(dyn_pool);
+    destroy(lp_coins_2);
+    destroy(oracle_registry);
+    destroy(clock);
+    destroy(price_state);
+    destroy(lending_market);
+    destroy(bank_sui);
+    destroy(bank_usdc);
+
+    test_scenario::end(scenario);
+}
+
+/// Checks that a lower btoken ratio for the output token increases slippage.
+/// The btoken ratio of the output has an impact on how the pool perceives
+/// the scarcity of the output reserve, which itself is what controls the slippage
+/// A higher bToken ratio means that the actual reserve amount is higher than the
+/// btoken reserve amount, which leads to less scarcity, hence less slippage
+#[test]
+fun test_dmm_output_btoken_ratio_higher_b2a_lower_slippage() {
+    let mut scenario = test_scenario::begin(@0x26);
+
+    let (pool, mut dyn_pool, oracle_registry, mut price_state, mut lending_market, mut bank_sui, mut bank_usdc) = setup(
+        100,
+        1,
+        &mut scenario,
+    );
+    let clock = clock::create_for_testing(scenario.ctx());
+
+    let mut coin_sui = coin::mint_for_testing<B_TEST_SUI>(2_000 * 1_000_000_000, scenario.ctx());
+    let mut coin_usdc = coin::mint_for_testing<B_TEST_USDC>(2_000 * 1_000_000, scenario.ctx());
+    
+    let (lp_coins_2, _) = dyn_pool.deposit_liquidity(
+        &mut coin_sui,
+        &mut coin_usdc,
+        e9(1_000),
+        e6(1_000),
+        scenario.ctx(),
+    );
+
+    destroy(coin_sui);
+    destroy(coin_usdc);
+
+    price_state.update_price<TEST_USDC>(1, 0, &clock);
+    price_state.update_price<TEST_SUI>(3, 0, &clock);
+
+    // Quotes prior to btoken ratio manipulation
+    let oracle_price_update_usdc = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
+        0,
+        &clock,
+    );
+
+    let oracle_price_update_sui = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
+        1,
+        &clock,
+    );
+
+    let amount_in = e6(10);
+    
+    let res_b2a_dyn_prior = dmm::quote_swap(
+        &dyn_pool,
+        &bank_sui,
+        &bank_usdc,
+        &lending_market,
+        oracle_price_update_sui,
+        oracle_price_update_usdc,
+        amount_in,
+        false, // a2b
+        &clock,
+    );
+
+    // Manipulate btoken prices
+    let admin = global_admin::init_for_testing(scenario.ctx());
+    bank_sui.init_lending(&admin, &mut lending_market, 0, 0, scenario.ctx());
+    bank_usdc.init_lending(&admin, &mut lending_market, 0, 0, scenario.ctx());
+
+    let bsui_supply = bank_sui.btoken_supply_for_testing();
+    destroy(bsui_supply.increase_supply(e9(1_000))); // 1.0x
+    let funds_available_sui = bank_sui.funds_available_for_testing();
+    funds_available_sui.join(balance::create_for_testing(e9(1_000) + e9(1_000)));
+    
+    let busdc_supply = bank_usdc.btoken_supply_for_testing();
+    destroy(busdc_supply.increase_supply(e6(1_000)));
+    let funds_available_usdc = bank_usdc.funds_available_for_testing();
+    funds_available_usdc.join(balance::create_for_testing(e6(1_000)));
+
+    let (bank_total_funds, total_btoken_supply) = bank_usdc.get_btoken_ratio(&lending_market, &clock);
+    let btoken_ratio_usdc_after = bank_total_funds.div(total_btoken_supply);
+    
+    let (bank_total_funds, total_btoken_supply) = bank_sui.get_btoken_ratio(&lending_market, &clock);
+    let btoken_ratio_sui_after = bank_total_funds.div(total_btoken_supply);
+
+    // Quotes after btoken ratio manipulation
+    let oracle_price_update_usdc = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_USDC>(&price_state),
+        0,
+        &clock,
+    );
+
+    let oracle_price_update_sui = oracle_registry.get_pyth_price(
+        mock_pyth::get_price_obj<TEST_SUI>(&price_state),
+        1,
+        &clock,
+    );
+
+    let btoken_amount_in = decimal::from(amount_in).div(btoken_ratio_usdc_after).floor();
+    
+    let res_b2a_dyn_post = dmm::quote_swap(
+        &dyn_pool,
+        &bank_sui,
+        &bank_usdc,
+        &lending_market,
+        oracle_price_update_sui,
+        oracle_price_update_usdc,
+        btoken_amount_in,
+        false, // a2b
+        &clock,
+    );
+
+    // Before
+
+    let new_delta_out = res_b2a_dyn_prior.amount_out() + res_b2a_dyn_prior.output_fees().protocol_fees() + res_b2a_dyn_prior.output_fees().pool_fees();
+    let dx = fp64::from(new_delta_out as u128).div(fp64::from(e9(1) as u128));
+    let dy = fp64::from(e6(10) as u128).div(fp64::from(e6(1) as u128));
+    let price_b2a_prior_dyn = dy.div(dx);
+    assert!(price_b2a_prior_dyn.to_string_clipped(9) == utf8(b"3.005002778"), 0);
+    let slippage = price_b2a_prior_dyn.sub(fp64::from(3)).div(fp64::from(3));
+    assert!(slippage.to_string() == utf8(b"0.001667592735902009"), 0); // slippage: ~0.001667592735902009
+
+    // After
+    let new_delta_out = res_b2a_dyn_post.amount_out() + res_b2a_dyn_post.output_fees().protocol_fees() + res_b2a_dyn_post.output_fees().pool_fees();
+    let dx = fp64::from(new_delta_out as u128).div(fp64::from(e9(1) as u128)).mul(decimal_to_fixedpoint64(btoken_ratio_sui_after)); // sui
+    let dy = fp64::from(amount_in as u128).div(fp64::from(e6(1) as u128)); // usdc
+    let price_b2a_post_dyn = dy.div(dx);
+
+    assert!(price_b2a_post_dyn.lt(price_b2a_prior_dyn), 0); // Price is lower due to lower slippage
+    assert!(price_b2a_post_dyn.to_string() == utf8(b"3.002500694554974418"), 0);
+    let slippage_post = price_b2a_post_dyn.sub(fp64::from(3)).div(fp64::from(3));
+
+    assert!(slippage_post.lt(slippage), 0); // Slippage is lower
+    assert!(slippage_post.to_string() == utf8(b"0.000833564851658139"), 0); // slippage: ~0.000833564851658139
+
+    destroy(admin);
+    destroy(pool);
+    destroy(dyn_pool);
     destroy(lp_coins_2);
     destroy(oracle_registry);
     destroy(clock);

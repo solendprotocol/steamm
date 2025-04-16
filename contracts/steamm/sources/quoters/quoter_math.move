@@ -1,6 +1,5 @@
 module steamm::quoter_math;
 
-use std::string::utf8;
 use suilend::decimal::Decimal;
 
 use steamm::fixed_point64::{Self, FixedPoint64};
@@ -192,13 +191,11 @@ fun compute_f(
 
     // t1 - t2 > 0 (always)
     if (fixed_point64::gte(intermediate_magnitude, k)) {
-        // print(&utf8(b"branch 1"));
         // BRANCH 1
         // If t1 - t2 > 0 && > k, then its safe to subtract k and get positive value
         (fixed_point64::sub(intermediate_magnitude, k), true)
     } else {
         // BRANCH 2
-        // print(&utf8(b"branch 2"));
         // If t1 - t2 > 0 && < k, then the subtraction of k will lead to a negative value
         (fixed_point64::sub(k, intermediate_magnitude), false)
     }
@@ -235,7 +232,7 @@ fun test_iter_newton_raphson() {
     let z_initial = fixed_point64::from_rational(999999999899999999, 1000000000000000000); // 0.999999999899999999
     let z = newton_raphson(k, a, z_initial);
 
-    print(&z.to_string());
+    // print(&z.to_string());
     
     // assert!(z.to_string() == utf8(b"0.000199980001333266"), 0);
 
@@ -246,13 +243,14 @@ fun test_iter_newton_raphson() {
 #[test]
 fun test_newton_raphson() {
     use std::debug::print;
+    use std::string::utf8;
     // k:  0.0002 ; A:  1
     let k = fixed_point64::from_rational(2, 10000); // 0.0002
     let a = fixed_point64::from(1);                // A = 1
     let z_initial = fixed_point64::from_rational(199979994408495, 1000000000000000000); // 0.000199979994408495
     let z = newton_raphson(k, a, z_initial);
     
-    print(&z.to_string());
+    // print(&z.to_string());
     assert!(z.to_string() == utf8(b"0.000199980001333266"), 0);
 
     let (result, _) = compute_f(z, a, k);

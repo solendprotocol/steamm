@@ -436,7 +436,6 @@ public fun log2_plus_64(x: FixedPoint64): FixedPoint64 {
 
 /// As seen in: https://github.com/aptos-labs/aptos-core/blob/447f579396590983dd5fee46cad44e4defd297f3/aptos-move/framework/aptos-stdlib/sources/math_fixed64.move#L35
 public fun ln_plus_64ln2(x: FixedPoint64): FixedPoint64 {
-    use std::debug::print;
     let raw_value = x.value();
     let x = (log2_64(raw_value).value() as u256);
     from_raw_value(((x * LN2) >> 64 as u128))
