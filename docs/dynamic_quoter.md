@@ -1,4 +1,4 @@
-### Dynamic Liquidity Fee
+# Dynamic Liquidity Fee
 
 The idea behind the dynamic liquidity fee is to model the slippage of a given trade based on how much liquidity is extracted from it corresponding output token.
 
@@ -10,7 +10,7 @@ We take the oracle price as the current midmarket price, and apply a liquidity f
 
 
 
-### Intuition
+## Intuition
 
 We start with the following relationship for calculating the output amount in a token swap is:
 
@@ -18,13 +18,13 @@ $$
 \Delta Output = R_{Output}(1 - e^{-U})
 $$
 
-where $u$ is the **utilisation metric**.
+where $u$ is the **utilization metric**.
 
 - **$R_{Output}$**: Represents the total reserve of the output token in the liquidity pool. It’s the maximum amount you could theoretically get if you drained the entire pool.
 
-- **$u$ is the utilisation metric**: This measures how much of the pool’s liquidity a trade consumes. It reflects the trade size relative to the pool’s reserves, adjusted by factors like price. A small $u$ indicates a small trade that barely taps the pool, while a large one signals a large trade that strains liquidity.
+- **$u$ is the utilization metric**: This measures how much of the pool’s liquidity a trade consumes. It reflects the trade size relative to the pool’s reserves, adjusted by factors like price. A small $u$ indicates a small trade that barely taps the pool, while a large one signals a large trade that strains liquidity.
 
-- **$e^{-U}$**: The exponential function translates the utilisation metric into a slippage factor:
+- **$e^{-U}$**: The exponential function translates the utilization metric into a slippage factor:
   - For small trades (small $u$), $e^{-U}$ is close to 1, so $1 - e^{-U} \approx 0$. You get a small output, proportional to the trade size, with minimal slippage relative to the market price.
   - For large trades (large $u$), $e^{-U}$ approaches 0, so $1 - e^{-U} \approx 1$. You receive a larger fraction of the pool’s reserve, but slippage increases, limiting the output to prevent draining the pool.
 
@@ -37,7 +37,7 @@ where $u$ is the **utilisation metric**.
   - Large trades encounter increasing slippage, protecting the pool from excessive depletion and mimicking the price dynamics of a traditional orderbook.
 
 
-### Liquidity Fee for Volatile Pairs
+## Liquidity Fee for Volatile Pairs
 
 We start by defining the variables:
 
@@ -49,12 +49,9 @@ We start by defining the variables:
 - Decimals X: $d_x$
 - Decimals Y: $d_y$
 
+Depending on the direction of a trade, the utilization is computed differently to account for which token is the base and quote in the oracle price, as well as to account which pool reserve corresponds to the output reserve.
 
-
-
-Depending on the direction of a trade, the utilisation is computed differently to account for which token is the base and quote in the oracle price, as well as to account which pool reserve corresponds to the output reserve.
-
-In loose terms we define the utilisation $u$ as 
+In loose terms we define the utilization $u$ as 
 $$
 \frac{\tilde{\Delta}_{out}}{R_{out}}
 $$
@@ -115,14 +112,14 @@ $$
 We therefore arrive to the following functions:
 
 
-#### Swap X to Y:
+### Swap X to Y:
 $$
 \Delta y = R_y (1 - e^{-U_y})= R_y (1 - e^{-\frac{P \Delta x}{R_y 10^{d_x - d_y}}})
 $$
 
 
 
-#### Swap Y to X:
+### Swap Y to X:
 $$
 \Delta x = R_x (1 - e^{-U_x}) = R_x (1 - e^{-\frac{\Delta y 10^{d_x - d_y} }{R_x P}})
 $$
@@ -250,18 +247,24 @@ $$
 
 In that what is the value of $z$ such that $F(z) = 0$.
 
-Since we know that: $z = \frac{\Delta y}{R_y}$ and we know that the upper bound for $\Delta y = \Delta x \cdot p_o \cdot \frac{10^{d_y}}{10^{dx}}$.
+#### The inital guess 
+
+The variable $k$ can be interpreted as the trade utilization, if the trade was executed at the oracle price. In the same fashion, we can interpret $z$ as the actual utilization of the trade, given the actual slippage computed by the pool. Therefore, we can use $k$ as the initial guess for $z$. We know that the actual utilization of the trade must be lower than the utilization given by the oracle, because that's the whole point of having slippage. We know that $z < k$, and that therefore $k$ will act as an upper bound for the value of $z$.
+
+### The inital guess - proof
+
+Since we know that: $z = \frac{\Delta y}{R_y}$ and we know that the upper bound for $\Delta y = \Delta x \cdot P \cdot \frac{10^{d_y}}{10^{dx}}$.
 
 This is because of the equality holds for a swap at the oracle price:
 $$
 \frac{\Delta y}{\Delta x} \cdot \frac{10^{d_x}}{10^{d_y}} = \frac{Y_o}{X_o}
 $$
 
-where $P_o =  \frac{Y_o}{X_o}$ is the oracle price, which relates a quantity of $Y$ with a quantity of $X$.
+where $P =  \frac{Y_o}{X_o}$ is the oracle price, which relates a quantity of $Y$ with a quantity of $X$.
 
 In other words, since the swap incurs slippage, the actual delta Y must be lower than the delta Y otherwise received by the oracle price:
 
-$$\Delta y < \Delta x \cdot p_o \cdot \frac{10^{d_y}}{10^{dx}}$$
+$$\Delta y < \Delta x \cdot P \cdot \frac{10^{d_y}}{10^{dx}}$$
 
 
 Both $z$ and $\Delta Y$ are positively related. Therefore, we want to find the upper bound of $z$ such that:
@@ -271,13 +274,13 @@ z_U = \frac {\Delta y_o}{R_y}
 $$
 
 $$
-z_U = \frac{\Delta x \cdot p_o}{R_y} \cdot \frac{10^{d_y}}{10^{d_x}}
+z_U = \frac{\Delta x \cdot P}{R_y} \cdot \frac{10^{d_y}}{10^{d_x}} = k
 $$
 
 It follows the constraint:
 
 $$
-z < z_U
+z < k
 $$
 
 This constraint is useful as it serves as the initial guess used in the numerical approximation needed to solve the equation (since its transcendental, we cannot solve it analytically).
@@ -310,18 +313,24 @@ $$
 
 In that what is the value of $z$ such that $F(z) = 0$.
 
-Since we know that: $z = \frac{\Delta x}{R_x}$ and we know that the upper bound for $\Delta x = \frac{\Delta y}{p_o} \cdot \frac{10^{d_x}}{10^{dy}}$.
+#### The inital guess 
+
+The variable $k$ can be interpreted as the trade utilization, if the trade was executed at the oracle price. In the same fashion, we can interpret $z$ as the actual utilization of the trade, given the actual slippage computed by the pool. Therefore, we can use $k$ as the initial guess for $z$. We know that the actual utilization of the trade must be lower than the utilization given by the oracle, because that's the whole point of having slippage. We know that $z < k$, and that therefore $k$ will act as an upper bound for the value of $z$.
+
+### The inital guess - proof
+
+Since we know that: $z = \frac{\Delta x}{R_x}$ and we know that the upper bound for $\Delta x = \frac{\Delta y}{P} \cdot \frac{10^{d_x}}{10^{dy}}$.
 
 This is because of the equality holds for a swap at the oracle price:
 $$
 \frac{\Delta x}{\Delta y} \cdot \frac{10^{d_y}}{10^{d_x}} = \frac{X_o}{Y_o}
 $$
 
-where $P_o =  \frac{Y_o}{X_o}$ is the oracle price, which relates a quantity of $Y$ with a quantity of $X$.
+where $P =  \frac{Y_o}{X_o}$ is the oracle price, which relates a quantity of $Y$ with a quantity of $X$.
 
 In other words, since the swap incurs slippage, the actual delta Y must be lower than the delta Y otherwise received by the oracle price:
 
-$$\Delta x < \frac{\Delta y}{p_o} \cdot \frac{10^{d_x}}{10^{d_y}}$$
+$$\Delta x < \frac{\Delta y}{P} \cdot \frac{10^{d_x}}{10^{d_y}}$$
 
 
 Both $z$ and $\Delta Y$ are positively related. Therefore, we want to find the upper bound of $z$ such that:
@@ -331,13 +340,13 @@ z_U = \frac {\Delta x_o}{R_x}
 $$
 
 $$
-z_U = \frac{\Delta y}{R_x \cdot p_o} \cdot \frac{10^{d_x}}{10^{d_y}}
+z_U = \frac{\Delta y}{R_x \cdot P} \cdot \frac{10^{d_x}}{10^{d_y}} = k
 $$
 
 It follows the constraint:
 
 $$
-z < z_U
+z < k
 $$
 
 This constraint is useful as it serves as the initial guess used in the numerical approximation needed to solve the equation (since its transcendental, we cannot solve it analytically).
