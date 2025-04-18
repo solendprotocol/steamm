@@ -2,7 +2,6 @@
 module steamm::stable;
 
 use oracles::oracles::{OracleRegistry, OraclePriceUpdate};
-use oracles::oracle_decimal::{OracleDecimal};
 use steamm::pool::{Self, Pool, SwapResult};
 use steamm::quote::SwapQuote;
 use steamm::registry::Registry;

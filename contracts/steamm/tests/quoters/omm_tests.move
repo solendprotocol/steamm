@@ -1,12 +1,12 @@
 #[test_only]
-module steamm::omm_tests;
+module steamm::naive_omm_tests;
 
 use oracles::oracles::{Self, OracleRegistry};
 use steamm::b_test_sui::B_TEST_SUI;
 use steamm::b_test_usdc::B_TEST_USDC;
 use steamm::bank::{Bank};
 use steamm::lp_usdc_sui::LP_USDC_SUI;
-use steamm::omm::{Self, OracleQuoter};
+use steamm::dummy_omm::{Self, OracleQuoter};
 use steamm::pool::{Pool};
 use steamm::test_utils::{base_setup};
 use sui::clock::{Self};
@@ -70,7 +70,7 @@ fun setup(
         scenario.ctx(),
     );
 
-    let pool = omm::new<
+    let pool = dummy_omm::new<
         LENDING_MARKET,
         TEST_USDC,
         TEST_SUI,
@@ -148,7 +148,7 @@ fun test_omm_basic() {
         &clock,
     );
 
-    let _swap_result = omm::swap(
+    let _swap_result = dummy_omm::swap(
         &mut pool,
         &bank_a,
         &bank_b,
@@ -182,7 +182,7 @@ fun test_omm_basic() {
     );
 
     let old_coin_b_value = coin_b.value();
-    let _swap_result = omm::swap(
+    let _swap_result = dummy_omm::swap(
         &mut pool,
         &bank_a,
         &bank_b,
@@ -216,7 +216,7 @@ fun test_omm_basic() {
 }
 
 #[test]
-#[expected_failure(abort_code = steamm::omm::EInvalidOracleIndex)]
+#[expected_failure(abort_code = steamm::dummy_omm::EInvalidOracleIndex)]
 fun test_omm_fail_wrong_oracle() {
     let mut scenario = test_scenario::begin(@0x26);
 
@@ -258,7 +258,7 @@ fun test_omm_fail_wrong_oracle() {
     );
 
     // oracle updates are switched
-    let _swap_result = omm::swap(
+    let _swap_result = dummy_omm::swap(
         &mut pool,
         &bank_a,
         &bank_b,
@@ -289,7 +289,7 @@ fun test_omm_fail_wrong_oracle() {
 }
 
 #[test]
-#[expected_failure(abort_code = steamm::omm::EInvalidBankType)]
+#[expected_failure(abort_code = steamm::dummy_omm::EInvalidBankType)]
 fun test_omm_fail_not_a_btoken() {
     let mut scenario = test_scenario::begin(@0x26);
 
@@ -333,7 +333,7 @@ fun test_omm_fail_not_a_btoken() {
         scenario.ctx(),
     );
 
-    let pool = omm::new<
+    let pool = dummy_omm::new<
         LENDING_MARKET,
         TEST_USDC,
         TEST_SUI,
@@ -418,7 +418,7 @@ fun test_omm_quote_swap_insufficient_liquidity() {
 
     // Try to quote a swap with an amount much larger than pool liquidity
     // Attempting to swap 1000 USDC when pool only has 100
-    let quote = omm::quote_swap(
+    let quote = dummy_omm::quote_swap(
         &pool,
         &bank_a,
         &bank_b,
@@ -450,7 +450,7 @@ fun test_omm_quote_swap_insufficient_liquidity() {
     );
 
     // Check the opposite direction as well - trying to swap more SUI than available
-    let quote = omm::quote_swap(
+    let quote = dummy_omm::quote_swap(
         &pool,
         &bank_a,
         &bank_b,
@@ -526,7 +526,7 @@ fun test_omm_swap_insufficient_liquidity() {
 
     // This should fail with EInsufficientLiquidity (or similar error)
     // as we're trying to swap 1000 USDC when pool only has 100 USDC
-    let _swap_result = omm::swap(
+    let _swap_result = dummy_omm::swap(
         &mut pool,
         &bank_a,
         &bank_b,

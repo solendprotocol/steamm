@@ -50,3 +50,18 @@ public(package) fun oracle_decimal_to_decimal(price: OracleDecimal): Decimal {
         decimal::from_u128(price.base()).mul(decimal::from(10u64.pow(price.expo() as u8)))
     }
 }
+
+// ===== Tests =====
+
+#[test]
+fun test_oracle_decimal_to_decimal() {
+    use sui::test_utils::assert_eq;
+    use oracles::oracle_decimal::{Self};
+
+    let price = oracle_decimal_to_decimal(oracle_decimal::new(140, 4, false));
+    assert_eq(price, decimal::from(1_400_000));
+
+    let price = oracle_decimal_to_decimal(oracle_decimal::new(140, 3, true));
+    assert_eq(price, decimal::from(140).div(decimal::from(1000)));
+}
+
