@@ -2,14 +2,15 @@
 
 [move]
 version = 3
-manifest_digest = "4743DBE64797DC347403F3D8A2EFC5ADA00CA08A37E6C7677565488881C067CB"
-deps_digest = "397E6A9F7A624706DBDFEE056CE88391A15876868FD18A88504DA74EB458D697"
+manifest_digest = "80561D5EBA05607E82B31041442C945646ACB7AB55E57DB966A55FEF63334ADC"
+deps_digest = "52B406A7A21811BEF51751CF88DA0E76DAEFFEAC888D4F4060B1A72BBE7D8D35"
 dependencies = [
   { id = "Bridge", name = "Bridge" },
   { id = "MoveStdlib", name = "MoveStdlib" },
   { id = "Sui", name = "Sui" },
   { id = "SuiSystem", name = "SuiSystem" },
   { id = "steamm", name = "steamm" },
+  { id = "suilend", name = "suilend" },
 ]
 
 [[move.package]]
@@ -79,7 +80,7 @@ dependencies = [
 
 [[move.package]]
 id = "oracles"
-source = { git = "https://github.com/solendprotocol/suilend.git", rev = "hotfix-sui-version", subdir = "contracts/oracles" }
+source = { git = "https://github.com/solendprotocol/suilend.git", rev = "beta-v5", subdir = "contracts/oracles" }
 
 dependencies = [
   { id = "Bridge", name = "Bridge" },
@@ -92,7 +93,7 @@ dependencies = [
 
 [[move.package]]
 id = "sprungsui"
-source = { git = "https://github.com/solendprotocol/suilend.git", rev = "hotfix-sui-version", subdir = "contracts/sprungsui" }
+source = { git = "https://github.com/solendprotocol/suilend.git", rev = "beta-v5", subdir = "contracts/sprungsui" }
 
 dependencies = [
   { id = "Bridge", name = "Bridge" },
@@ -116,7 +117,7 @@ dependencies = [
 
 [[move.package]]
 id = "suilend"
-source = { git = "https://github.com/solendprotocol/suilend.git", rev = "hotfix-sui-version", subdir = "contracts/suilend" }
+source = { git = "https://github.com/solendprotocol/suilend.git", rev = "beta-v5", subdir = "contracts/suilend" }
 
 dependencies = [
   { id = "Bridge", name = "Bridge" },
@@ -129,6 +130,6 @@ dependencies = [
 ]
 
 [move.toolchain-version]
-compiler-version = "1.46.1"
+compiler-version = "1.47.0"
 edition = "2024.beta"
 flavor = "sui"
