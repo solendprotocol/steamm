@@ -622,7 +622,7 @@ public(package) fun multiply_divide(
             if (vector::length(denominators) == 0) {
                 abort EMultiplicationOverflow
             };
-            // Pop the last (largest) denominator
+            // Pop the last (smallest) denominator
             let denominator = vector::pop_back(denominators);
             let mut division_opt = checked_div(result, denominator);
             if (option::is_some(&division_opt)) {
@@ -634,10 +634,35 @@ public(package) fun multiply_divide(
         }
     };
 
-    // Process remaining denominators
+    // Process remaining denominators with multiply-and-flush
+    let mut denom_product = one();
+    if (vector::length(denominators) > 0) {
+        // Initialize with the first denominator
+        denom_product = vector::pop_back(denominators);
+    };
+
     while (vector::length(denominators) > 0) {
         let denominator = vector::pop_back(denominators);
-        let mut division_opt = checked_div(result, denominator);
+        let mut mul_opt = checked_mul(denom_product, denominator);
+        if (option::is_some(&mul_opt)) {
+            // Multiplication successful, update denom_product
+            denom_product = option::extract(&mut mul_opt);
+        } else {
+            // Overflow detected, flush by dividing result by current denom_product
+            let mut division_opt = checked_div(result, denom_product);
+            if (option::is_some(&division_opt)) {
+                result = option::extract(&mut division_opt);
+            } else {
+                abort EFailedDivision
+            };
+            // Start new product with the current denominator
+            denom_product = denominator;
+        }
+    };
+
+    // Final division if denom_product is not 1.0
+    if (denom_product != one()) {
+        let mut division_opt = checked_div(result, denom_product);
         if (option::is_some(&division_opt)) {
             result = option::extract(&mut division_opt);
         } else {
